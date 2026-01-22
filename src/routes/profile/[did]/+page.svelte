@@ -62,6 +62,27 @@
 </script>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto">
+  <a
+    href="/"
+    class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 mb-6 transition-colors"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      ><line x1="19" y1="12" x2="5" y2="12" /><polyline
+        points="12 19 5 12 12 5"
+      /></svg
+    >
+    Back to Home
+  </a>
+
   {#if loading}
     <div class="flex justify-center mt-20">
       <Loader2 class="animate-spin text-green-500" />
