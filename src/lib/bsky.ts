@@ -109,13 +109,15 @@ export async function getPlaylist(did: string, rkey: string) {
   return res.data;
 }
 
-export async function addToPlaylist(playlistUri: string, track: Track, currentPlaylistRecordValue: any) {
+export async function addToPlaylist(playlistUri: string, track: Track, currentPlaylistRecordWrapper: any) {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
 
-  // Simplified update (non-atomic)
-  const newTracks = [...(currentPlaylistRecordValue.tracks || []), {
+  // currentPlaylistRecordWrapper is { uri, cid, value: { name, tracks, ... } }
+  const content = currentPlaylistRecordWrapper.value;
+
+  const newTracks = [...(content.tracks || []), {
     track: track.title,
     artist: track.artist,
     album: track.album,
@@ -132,8 +134,8 @@ export async function addToPlaylist(playlistUri: string, track: Track, currentPl
     collection: NSID_PLAYLIST,
     rkey: rkey,
     record: {
-      ...currentPlaylistRecordValue,
-      tracks: newTracks
+      ...content, // Spread the original CONTENT (name, etc)
+      tracks: newTracks // Override tracks
     }
   });
 }

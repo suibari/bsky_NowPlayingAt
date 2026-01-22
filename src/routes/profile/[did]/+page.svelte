@@ -1,12 +1,15 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { agent } from "$lib/stores";
-  import { getHistory, getPlaylists } from "$lib/bsky";
-  import { Loader2, Music, Disc } from "lucide-svelte";
+  import { agent, userProfile } from "$lib/stores";
+  import { getHistory, getPlaylists, createPlaylist } from "$lib/bsky";
+  import { Loader2, Music, Disc, Plus } from "lucide-svelte";
 
   // $page.params is reactive but derived, so we react to it.
   $: did = $page.params.did;
+
+  // Check ownership
+  $: isOwner = $userProfile?.did === did;
 
   let profile: any = null;
   let history: any[] = [];
@@ -41,6 +44,20 @@
       console.error("Failed to load profile data", e);
     }
     loading = false;
+  }
+
+  async function handleCreatePlaylist() {
+    const name = prompt("Enter playlist name:");
+    if (!name) return;
+
+    try {
+      await createPlaylist(name);
+      // Refresh playlists
+      playlists = await getPlaylists(did!);
+      alert("Playlist created!");
+    } catch (e) {
+      alert("Failed to create playlist: " + e);
+    }
   }
 </script>
 
@@ -94,6 +111,22 @@
     <div>
       {#if activeTab === "playlists"}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Create New Card (Owner Only) -->
+          {#if isOwner}
+            <button
+              on:click={handleCreatePlaylist}
+              class="flex flex-col items-center justify-center p-4 rounded-xl border-2 border-dashed border-gray-800 hover:border-green-500 hover:bg-gray-900 transition-all group h-full min-h-[120px]"
+            >
+              <Plus
+                class="text-gray-500 group-hover:text-green-500 mb-2 transition-colors"
+                size={32}
+              />
+              <span class="text-gray-500 group-hover:text-white font-medium"
+                >Create New Playlist</span
+              >
+            </button>
+          {/if}
+
           {#each playlists as pl}
             <a
               href={`/playlist/${did}/${pl.uri.split("/").pop()}`}
@@ -116,7 +149,7 @@
               </div>
             </a>
           {/each}
-          {#if playlists.length === 0}
+          {#if playlists.length === 0 && !isOwner}
             <p class="text-gray-500 italic">No playlists found.</p>
           {/if}
         </div>
