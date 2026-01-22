@@ -1,1 +1,38 @@
 @import 'tailwindcss';
+
+:root {
+  --color-accent: #1db954; /* Green-ish */
+  --color-bg: #000000;
+  --color-text: #ffffff;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Inter', sans-serif; /* Setup in <head> if needed, or use default sans */
+  @apply antialiased;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #000; 
+}
+::-webkit-scrollbar-thumb {
+  background: #333; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent); 
+}

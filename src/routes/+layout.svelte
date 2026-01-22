@@ -1,9 +1,58 @@
 <script lang="ts">
-	import './layout.css';
-	import favicon from '$lib/assets/favicon.svg';
+	import "../routes/layout.css";
+	import { onMount } from "svelte";
+	import { getClient, publicAgent } from "$lib/atproto";
+	import { agent, userProfile, authState } from "$lib/stores";
+	import { Agent } from "@atproto/api";
 
-	let { children } = $props();
+	let mounted = false;
+
+	onMount(async () => {
+		mounted = true;
+		const client = getClient();
+		if (!client) return;
+
+		try {
+			// 1. Init Client
+			const res = await client.init();
+
+			if (res && res.session) {
+				const { session } = res;
+				// 2. Create Agent with session
+				const newAgent = new Agent(session);
+				agent.set(newAgent);
+
+				// 3. Fetch Profile
+				const profileRes = await newAgent.getProfile({ actor: session.did });
+				userProfile.set(profileRes.data);
+
+				authState.set({ isLoading: false, error: null, isAuthenticated: true });
+				console.log("Authenticated as:", session.did);
+			} else {
+				authState.set({
+					isLoading: false,
+					error: null,
+					isAuthenticated: false,
+				});
+				console.log("Not authenticated");
+			}
+		} catch (e) {
+			console.error("Auth init error:", e);
+			authState.set({
+				isLoading: false,
+				error: String(e),
+				isAuthenticated: false,
+			});
+		}
+	});
+
+	$: if (typeof window !== "undefined" && mounted && $authState.isLoading) {
+		// Optional: loading spinner logic
+	}
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
-{@render children()}
+<div class="min-h-screen flex flex-col">
+	<main class="flex-grow">
+		<slot />
+	</main>
+</div>
