@@ -2,6 +2,7 @@
 	import "../routes/layout.css";
 	import { onMount } from "svelte";
 	import { getClient, publicAgent } from "$lib/atproto";
+	import { ensureConfig } from "$lib/bsky";
 	import { agent, userProfile, authState } from "$lib/stores";
 	import { Agent } from "@atproto/api";
 
@@ -28,6 +29,9 @@
 
 				authState.set({ isLoading: false, error: null, isAuthenticated: true });
 				console.log("Authenticated as:", session.did);
+
+				// 4. Ensure Config & Favorites Playlist
+				ensureConfig(); // Fire and forget, or await if critical for UI
 			} else {
 				authState.set({
 					isLoading: false,
