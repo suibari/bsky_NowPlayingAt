@@ -22,6 +22,7 @@ export async function createHistoryRecord(track: Track) {
     artist: track.artist,
     album: track.album,
     trackUri: track.trackUri,
+    img: track.artworkUrl,
     links: {
       spotify: track.spotifyUrl,
       youtube: track.youtubeMusicUrl

@@ -2,8 +2,16 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { agent, userProfile } from "$lib/stores";
-  import { getHistory, getPlaylists, createPlaylist } from "$lib/bsky";
-  import { Loader2, Music, Disc, Plus } from "lucide-svelte";
+  import {
+    getHistory,
+    getPlaylists,
+    createPlaylist,
+    createReactionRecord,
+    addToPlaylist,
+  } from "$lib/bsky";
+  import { Loader2, Music, Disc, Plus, X } from "lucide-svelte";
+  import TrackCard from "$lib/components/TrackCard.svelte";
+  import type { Track } from "$lib/music";
 
   // $page.params is reactive but derived, so we react to it.
   $: did = $page.params.did;
@@ -16,6 +24,31 @@
   let playlists: any[] = [];
   let loading = true;
   let activeTab = "playlists"; // 'playlists' | 'history'
+
+  // Modal State (Reused from Dashboard for consistency if user wants to react inside profile)
+  let showReactionModal = false;
+  let targetTrackForReaction: Track | null = null;
+  const popularEmojis = [
+    "🔥",
+    "❤️",
+    "🥺",
+    "🎧",
+    "🕺",
+    "🤘",
+    "🎹",
+    "✨",
+    "💯",
+    "😭",
+    "😴",
+    "🍺",
+    "💿",
+    "🚀",
+  ];
+
+  // Playlist Modal State (For 'Add to Playlist' from History)
+  let showPlaylistModal = false;
+  let targetTrackForPlaylist: Track | null = null;
+  let myPlaylists: any[] = [];
 
   onMount(async () => {
     // loadData handled by reactivity below
@@ -57,6 +90,65 @@
       alert("Playlist created!");
     } catch (e) {
       alert("Failed to create playlist: " + e);
+    }
+  }
+
+  // --- Handlers for TrackCard ---
+
+  function mapHistoryToTrack(item: any): Track {
+    const val = item.value;
+    return {
+      id: val.trackUri, // Using URI as ID since we store it
+      title: val.track,
+      artist: val.artist,
+      album: val.album,
+      artworkUrl: val.img || "", // Fallback handled by Card
+      trackUri: val.trackUri,
+      spotifyUrl: val.links?.spotify,
+      youtubeMusicUrl: val.links?.youtube,
+    };
+  }
+
+  function openReactionModal(track: Track) {
+    targetTrackForReaction = track;
+    showReactionModal = true;
+  }
+
+  async function handleReaction(emoji: string) {
+    if (!targetTrackForReaction) return;
+    try {
+      await createReactionRecord(targetTrackForReaction, emoji);
+      alert(`Reacted with ${emoji}!`);
+      showReactionModal = false;
+    } catch (e) {
+      alert("Failed to react: " + e);
+    }
+  }
+
+  // Playlist Add Logic (from History)
+  async function openPlaylistModal(track: Track) {
+    if (!$userProfile) return;
+    targetTrackForPlaylist = track;
+    showPlaylistModal = true;
+    try {
+      if (isOwner && playlists.length > 0) {
+        myPlaylists = playlists; // Reuse loaded if owner
+      } else {
+        myPlaylists = await getPlaylists($userProfile.did);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleAddToPlaylist(playlist: any) {
+    if (!targetTrackForPlaylist) return;
+    try {
+      await addToPlaylist(playlist.uri, targetTrackForPlaylist, playlist);
+      alert(`Added to ${playlist.value.name}!`);
+      showPlaylistModal = false;
+    } catch (e) {
+      alert("Failed to add: " + e);
     }
   }
 </script>
@@ -175,30 +267,99 @@
           {/if}
         </div>
       {:else}
-        <div class="space-y-2">
+        <!-- HISTORY LIST -->
+        <div class="space-y-4">
           {#each history as item}
-            <div
-              class="flex items-center gap-3 bg-gray-900/50 p-3 rounded-lg border border-gray-800/50"
-            >
-              <div
-                class="bg-gray-800 w-10 h-10 rounded flex items-center justify-center text-gray-500"
-              >
-                <Music size={16} />
-              </div>
-              <div>
-                <p class="text-sm font-bold text-white">{item.value.track}</p>
-                <p class="text-xs text-gray-400">{item.value.artist}</p>
-              </div>
-              <div class="ml-auto text-xs text-gray-600">
-                {new Date(item.value.postedAt).toLocaleDateString()}
-              </div>
-            </div>
+            <TrackCard
+              track={mapHistoryToTrack(item)}
+              isOwner={false}
+              on:reaction={(e) => openReactionModal(e.detail)}
+              on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+            />
           {/each}
           {#if history.length === 0}
             <p class="text-gray-500 italic">No history yet.</p>
           {/if}
         </div>
       {/if}
+    </div>
+  {/if}
+
+  <!-- Reaction Modal -->
+  {#if showReactionModal}
+    <div
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      on:click|self={() => (showReactionModal = false)}
+      role="button"
+      tabindex="0"
+      on:keydown={(e) => e.key === "Escape" && (showReactionModal = false)}
+    >
+      <div
+        class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-2xl"
+      >
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-bold text-white">Pick a Vibe</h2>
+          <button
+            on:click={() => (showReactionModal = false)}
+            class="text-gray-400 hover:text-white"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div class="grid grid-cols-5 gap-3 mb-6">
+          {#each popularEmojis as emoji}
+            <button
+              on:click={() => handleReaction(emoji)}
+              class="text-2xl hover:scale-125 transition-transform p-2 hover:bg-white/10 rounded-lg"
+            >
+              {emoji}
+            </button>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Playlist Modal -->
+  {#if showPlaylistModal}
+    <div
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      on:click|self={() => (showPlaylistModal = false)}
+      role="button"
+      tabindex="0"
+      on:keydown={(e) => e.key === "Escape" && (showPlaylistModal = false)}
+    >
+      <div
+        class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
+      >
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-white">Add to Playlist</h2>
+          <button
+            on:click={() => (showPlaylistModal = false)}
+            class="text-gray-400 hover:text-white"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        {#if myPlaylists.length > 0}
+          <div class="space-y-2 max-h-60 overflow-y-auto">
+            {#each myPlaylists as pl}
+              <button
+                on:click={() => handleAddToPlaylist(pl)}
+                class="w-full flex items-center justify-between bg-gray-800 p-3 rounded-lg hover:bg-gray-700 transition-colors text-left"
+              >
+                <span class="font-medium text-white">{pl.value.name}</span>
+                <span class="text-xs text-gray-500"
+                  >{pl.value.tracks?.length || 0} songs</span
+                >
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <div class="text-center text-gray-500 py-6">No playlists found.</div>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>

@@ -8,14 +8,18 @@
     MessageSquarePlus,
     Disc,
     Loader2,
+    GripVertical,
+    Trash2,
   } from "lucide-svelte";
   import { getBacklinks } from "$lib/constellation";
   import { resolveLinks } from "$lib/odesli";
 
-  // Custom Icon for YT Music if needed, or re-use others.
-  // Lucide doesn't have specific yt-music, using 'Music' or similar.
-
   export let track: Track;
+  export let isOwner: boolean = false;
+  export let showDelete: boolean = false;
+  export let showDragHandle: boolean = false;
+  export let isDragging: boolean = false; // Styling state
+  export let index: number = 0; // For drag reference
 
   const dispatch = createEventDispatcher();
 
@@ -32,9 +36,8 @@
   let loadingReactions = false;
   let loadedReactions = false;
 
-  // Link Resolution State
+  // Link Resolution
   let resolvingLink: "spotify" | "ytmusic" | null = null;
-  // Cache resolved links locally to avoid re-fetching
   let cachedSpotify: string | undefined = track.spotifyUrl;
   let cachedYtMusic: string | undefined = track.youtubeMusicUrl;
 
@@ -59,7 +62,7 @@
         }));
       loadedReactions = true;
     } catch (e) {
-      console.error("Failed to load reactions", e);
+      // console.error("Failed to load reactions", e);
     }
     loadingReactions = false;
   }
@@ -88,7 +91,6 @@
       if (targetUrl) {
         window.open(targetUrl, "_blank");
       } else {
-        // Fallback to search if Odesli fails
         const query = encodeURIComponent(`${track.artist} ${track.title}`);
         if (platform === "spotify") {
           window.open(`https://open.spotify.com/search/${query}`, "_blank");
@@ -113,25 +115,51 @@
   function handleReaction() {
     dispatch("reaction", track);
   }
+
+  function handleDelete() {
+    dispatch("delete", index);
+  }
 </script>
 
 <!-- Card Container -->
 <div
-  class="bg-gray-900 border border-gray-800 rounded-xl p-4 transition-all duration-300 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 cursor-pointer group"
+  class="bg-gray-900 border border-gray-800 rounded-xl p-4 transition-all duration-300 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 group relative"
   class:ring-2={expanded}
   class:ring-green-500={expanded}
-  on:click={toggleExpand}
-  on:keydown={(e) => e.key === "Enter" && toggleExpand()}
-  role="button"
-  tabindex="0"
+  class:opacity-50={isDragging}
+  class:cursor-move={showDragHandle}
+  draggable={showDragHandle}
+  on:dragstart
+  on:dragover
+  on:drop
+  role="listitem"
 >
   <div class="flex gap-4 items-center">
+    <!-- Drag Handle -->
+    {#if showDragHandle}
+      <div
+        class="text-gray-600 cursor-grab active:cursor-grabbing p-1 -ml-2"
+        on:mousedown|stopPropagation
+      >
+        <GripVertical size={20} />
+      </div>
+    {/if}
+
     <!-- Artwork -->
-    <div class="relative w-16 h-16 flex-shrink-0">
+    <div
+      class="relative w-16 h-16 flex-shrink-0 cursor-pointer"
+      on:click={toggleExpand}
+      on:keypress={(e) => e.key === "Enter" && toggleExpand()}
+      role="button"
+      tabindex="0"
+    >
       <img
-        src={track.artworkUrl}
+        src={track.artworkUrl || "/placeholder_art.png"}
         alt={track.title}
-        class="w-full h-full object-cover rounded-md shadow-md"
+        class="w-full h-full object-cover rounded-md shadow-md bg-gray-800"
+        on:error={(e) =>
+          ((e.currentTarget as HTMLImageElement).src =
+            "https://placehold.co/100x100?text=No+Art")}
       />
       <div
         class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md"
@@ -141,17 +169,21 @@
     </div>
 
     <!-- Meta -->
-    <div class="flex-grow min-w-0">
+    <div
+      class="flex-grow min-w-0 flex flex-col justify-center h-16 cursor-pointer"
+      on:click={toggleExpand}
+    >
       <h3 class="font-bold text-white truncate text-lg leading-tight">
         {track.title}
       </h3>
       <p class="text-gray-400 text-sm truncate">{track.artist}</p>
-      <p class="text-gray-500 text-xs truncate">{track.album}</p>
+      {#if track.album}
+        <p class="text-gray-500 text-xs truncate">{track.album}</p>
+      {/if}
     </div>
 
     <!-- Quick Actions (Direct Playback) -->
-    <div class="flex gap-2" on:click|stopPropagation={() => {}}>
-      <!-- Spotify -->
+    <div class="flex gap-2 items-center" on:click|stopPropagation={() => {}}>
       <button
         on:click={() => resolveAndOpen("spotify")}
         class="text-gray-400 hover:text-green-500 transition-colors p-1"
@@ -165,7 +197,6 @@
         {/if}
       </button>
 
-      <!-- Youtube Music -->
       <button
         on:click={() => resolveAndOpen("ytmusic")}
         class="text-gray-400 hover:text-red-500 transition-colors p-1"
@@ -175,7 +206,6 @@
         {#if resolvingLink === "ytmusic"}
           <Loader2 size={20} class="animate-spin" />
         {:else}
-          <!-- Custom Circle Play icon for YTM-ish look -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="20"
@@ -192,6 +222,17 @@
           >
         {/if}
       </button>
+
+      <!-- Delete Button (Owner) -->
+      {#if showDelete}
+        <button
+          on:click={handleDelete}
+          class="text-gray-600 hover:text-red-500 transition-colors p-1 ml-1"
+          title="Remove Track"
+        >
+          <Trash2 size={20} />
+        </button>
+      {/if}
     </div>
   </div>
 
@@ -208,10 +249,10 @@
             <Loader2 size={12} class="animate-spin" /> Loading reactions...
           </div>
         {:else if reactions.length > 0}
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
             {#each reactions as rx}
               <div
-                class="flex items-center gap-1 bg-gray-800/80 rounded-full px-2 py-1"
+                class="flex items-center gap-1 bg-gray-800/80 rounded-full px-2 py-1 border border-gray-700"
                 title={rx.handle}
               >
                 {#if rx.avatar}
