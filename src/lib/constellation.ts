@@ -1,13 +1,4 @@
-export interface ConstellationRecord {
-  did: string;
-  collection: string;
-  rkey: string;
-  uri?: string;
-  cid?: string;
-  value?: unknown; // Hydrated record value
-  author?: { did: string; handle?: string; avatar?: string }; // For frames/links format
-  [key: string]: unknown;
-}
+import { type ConstellationRecord, REACTION_SOURCE } from '$lib/schema';
 
 export async function getBacklinks(
   subject: string,
@@ -17,22 +8,16 @@ export async function getBacklinks(
   const allRecords: ConstellationRecord[] = [];
   let cursor: string | undefined;
 
-  // Encode subject
   try {
     do {
-      // Manual query string construction to avoid unwanted encoding of at-uri
-      let queryString = `subject=${encodeURIComponent(subject)}&limit=${limit}`;
+      const params = new URLSearchParams();
+      params.set('subject', subject);
+      params.set('limit', limit.toString());
+      if (source) params.set('source', source);
+      if (cursor) params.set('cursor', cursor);
 
-      if (source) {
-        queryString += `&source=${source}`;
-      }
+      const url = `https://constellation.microcosm.blue/xrpc/blue.microcosm.links.getBacklinks?${params.toString()}`;
 
-      if (cursor) {
-        queryString += `&cursor=${cursor}`;
-      }
-
-      const url = `https://constellation.microcosm.blue/xrpc/blue.microcosm.links.getBacklinks?${queryString}`;
-      
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();

@@ -2,10 +2,10 @@ import { get } from 'svelte/store';
 import { agent, userProfile } from '$lib/stores';
 import type { Track } from '$lib/music';
 
-const NSID_HISTORY = 'com.suibari.nowplayingat.history';
-const NSID_CONFIG = 'com.suibari.nowplayingat.config';
-const NSID_REACTION = 'com.suibari.nowplayingat.reaction';
-const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
+export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
+export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
+export const NSID_REACTION = 'com.suibari.nowplayingat.reaction';
+export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 // --- HISTORY ---
 
@@ -200,4 +200,44 @@ export async function ensureConfig() {
   } catch (e) {
     console.warn("Failed to check/create config:", e);
   }
+}
+// --- HYDRATION ---
+
+import { getPdsEndpoint } from '$lib/atproto';
+import { type ConstellationRecord, type ReactionRecord } from '$lib/schema';
+
+export async function hydrateReactions(records: ConstellationRecord[]): Promise<ReactionRecord[]> {
+  const results: ReactionRecord[] = [];
+  const pdsCache = new Map<string, string | null>();
+
+  // Process in parallel
+  const promises = records.map(async (rec) => {
+    try {
+      let pds = pdsCache.get(rec.did);
+      // If not in cache, fetch and cache
+      if (pds === undefined) {
+        pds = await getPdsEndpoint(rec.did);
+        pdsCache.set(rec.did, pds);
+      }
+
+      if (!pds) return;
+
+      // Direct XRPC fetch to PDS
+      const url = `${pds}/xrpc/com.atproto.repo.getRecord?repo=${rec.did}&collection=${rec.collection}&rkey=${rec.rkey}`;
+      const res = await fetch(url);
+
+      if (res.ok) {
+        const json = await res.json();
+        // json.value is the record
+        if (json.value) {
+          results.push(json.value as ReactionRecord);
+        }
+      }
+    } catch (e) {
+      console.warn(`Failed to hydrate reaction for ${rec.did}:`, e);
+    }
+  });
+
+  await Promise.all(promises);
+  return results;
 }

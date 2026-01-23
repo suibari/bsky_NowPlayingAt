@@ -13,6 +13,8 @@
   } from "lucide-svelte";
   import { getBacklinks } from "$lib/constellation";
   import { resolveLinks } from "$lib/odesli";
+  import { REACTION_SOURCE } from "$lib/schema";
+  import { hydrateReactions } from "$lib/bsky";
 
   export let track: Track;
   export let isOwner: boolean = false;
@@ -26,13 +28,12 @@
   let expanded = false;
   let postToBsky = false;
 
-  // Reaction State
-  interface ReactionDisplay {
+  // Reaction State (Grouped)
+  interface ReactionGroup {
     emoji: string;
-    avatar?: string;
-    handle: string;
+    count: number;
   }
-  let reactions: ReactionDisplay[] = [];
+  let reactions: ReactionGroup[] = [];
   let loadingReactions = false;
   let loadedReactions = false;
 
@@ -52,14 +53,23 @@
     if (!track.trackUri) return;
     loadingReactions = true;
     try {
-      const res = await getBacklinks(track.trackUri, undefined, 50);
-      reactions = res
-        .filter((r) => (r.value as any)?.emoji)
-        .map((r) => ({
-          emoji: (r.value as any).emoji,
-          avatar: r.author?.avatar,
-          handle: r.author?.handle || "Unknown",
-        }));
+      const res = await getBacklinks(track.trackUri, REACTION_SOURCE);
+
+      const records = await hydrateReactions(res);
+
+      const counts: Record<string, number> = {};
+
+      for (const r of records) {
+        if (r.emoji) {
+          counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+        }
+      }
+
+      reactions = Object.entries(counts).map(([emoji, count]) => ({
+        emoji,
+        count,
+      }));
+
       loadedReactions = true;
     } catch (e) {
       // console.error("Failed to load reactions", e);
@@ -252,17 +262,11 @@
           <div class="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
             {#each reactions as rx}
               <div
-                class="flex items-center gap-1 bg-gray-800/80 rounded-full px-2 py-1 border border-gray-700"
-                title={rx.handle}
+                class="flex items-center gap-1 bg-gray-800/80 rounded-full px-3 py-1 border border-gray-700 font-bold text-white shadow-sm"
+                title={`${rx.count} reactions`}
               >
-                {#if rx.avatar}
-                  <img
-                    src={rx.avatar}
-                    alt={rx.handle}
-                    class="w-4 h-4 rounded-full"
-                  />
-                {/if}
-                <span class="text-xs">{rx.emoji}</span>
+                <span class="text-sm">{rx.emoji}</span>
+                <span class="text-xs text-green-500 ml-1">{rx.count}</span>
               </div>
             {/each}
           </div>
@@ -290,6 +294,7 @@
         <button
           on:click={handleNowPlaying}
           class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95"
+          title="Share to NowPlaying Feed"
         >
           <Share2 size={16} /> #NowPlaying
         </button>
