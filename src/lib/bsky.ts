@@ -24,7 +24,7 @@ export async function createHistoryRecord(track: Track) {
     trackUri: track.trackUri,
     links: {
       spotify: track.spotifyUrl,
-      youtube: track.youtubeUrl
+      youtube: track.youtubeMusicUrl
     },
     postedAt: new Date().toISOString()
   };
@@ -123,7 +123,7 @@ export async function addToPlaylist(playlistUri: string, track: Track, currentPl
     album: track.album,
     trackUri: track.trackUri,
     img: track.artworkUrl,
-    links: { spotify: track.spotifyUrl, youtube: track.youtubeUrl }
+    links: { spotify: track.spotifyUrl, youtube: track.youtubeMusicUrl }
   }];
 
   // playlistUri: at://did/collection/rkey

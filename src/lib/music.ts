@@ -6,8 +6,8 @@ export interface Track {
   artworkUrl: string; // usually 100x100, can be resized
   previewUrl?: string; // iTunes often provides 30s preview
   trackUri: string; // The iTunes Store URL (Canonical Subject)
-  spotifyUrl?: string; // Generated search link
-  youtubeUrl?: string; // Generated search link
+  spotifyUrl?: string; // Resolved by Odesli
+  youtubeMusicUrl?: string; // Resolved by Odesli
 }
 
 export async function searchTracks(query: string): Promise<Track[]> {
@@ -32,9 +32,9 @@ export async function searchTracks(query: string): Promise<Track[]> {
         artworkUrl: item.artworkUrl100?.replace('100x100', '600x600'), // Get higher res
         previewUrl: item.previewUrl,
         trackUri: trackUri,
-        // Fallbacks since we don't have real Spotify IDs without their API
-        spotifyUrl: `https://open.spotify.com/search/${encodeURIComponent(item.artistName + " " + item.trackName)}`,
-        youtubeUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(item.artistName + " " + item.trackName)}`
+        // Fallbacks (Search Links) - Will be resolved to direct links via Odesli on interaction
+        spotifyUrl: undefined,
+        youtubeMusicUrl: undefined
       };
     });
   } catch (e) {

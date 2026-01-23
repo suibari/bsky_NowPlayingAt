@@ -5,13 +5,15 @@
     Play,
     Plus,
     Share2,
-    Heart,
-    Youtube,
-    Disc,
     MessageSquarePlus,
+    Disc,
     Loader2,
   } from "lucide-svelte";
   import { getBacklinks } from "$lib/constellation";
+  import { resolveLinks } from "$lib/odesli";
+
+  // Custom Icon for YT Music if needed, or re-use others.
+  // Lucide doesn't have specific yt-music, using 'Music' or similar.
 
   export let track: Track;
 
@@ -30,6 +32,12 @@
   let loadingReactions = false;
   let loadedReactions = false;
 
+  // Link Resolution State
+  let resolvingLink: "spotify" | "ytmusic" | null = null;
+  // Cache resolved links locally to avoid re-fetching
+  let cachedSpotify: string | undefined = track.spotifyUrl;
+  let cachedYtMusic: string | undefined = track.youtubeMusicUrl;
+
   function toggleExpand() {
     expanded = !expanded;
     if (expanded && !loadedReactions) {
@@ -41,22 +49,57 @@
     if (!track.trackUri) return;
     loadingReactions = true;
     try {
-      // Constellation: Find who linked to this iTunes URL
       const res = await getBacklinks(track.trackUri, undefined, 50);
-
       reactions = res
-        .filter((r) => (r.value as any)?.emoji) // Only show emoji reactions
+        .filter((r) => (r.value as any)?.emoji)
         .map((r) => ({
           emoji: (r.value as any).emoji,
           avatar: r.author?.avatar,
           handle: r.author?.handle || "Unknown",
         }));
-
       loadedReactions = true;
     } catch (e) {
       console.error("Failed to load reactions", e);
     }
     loadingReactions = false;
+  }
+
+  async function resolveAndOpen(platform: "spotify" | "ytmusic") {
+    let targetUrl = platform === "spotify" ? cachedSpotify : cachedYtMusic;
+
+    if (targetUrl) {
+      window.open(targetUrl, "_blank");
+      return;
+    }
+
+    resolvingLink = platform;
+    try {
+      const res = await resolveLinks(track.trackUri);
+      if (res) {
+        if (platform === "spotify") {
+          cachedSpotify = res.linksByPlatform.spotify?.url;
+          targetUrl = cachedSpotify;
+        } else {
+          cachedYtMusic = res.linksByPlatform.youtubeMusic?.url;
+          targetUrl = cachedYtMusic;
+        }
+      }
+
+      if (targetUrl) {
+        window.open(targetUrl, "_blank");
+      } else {
+        // Fallback to search if Odesli fails
+        const query = encodeURIComponent(`${track.artist} ${track.title}`);
+        if (platform === "spotify") {
+          window.open(`https://open.spotify.com/search/${query}`, "_blank");
+        } else {
+          window.open(`https://music.youtube.com/search?q=${query}`, "_blank");
+        }
+      }
+    } catch (e) {
+      console.error("Link resolution failed", e);
+    }
+    resolvingLink = null;
   }
 
   function handleNowPlaying() {
@@ -106,28 +149,49 @@
       <p class="text-gray-500 text-xs truncate">{track.album}</p>
     </div>
 
-    <!-- Quick Actions (Always Visible) -->
+    <!-- Quick Actions (Direct Playback) -->
     <div class="flex gap-2" on:click|stopPropagation={() => {}}>
-      {#if track.spotifyUrl}
-        <a
-          href={track.spotifyUrl}
-          target="_blank"
-          class="text-gray-400 hover:text-green-500 transition-colors"
-          title="Open in Spotify"
-        >
+      <!-- Spotify -->
+      <button
+        on:click={() => resolveAndOpen("spotify")}
+        class="text-gray-400 hover:text-green-500 transition-colors p-1"
+        title="Play on Spotify"
+        disabled={resolvingLink === "spotify"}
+      >
+        {#if resolvingLink === "spotify"}
+          <Loader2 size={20} class="animate-spin" />
+        {:else}
           <Disc size={20} />
-        </a>
-      {/if}
-      {#if track.youtubeUrl}
-        <a
-          href={track.youtubeUrl}
-          target="_blank"
-          class="text-gray-400 hover:text-red-500 transition-colors"
-          title="Search on YouTube"
-        >
-          <Youtube size={20} />
-        </a>
-      {/if}
+        {/if}
+      </button>
+
+      <!-- Youtube Music -->
+      <button
+        on:click={() => resolveAndOpen("ytmusic")}
+        class="text-gray-400 hover:text-red-500 transition-colors p-1"
+        title="Play on YouTube Music"
+        disabled={resolvingLink === "ytmusic"}
+      >
+        {#if resolvingLink === "ytmusic"}
+          <Loader2 size={20} class="animate-spin" />
+        {:else}
+          <!-- Custom Circle Play icon for YTM-ish look -->
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            ><circle cx="12" cy="12" r="10" /><polygon
+              points="10 8 16 12 10 16 10 8"
+            /></svg
+          >
+        {/if}
+      </button>
     </div>
   </div>
 
