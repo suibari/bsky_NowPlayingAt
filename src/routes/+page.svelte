@@ -27,6 +27,26 @@
   let myPlaylists: any[] = [];
   let loadingPlaylists = false;
 
+  // Reaction State
+  let showReactionModal = false;
+  let targetTrackForReaction: Track | null = null;
+  const popularEmojis = [
+    "🔥",
+    "❤️",
+    "🥺",
+    "🎧",
+    "🕺",
+    "🤘",
+    "🎹",
+    "✨",
+    "💯",
+    "😭",
+    "😴",
+    "🍺",
+    "💿",
+    "🚀",
+  ];
+
   async function handleSignIn() {
     if (!handleInput.includes(".")) {
       handleInput += ".bsky.social";
@@ -105,16 +125,25 @@
 
   // --- REACTION LOGIC ---
 
-  async function openReactionModal(track: Track) {
-    const emoji = prompt("Enter an emoji to react with:", "🔥");
-    if (!emoji) return;
+  function openReactionModal(track: Track) {
+    targetTrackForReaction = track;
+    showReactionModal = true;
+  }
 
+  async function handleReaction(emoji: string) {
+    if (!targetTrackForReaction) return;
     try {
-      await createReactionRecord(track, emoji);
-      alert("Reaction posted!");
+      await createReactionRecord(targetTrackForReaction, emoji);
+      alert(`Reacted with ${emoji}!`);
+      showReactionModal = false;
     } catch (e) {
       alert("Failed to react: " + e);
     }
+  }
+
+  function handleCustomReaction() {
+    const emoji = prompt("Enter a custom emoji:");
+    if (emoji) handleReaction(emoji);
   }
 </script>
 
@@ -285,6 +314,49 @@
         </div>
       </div>
     {/if}
+
+    <!-- Reaction Modal -->
+    {#if showReactionModal}
+      <div
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
+        on:click|self={() => (showReactionModal = false)}
+        role="button"
+        tabindex="0"
+        on:keydown={(e) => e.key === "Escape" && (showReactionModal = false)}
+      >
+        <div
+          class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-2xl"
+        >
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-white">Pick a Vibe</h2>
+            <button
+              on:click={() => (showReactionModal = false)}
+              class="text-gray-400 hover:text-white"
+            >
+              <X size={24} />
+            </button>
+          </div>
+
+          <div class="grid grid-cols-5 gap-3 mb-6">
+            {#each popularEmojis as emoji}
+              <button
+                on:click={() => handleReaction(emoji)}
+                class="text-2xl hover:scale-125 transition-transform p-2 hover:bg-white/10 rounded-lg"
+              >
+                {emoji}
+              </button>
+            {/each}
+          </div>
+
+          <button
+            on:click={handleCustomReaction}
+            class="w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors text-sm"
+          >
+            Use Custom Emoji...
+          </button>
+        </div>
+      </div>
+    {/if}
   </div>
 {:else}
   <!-- GUEST / LOGIN VIEW -->
@@ -378,6 +450,19 @@
     }
     100% {
       transform: translate(0px, 0px) scale(1);
+    }
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 </style>
