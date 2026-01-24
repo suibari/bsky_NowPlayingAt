@@ -608,7 +608,7 @@
           class="w-full bg-green-500 hover:bg-green-400 text-black font-extrabold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
         >
           {#if isSigningIn}
-            <Loader2 class="animate-spin" size={24} /> 接続中...
+            <Loader2 class="animate-spin" size={24} /> リダイレクト中...
           {:else}
             サインイン
           {/if}
