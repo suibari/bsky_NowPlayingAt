@@ -1,12 +1,10 @@
 {
   "client_name": "なうぷれあっと",
-  "client_uri": "https://bsky-nowplayingat.pages.dev",
+  "client_uri": "https://nowplayingat.suibari.com",
   "redirect_uris": [
-    "http://127.0.0.1:5173/",
-    "http://localhost:5173/",
-    "https://bsky-nowplayingat.pages.dev/"
+    "https://nowplayingat.suibari.com/"
   ],
-  "scope": "atproto transition:generic",
+  "scope": "atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create",
   "grant_types": [
     "authorization_code",
     "refresh_token"

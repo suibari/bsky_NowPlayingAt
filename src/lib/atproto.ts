@@ -6,7 +6,7 @@ export const publicAgent = new AtpAgent({ service: 'https://public.api.bsky.app'
 export let client: BrowserOAuthClient | null = null;
 
 // Must match client-metadata.json
-const SCOPE = 'atproto transition:generic';
+const SCOPE = 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create';
 
 export function getClient() {
   if (typeof window === 'undefined') return null;
