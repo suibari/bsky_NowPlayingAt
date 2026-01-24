@@ -24,6 +24,7 @@
 
   let expanded = false;
   let postToBsky = false;
+  let comment = "";
 
   // Link Resolution
   let resolvingLink: "spotify" | "ytmusic" | null = null;
@@ -72,7 +73,9 @@
   }
 
   function handleNowPlaying() {
-    dispatch("nowPlaying", { track, postToBsky });
+    // If track doesn't have comment but local input does, attach it temporarily for the event
+    const trackWithComment = { ...track, comment: comment || track.comment };
+    dispatch("nowPlaying", { track: trackWithComment, postToBsky });
   }
 
   function handleAddToPlaylist() {
@@ -137,7 +140,7 @@
 
     <!-- Meta -->
     <div
-      class="flex-grow min-w-0 flex flex-col justify-center h-16 cursor-pointer"
+      class="flex-grow min-w-0 flex flex-col justify-center min-h-16 cursor-pointer"
       on:click={toggleExpand}
     >
       <h3 class="font-bold text-white truncate text-lg leading-tight">
@@ -146,6 +149,11 @@
       <p class="text-gray-400 text-sm truncate">{track.artist}</p>
       {#if track.album}
         <p class="text-gray-500 text-xs truncate">{track.album}</p>
+      {/if}
+      {#if track.comment}
+        <p class="text-white/80 text-sm mt-1 italic break-words line-clamp-2">
+          "{track.comment}"
+        </p>
       {/if}
     </div>
 
@@ -230,8 +238,19 @@
       <div
         class="flex justify-between items-center bg-gray-800/50 p-3 rounded-lg"
       >
+        <div class="flex-grow mr-4">
+          <input
+            type="text"
+            bind:value={comment}
+            placeholder="Add a comment..."
+            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1 text-sm text-white focus:ring-1 focus:ring-green-500 focus:outline-none placeholder-gray-600"
+            on:click|stopPropagation
+            on:keydown|stopPropagation
+          />
+        </div>
+
         <label
-          class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 select-none"
+          class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 select-none mr-4"
         >
           <input
             type="checkbox"

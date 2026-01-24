@@ -8,6 +8,7 @@ export interface Track {
   trackUri: string; // The iTunes Store URL (Canonical Subject)
   spotifyUrl?: string; // Resolved by Odesli
   youtubeMusicUrl?: string; // Resolved by Odesli
+  comment?: string; // User comment
 }
 
 export async function searchTracks(query: string): Promise<Track[]> {

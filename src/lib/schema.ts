@@ -20,6 +20,7 @@ export interface Track {
 
 export interface HistoryRecord extends Track {
   $type: typeof NSID_HISTORY;
+  comment?: string;
   postedAt: string;
 }
 

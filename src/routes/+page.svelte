@@ -325,6 +325,7 @@
                           trackUri: item.record.trackUri,
                           spotifyUrl: item.record.links?.spotify,
                           youtubeMusicUrl: item.record.links?.youtube,
+                          comment: item.record.comment,
                         }}
                         on:nowPlaying={(e) =>
                           executeNowPlaying(

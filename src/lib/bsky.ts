@@ -31,6 +31,7 @@ export async function createHistoryRecord(track: MusicTrack) {
       spotify: track.spotifyUrl,
       youtube: track.youtubeMusicUrl
     },
+    comment: track.comment,
     postedAt: new Date().toISOString()
   };
 
@@ -225,8 +226,11 @@ export async function postToFeed(track: MusicTrack, text?: string) {
   const linkLabel = "💿なうぷれあっとで見る";
 
   // We construct the text segments
+  const comment = text || track.comment;
+
   const segments = [
     `#NowPlaying #なうぷれ`,
+    comment ? `\n\n${comment}` : "",
     `\n${track.title} - ${track.artist}\n\n`,
     linkLabel
   ];

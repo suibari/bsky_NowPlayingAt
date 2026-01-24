@@ -94,6 +94,7 @@
       trackUri: val.trackUri,
       spotifyUrl: val.links?.spotify,
       youtubeMusicUrl: val.links?.youtube,
+      comment: val.comment,
     };
   }
 
