@@ -8,6 +8,7 @@
   import { Loader2, X, Share2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReactionBar from "$lib/components/ReactionBar.svelte";
+  import { generatePlaylistThumbnail } from "$lib/thumbnail";
   import type { Track } from "$lib/music";
 
   // React to params
@@ -25,9 +26,75 @@
   let showShareModal = false;
   let shareText = "";
   let sharing = false;
+  let shareStatus = ""; // To show detailed status "Generating image...", "Uploading...", etc.
 
   // Drag State
   let draggingIndex: number | null = null;
+
+  async function handleShare() {
+    if (!$agent) {
+      alert("Please sign in to share.");
+      return;
+    }
+    sharing = true;
+    shareStatus = "Generating thumbnail...";
+
+    try {
+      const playlistName = (playlistRecord.value as any).name;
+      const authorName = authorProfile.displayName || authorProfile.handle;
+
+      // Generate Thumbnail
+      let thumbBlob = undefined;
+      try {
+        const mappedTracks = tracks.map(mapToTrack);
+        const blob = await generatePlaylistThumbnail(mappedTracks);
+        if (blob) {
+          shareStatus = "Uploading image...";
+          const uploadRes = await $agent.uploadBlob(blob, {
+            encoding: "image/jpeg",
+          });
+          thumbBlob = uploadRes.data.blob;
+        }
+      } catch (e) {
+        console.warn(
+          "Thumbnail generation/upload failed, proceeding without it",
+          e,
+        );
+      }
+
+      shareStatus = "Posting...";
+      const rt = new RichText({ text: shareText });
+      await rt.detectFacets($agent);
+
+      const embed: any = {
+        $type: "app.bsky.embed.external",
+        external: {
+          uri: window.location.href,
+          title: playlistName,
+          description: `Playlist created by ${authorName} on Atmosphere`,
+        },
+      };
+
+      if (thumbBlob) {
+        embed.external.thumb = thumbBlob;
+      }
+
+      await $agent.post({
+        text: rt.text,
+        facets: rt.facets,
+        embed: embed,
+        createdAt: new Date().toISOString(),
+      });
+
+      alert("Shared to Bluesky!");
+      showShareModal = false;
+    } catch (e) {
+      console.error("Failed to share:", e);
+      alert("Failed to share: " + e);
+    }
+    sharing = false;
+    shareStatus = "";
+  }
 
   // Playlist Modal State (Add to OTHER playlist)
   let showPlaylistModal = false;
@@ -73,42 +140,6 @@
     // URL will be in the embed, not the text
     shareText = `Check out this playlist: "${playlistName}" by ${authorName} 🎵\n\n#なうぷれあっと`;
     showShareModal = true;
-  }
-
-  async function handleShare() {
-    if (!$agent) {
-      alert("Please sign in to share.");
-      return;
-    }
-    sharing = true;
-    try {
-      const playlistName = (playlistRecord.value as any).name;
-      const authorName = authorProfile.displayName || authorProfile.handle;
-
-      const rt = new RichText({ text: shareText });
-      await rt.detectFacets($agent);
-
-      await $agent.post({
-        text: rt.text,
-        facets: rt.facets,
-        embed: {
-          $type: "app.bsky.embed.external",
-          external: {
-            uri: window.location.href,
-            title: playlistName,
-            description: `Playlist created by ${authorName} on Atmosphere`,
-          },
-        },
-        createdAt: new Date().toISOString(),
-      });
-
-      alert("Shared to Bluesky!");
-      showShareModal = false;
-    } catch (e) {
-      console.error("Failed to share:", e);
-      alert("Failed to share: " + e);
-    }
-    sharing = false;
   }
 
   async function savePlaylist() {
