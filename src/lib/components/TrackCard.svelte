@@ -2,7 +2,7 @@
   import type { Track } from "$lib/music";
   import { createEventDispatcher } from "svelte";
   import {
-    Play,
+    ChevronDown,
     Share2,
     Disc,
     Loader2,
@@ -134,7 +134,7 @@
       <div
         class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md"
       >
-        <Play class="text-white fill-white w-6 h-6" />
+        <ChevronDown class="text-white w-8 h-8" />
       </div>
     </div>
 
