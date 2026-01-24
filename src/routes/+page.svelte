@@ -204,7 +204,7 @@
             type="text"
             bind:value={searchQuery}
             on:input={() => performSearch(searchQuery)}
-            placeholder="Search for songs, artists, or albums..."
+            placeholder="曲名、アーティスト名、アルバム名を入力"
             class="w-full bg-gray-900 border border-gray-800 text-white rounded-full py-4 pl-14 pr-6 shadow-lg focus:ring-2 focus:ring-green-500 focus:border-transparent focus:outline-none transition-all placeholder-gray-600 text-lg"
           />
           {#if searchQuery}
