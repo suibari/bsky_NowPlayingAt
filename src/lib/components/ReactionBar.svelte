@@ -8,6 +8,9 @@
   import type { Track } from "$lib/music";
   import type { PlaylistRecord } from "$lib/schema";
 
+  import { userProfile } from "$lib/stores";
+  import { get } from "svelte/store";
+
   export let subjectUri: string;
   // Metadata for creating the reaction record
   export let track: Track | undefined = undefined;
@@ -118,20 +121,47 @@
   }
 
   async function handleAddReaction(emoji: string) {
-    if (!track && !playlist) return; // Need metadata
+    if (!track && !playlist) return;
+
+    // Optimistic Update
+    showPicker = false;
+    const currentUser = get(userProfile);
+    if (currentUser) {
+      const existingGroup = reactions.find((r) => r.emoji === emoji);
+      const optimisticUser = {
+        did: currentUser.did,
+        handle: currentUser.handle,
+        avatar: currentUser.avatar,
+        displayName: currentUser.displayName,
+      };
+
+      if (existingGroup) {
+        // Avoid duplicate pushing if already reacted?
+        // For now assuming allow multiple or just pushing for UI feedback.
+        // Check if user already in group?
+        if (!existingGroup.users.find((u) => u.did === currentUser.did)) {
+          existingGroup.users = [...existingGroup.users, optimisticUser];
+          reactions = reactions; // Trigger reactivity
+        }
+      } else {
+        reactions = [...reactions, { emoji, users: [optimisticUser] }];
+      }
+    }
+
     try {
-      showPicker = false;
-      // Optimistic update? Maybe later. For now, fetch after.
       await createReactionRecord({
         subjectUri,
         emoji,
         track,
         playlist,
       });
-      loadReactions();
+      // No reloadReactions() here to avoid flicker if indexer is slow.
+      // We trust the optimistic update.
       dispatch("reaction", emoji);
     } catch (e) {
-      alert("Failed to react: " + e);
+      console.error("Failed to save reaction:", e);
+      alert("Failed to save reaction.");
+      loadReactions(); // Revert on failure
     }
   }
 </script>

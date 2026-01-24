@@ -6,7 +6,6 @@
     postToFeed,
     getPlaylists,
     addToPlaylist,
-    createReactionRecord,
     getGlobalTimeline,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
@@ -29,26 +28,6 @@
   let targetTrack: Track | null = null;
   let myPlaylists: any[] = [];
   let loadingPlaylists = false;
-
-  // Reaction State
-  let showReactionModal = false;
-  let targetTrackForReaction: Track | null = null;
-  const popularEmojis = [
-    "🔥",
-    "❤️",
-    "🥺",
-    "🎧",
-    "🕺",
-    "🤘",
-    "🎹",
-    "✨",
-    "💯",
-    "😭",
-    "😴",
-    "🍺",
-    "💿",
-    "🚀",
-  ];
 
   async function handleSignIn() {
     if (!handleInput.includes(".")) {
@@ -127,31 +106,6 @@
   }
 
   // --- REACTION LOGIC ---
-
-  function openReactionModal(track: Track) {
-    targetTrackForReaction = track;
-    showReactionModal = true;
-  }
-
-  async function handleReaction(emoji: string) {
-    if (!targetTrackForReaction) return;
-    try {
-      await createReactionRecord({
-        subjectUri: targetTrackForReaction.trackUri,
-        emoji: emoji,
-        track: targetTrackForReaction,
-      });
-      alert(`Reacted with ${emoji}!`);
-      showReactionModal = false;
-    } catch (e) {
-      alert("Failed to react: " + e);
-    }
-  }
-
-  function handleCustomReaction() {
-    const emoji = prompt("Enter a custom emoji:");
-    if (emoji) handleReaction(emoji);
-  }
 </script>
 
 {#if $authState.isLoading}
@@ -281,7 +235,6 @@
                 on:nowPlaying={(e) =>
                   executeNowPlaying(e.detail.track, e.detail.postToBsky)}
                 on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                on:reaction={(e) => openReactionModal(e.detail)}
               />
             {/each}
           </div>
@@ -374,7 +327,6 @@
                             e.detail.postToBsky,
                           )}
                         on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                        on:reaction={(e) => openReactionModal(e.detail)}
                       />
                     {:else if item.type === "reaction"}
                       {#if item.record.kind === "playlist" && item.record.playlist}
@@ -405,7 +357,6 @@
                               e.detail.postToBsky,
                             )}
                           on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                          on:reaction={(e) => openReactionModal(e.detail)}
                         />
                       {/if}
                     {:else if item.type === "playlist"}
@@ -477,49 +428,6 @@
               No playlists found. Go to your profile to create one!
             </div>
           {/if}
-        </div>
-      </div>
-    {/if}
-
-    <!-- Reaction Modal -->
-    {#if showReactionModal}
-      <div
-        class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
-        on:click|self={() => (showReactionModal = false)}
-        role="button"
-        tabindex="0"
-        on:keydown={(e) => e.key === "Escape" && (showReactionModal = false)}
-      >
-        <div
-          class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-2xl"
-        >
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-xl font-bold text-white">Pick a Vibe</h2>
-            <button
-              on:click={() => (showReactionModal = false)}
-              class="text-gray-400 hover:text-white"
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          <div class="grid grid-cols-5 gap-3 mb-6">
-            {#each popularEmojis as emoji}
-              <button
-                on:click={() => handleReaction(emoji)}
-                class="text-2xl hover:scale-125 transition-transform p-2 hover:bg-white/10 rounded-lg"
-              >
-                {emoji}
-              </button>
-            {/each}
-          </div>
-
-          <button
-            on:click={handleCustomReaction}
-            class="w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors text-sm"
-          >
-            Use Custom Emoji...
-          </button>
         </div>
       </div>
     {/if}

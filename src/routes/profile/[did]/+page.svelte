@@ -25,26 +25,6 @@
   let loading = true;
   let activeTab = "playlists"; // 'playlists' | 'history'
 
-  // Modal State (Reused from Dashboard for consistency if user wants to react inside profile)
-  let showReactionModal = false;
-  let targetTrackForReaction: Track | null = null;
-  const popularEmojis = [
-    "🔥",
-    "❤️",
-    "🥺",
-    "🎧",
-    "🕺",
-    "🤘",
-    "🎹",
-    "✨",
-    "💯",
-    "😭",
-    "😴",
-    "🍺",
-    "💿",
-    "🚀",
-  ];
-
   // Playlist Modal State (For 'Add to Playlist' from History)
   let showPlaylistModal = false;
   let targetTrackForPlaylist: Track | null = null;
@@ -107,26 +87,6 @@
       spotifyUrl: val.links?.spotify,
       youtubeMusicUrl: val.links?.youtube,
     };
-  }
-
-  function openReactionModal(track: Track) {
-    targetTrackForReaction = track;
-    showReactionModal = true;
-  }
-
-  async function handleReaction(emoji: string) {
-    if (!targetTrackForReaction) return;
-    try {
-      await createReactionRecord({
-        subjectUri: targetTrackForReaction.trackUri,
-        emoji: emoji,
-        track: targetTrackForReaction,
-      });
-      alert(`Reacted with ${emoji}!`);
-      showReactionModal = false;
-    } catch (e) {
-      alert("Failed to react: " + e);
-    }
   }
 
   // Playlist Add Logic (from History)
@@ -277,7 +237,6 @@
             <TrackCard
               track={mapHistoryToTrack(item)}
               isOwner={false}
-              on:reaction={(e) => openReactionModal(e.detail)}
               on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
             />
           {/each}
@@ -286,42 +245,6 @@
           {/if}
         </div>
       {/if}
-    </div>
-  {/if}
-
-  <!-- Reaction Modal -->
-  {#if showReactionModal}
-    <div
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      on:click|self={() => (showReactionModal = false)}
-      role="button"
-      tabindex="0"
-      on:keydown={(e) => e.key === "Escape" && (showReactionModal = false)}
-    >
-      <div
-        class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-2xl"
-      >
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold text-white">Pick a Vibe</h2>
-          <button
-            on:click={() => (showReactionModal = false)}
-            class="text-gray-400 hover:text-white"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div class="grid grid-cols-5 gap-3 mb-6">
-          {#each popularEmojis as emoji}
-            <button
-              on:click={() => handleReaction(emoji)}
-              class="text-2xl hover:scale-125 transition-transform p-2 hover:bg-white/10 rounded-lg"
-            >
-              {emoji}
-            </button>
-          {/each}
-        </div>
-      </div>
     </div>
   {/if}
 
