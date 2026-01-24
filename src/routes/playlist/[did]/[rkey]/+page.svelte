@@ -1,9 +1,11 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
+  import { publicAgent } from "$lib/atproto";
+  import { RichText } from "@atproto/api";
   import { agent, userProfile } from "$lib/stores";
   import { getPlaylist, addToPlaylist } from "$lib/bsky";
-  import { Loader2, X } from "lucide-svelte";
+  import { Loader2, X, Share2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReactionBar from "$lib/components/ReactionBar.svelte";
   import type { Track } from "$lib/music";
@@ -13,10 +15,16 @@
   $: rkey = $page.params.rkey;
 
   let playlistRecord: any = null;
+  let authorProfile: any = null;
   let tracks: any[] = [];
   let loading = true;
   let isOwner = false;
   let saving = false;
+
+  // Share Modal State
+  let showShareModal = false;
+  let shareText = "";
+  let sharing = false;
 
   // Drag State
   let draggingIndex: number | null = null;
@@ -42,14 +50,65 @@
     if (!$agent) return;
     loading = true;
     try {
-      const res = await getPlaylist(playlistDid, playlistRkey);
+      const [res, profileRes] = await Promise.all([
+        getPlaylist(playlistDid, playlistRkey),
+        publicAgent.getProfile({ actor: playlistDid }),
+      ]);
+
       playlistRecord = res;
+      authorProfile = profileRes.data;
+
       // Ensure tracks is an array
       tracks = (res.value as any).tracks || [];
     } catch (e) {
       console.error("Failed to load playlist", e);
     }
     loading = false;
+  }
+
+  function openShareModal() {
+    if (!playlistRecord || !authorProfile) return;
+    const playlistName = (playlistRecord.value as any).name;
+    const authorName = authorProfile.displayName || authorProfile.handle;
+    // URL will be in the embed, not the text
+    shareText = `Check out this playlist: "${playlistName}" by ${authorName} 🎵\n\n#なうぷれあっと`;
+    showShareModal = true;
+  }
+
+  async function handleShare() {
+    if (!$agent) {
+      alert("Please sign in to share.");
+      return;
+    }
+    sharing = true;
+    try {
+      const playlistName = (playlistRecord.value as any).name;
+      const authorName = authorProfile.displayName || authorProfile.handle;
+
+      const rt = new RichText({ text: shareText });
+      await rt.detectFacets($agent);
+
+      await $agent.post({
+        text: rt.text,
+        facets: rt.facets,
+        embed: {
+          $type: "app.bsky.embed.external",
+          external: {
+            uri: window.location.href,
+            title: playlistName,
+            description: `Playlist created by ${authorName} on Atmosphere`,
+          },
+        },
+        createdAt: new Date().toISOString(),
+      });
+
+      alert("Shared to Bluesky!");
+      showShareModal = false;
+    } catch (e) {
+      console.error("Failed to share:", e);
+      alert("Failed to share: " + e);
+    }
+    sharing = false;
   }
 
   async function savePlaylist() {
@@ -134,43 +193,57 @@
   }
 </script>
 
-<div class="min-h-screen p-6 max-w-4xl mx-auto">
-  <a
-    href="/"
-    class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 mb-6 transition-colors"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      ><line x1="19" y1="12" x2="5" y2="12" /><polyline
-        points="12 19 5 12 12 5"
-      /></svg
+<div class="min-h-screen p-6 max-w-4xl mx-auto relative">
+  <div class="flex justify-between items-center mb-6">
+    <a
+      href="/"
+      class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 transition-colors"
     >
-    Back to Home
-  </a>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        ><line x1="19" y1="12" x2="5" y2="12" /><polyline
+          points="12 19 5 12 12 5"
+        /></svg
+      >
+      Back to Home
+    </a>
+
+    <!-- Share Button -->
+    <button
+      on:click={openShareModal}
+      class="p-2 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+      title="Share Playlist"
+    >
+      <Share2 size={24} />
+    </button>
+  </div>
 
   {#if loading}
     <div class="flex justify-center mt-20">
       <Loader2 class="animate-spin text-green-500" />
     </div>
   {:else if playlistRecord}
-    <div class="mb-8 border-b border-gray-800 pb-6">
-      <h1 class="text-4xl font-black text-white mb-2">
+    <div class="mb-8 border-b border-gray-800 pb-6 relative">
+      <h1 class="text-4xl font-black text-white mb-2 pr-12">
         {(playlistRecord.value as any).name || "Unnamed Playlist"}
       </h1>
-      <p class="text-gray-400 mb-4">
-        Created by <a
+      <p class="text-gray-400 mb-4 flex items-center gap-1">
+        Created by
+        <a
           href={`/profile/${did}`}
-          class="text-green-500 hover:underline">User</a
+          class="text-green-500 hover:underline font-bold"
         >
-        • {tracks.length} songs
+          {authorProfile?.displayName || authorProfile?.handle || "User"}
+        </a>
+        <span>• {tracks.length} songs</span>
         {#if saving}
           <span class="text-green-500 text-xs ml-2 animate-pulse"
             >Saving changes...</span
@@ -231,5 +304,53 @@
     </div>
   {:else}
     <div class="text-center mt-20 text-red-500">Playlist not found</div>
+  {/if}
+
+  <!-- Share Modal -->
+  {#if showShareModal}
+    <div
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      on:click|self={() => (showShareModal = false)}
+      role="button"
+      tabindex="0"
+      on:keydown={(e) => e.key === "Escape" && (showShareModal = false)}
+    >
+      <div
+        class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
+      >
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold text-white">Share Playlist</h2>
+          <button
+            on:click={() => (showShareModal = false)}
+            class="text-gray-400 hover:text-white"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div class="mb-4">
+          <label for="shareText" class="block text-sm text-gray-400 mb-2"
+            >Message</label
+          >
+          <textarea
+            id="shareText"
+            bind:value={shareText}
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:outline-none min-h-[100px]"
+          ></textarea>
+        </div>
+
+        <button
+          on:click={handleShare}
+          disabled={sharing}
+          class="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+        >
+          {#if sharing}
+            <Loader2 class="animate-spin" size={18} /> Sharing...
+          {:else}
+            <Share2 size={18} /> Share to Bluesky
+          {/if}
+        </button>
+      </div>
+    </div>
   {/if}
 </div>
