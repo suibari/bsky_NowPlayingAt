@@ -8,8 +8,12 @@
   import { Loader2, X, Share2, Trash2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReactionBar from "$lib/components/ReactionBar.svelte";
+  import { dndzone, type DndEvent } from "svelte-dnd-action";
+  import { flip } from "svelte/animate";
   import { generatePlaylistThumbnail } from "$lib/thumbnail";
   import type { Track } from "$lib/music";
+
+  const flipDurationMs = 300;
 
   // React to params
   $: did = $page.params.did;
@@ -28,8 +32,7 @@
   let sharing = false;
   let shareStatus = ""; // To show detailed status "Generating image...", "Uploading...", etc.
 
-  // Drag State
-  let draggingIndex: number | null = null;
+  // Drag State (Handled by dndzone)
 
   async function handleShare() {
     if (!$agent) {
@@ -125,8 +128,11 @@
       playlistRecord = res;
       authorProfile = profileRes.data;
 
-      // Ensure tracks is an array
-      tracks = (res.value as any).tracks || [];
+      // Ensure tracks is an array and has IDs for dnd
+      tracks = ((res.value as any).tracks || []).map((t: any) => ({
+        ...t,
+        id: t.trackUri + Math.random().toString(36).substring(7), // Ensure unique ID
+      }));
     } catch (e) {
       console.error("Failed to load playlist", e);
     }
@@ -162,31 +168,12 @@
     saving = false;
   }
 
-  // DnD Handlers
-  function handleDragStart(e: DragEvent, index: number) {
-    draggingIndex = index;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = "move";
-    }
+  function handleDndConsider(e: CustomEvent<DndEvent<any>>) {
+    tracks = e.detail.items;
   }
 
-  function handleDragOver(e: DragEvent, index: number) {
-    e.preventDefault();
-    if (draggingIndex === null || draggingIndex === index) return;
-
-    // Local reorder
-    const oldTracks = [...tracks];
-    const movedItem = oldTracks[draggingIndex];
-    oldTracks.splice(draggingIndex, 1);
-    oldTracks.splice(index, 0, movedItem);
-
-    tracks = oldTracks;
-    draggingIndex = index;
-  }
-
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    draggingIndex = null;
+  function handleDndFinalize(e: CustomEvent<DndEvent<any>>) {
+    tracks = e.detail.items;
     savePlaylist();
   }
 
@@ -339,31 +326,34 @@
       </div>
     </div>
 
-    <div class="space-y-4">
-      <!-- Tracks using TrackCard -->
-      {#each tracks as track, index (track.trackUri + index)}
-        <TrackCard
-          track={mapToTrack(track)}
-          showDelete={isOwner}
-          showDragHandle={isOwner}
-          isDragging={draggingIndex === index}
-          {index}
-          on:delete={(e) => removeTrack(e.detail)}
-          on:dragstart={(e) => handleDragStart(e, index)}
-          on:dragover={(e) => handleDragOver(e, index)}
-          on:drop={(e) => handleDrop(e)}
-        />
-      {/each}
-
-      {#if tracks.length === 0}
-        <div
-          class="text-center py-12 border-2 border-dashed border-gray-800 rounded-xl"
-        >
-          <p class="text-gray-500">This playlist is empty.</p>
-          <p class="text-sm text-gray-600 mt-2">Go search for songs to add!</p>
+    <section
+      use:dndzone={{ items: tracks, flipDurationMs, dragDisabled: !isOwner }}
+      on:consider={handleDndConsider}
+      on:finalize={handleDndFinalize}
+      class="space-y-4"
+    >
+      {#each tracks as track, index (track.id)}
+        <div animate:flip={{ duration: flipDurationMs }}>
+          <TrackCard
+            track={mapToTrack(track)}
+            showDelete={isOwner}
+            showDragHandle={isOwner}
+            isDragging={false}
+            {index}
+            on:delete={(e) => removeTrack(e.detail)}
+          />
         </div>
-      {/if}
-    </div>
+      {/each}
+    </section>
+
+    {#if tracks.length === 0}
+      <div
+        class="text-center py-12 border-2 border-dashed border-gray-800 rounded-xl"
+      >
+        <p class="text-gray-500">This playlist is empty.</p>
+        <p class="text-sm text-gray-600 mt-2">Go search for songs to add!</p>
+      </div>
+    {/if}
   {:else}
     <div class="text-center mt-20 text-red-500">Playlist not found</div>
   {/if}

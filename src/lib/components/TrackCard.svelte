@@ -99,20 +99,12 @@
   class:ring-2={expanded}
   class:ring-green-500={expanded}
   class:opacity-50={isDragging}
-  class:cursor-move={showDragHandle}
-  draggable={showDragHandle}
-  on:dragstart
-  on:dragover
-  on:drop
   role="listitem"
 >
   <div class="flex gap-4 items-center">
     <!-- Drag Handle -->
     {#if showDragHandle}
-      <div
-        class="text-gray-600 cursor-grab active:cursor-grabbing p-1 -ml-2"
-        on:mousedown|stopPropagation
-      >
+      <div class="text-gray-600 cursor-grab active:cursor-grabbing p-1 -ml-2">
         <GripVertical size={20} />
       </div>
     {/if}
