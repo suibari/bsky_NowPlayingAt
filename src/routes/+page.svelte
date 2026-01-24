@@ -7,13 +7,16 @@
     getPlaylists,
     addToPlaylist,
     createReactionRecord,
+    getGlobalTimeline,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import TrackCard from "$lib/components/TrackCard.svelte";
+  import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import { Loader2, Music, X, Plus } from "lucide-svelte";
 
   let handleInput = "";
   let isSigningIn = false;
+  let activeTab: "search" | "discovery" = "search";
 
   // Search State
   let searchQuery = "";
@@ -156,7 +159,7 @@
   <div class="p-6 max-w-5xl mx-auto min-h-screen">
     <!-- Header -->
     <div
-      class="flex justify-between items-center mb-8 sticky top-0 bg-black/95 backdrop-blur-md z-20 py-4 border-b border-gray-800/50"
+      class="flex justify-between items-center mb-6 sticky top-0 bg-black/95 backdrop-blur-md z-20 py-4 border-b border-gray-800/50"
     >
       <h1 class="text-3xl font-black text-white tracking-tighter">
         なうぷれ<span class="text-green-500">あっと</span>
@@ -188,83 +191,230 @@
       </div>
     </div>
 
-    <!-- Search Section -->
-    <div class="mb-10 max-w-3xl mx-auto">
-      <div class="relative group">
-        <div
-          class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none"
+    <!-- TABS -->
+    <div class="flex justify-center mb-8">
+      <div class="bg-gray-900 p-1 rounded-full flex gap-1">
+        <button
+          on:click={() => (activeTab = "search")}
+          class="px-6 py-2 rounded-full text-sm font-bold transition-all {activeTab ===
+          'search'
+            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+            : 'text-gray-400 hover:text-white'}"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6 text-gray-500 group-focus-within:text-green-500 transition-colors"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-        </div>
-        <input
-          type="text"
-          bind:value={searchQuery}
-          on:input={() => performSearch(searchQuery)}
-          placeholder="Search for songs, artists, or albums..."
-          class="w-full bg-gray-900 border border-gray-800 text-white rounded-full py-4 pl-14 pr-6 shadow-lg focus:ring-2 focus:ring-green-500 focus:border-transparent focus:outline-none transition-all placeholder-gray-600 text-lg"
-        />
-        {#if searchQuery}
-          <button
-            on:click={() => {
-              searchQuery = "";
-              performSearch("");
-            }}
-            class="absolute inset-y-0 right-4 text-gray-500 hover:text-white"
-          >
-            <X size={20} />
-          </button>
-        {/if}
+          Song Search
+        </button>
+        <button
+          on:click={() => (activeTab = "discovery")}
+          class="px-6 py-2 rounded-full text-sm font-bold transition-all {activeTab ===
+          'discovery'
+            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+            : 'text-gray-400 hover:text-white'}"
+        >
+          Discovery
+        </button>
       </div>
     </div>
 
-    <!-- Results / Content -->
-    <div class="max-w-4xl mx-auto">
-      {#if isSearching}
-        <div class="flex justify-center py-12">
-          <Loader2 class="w-8 h-8 animate-spin text-green-500" />
+    {#if activeTab === "search"}
+      <!-- Search Section -->
+      <div class="mb-10 max-w-3xl mx-auto animate-fade-in">
+        <div class="relative group">
+          <div
+            class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-6 w-6 text-gray-500 group-focus-within:text-green-500 transition-colors"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+          <input
+            type="text"
+            bind:value={searchQuery}
+            on:input={() => performSearch(searchQuery)}
+            placeholder="Search for songs, artists, or albums..."
+            class="w-full bg-gray-900 border border-gray-800 text-white rounded-full py-4 pl-14 pr-6 shadow-lg focus:ring-2 focus:ring-green-500 focus:border-transparent focus:outline-none transition-all placeholder-gray-600 text-lg"
+          />
+          {#if searchQuery}
+            <button
+              on:click={() => {
+                searchQuery = "";
+                performSearch("");
+              }}
+              class="absolute inset-y-0 right-4 text-gray-500 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+          {/if}
         </div>
-      {:else if searchResults.length > 0}
-        <h2
-          class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 px-2"
-        >
-          Top Results
-        </h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-          {#each searchResults as track (track.id)}
-            <TrackCard
-              {track}
-              on:nowPlaying={(e) =>
-                executeNowPlaying(e.detail.track, e.detail.postToBsky)}
-              on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-              on:reaction={(e) => openReactionModal(e.detail)}
-            />
-          {/each}
-        </div>
-      {:else if searchQuery.length > 1}
-        <div class="text-center py-12 text-gray-500">
-          No tracks found for "{searchQuery}"
-        </div>
-      {:else}
-        <!-- Empty State / Recent History (Placeholder) -->
-        <div class="text-center py-20 opacity-30 select-none">
-          <Music size={80} class="mx-auto mb-6 text-gray-700" />
-          <p class="text-gray-500 text-lg">Start typing to explore music...</p>
-        </div>
-      {/if}
-    </div>
+      </div>
+
+      <!-- Results / Content -->
+      <div class="max-w-4xl mx-auto">
+        {#if isSearching}
+          <div class="flex justify-center py-12">
+            <Loader2 class="w-8 h-8 animate-spin text-green-500" />
+          </div>
+        {:else if searchResults.length > 0}
+          <h2
+            class="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 px-2"
+          >
+            Top Results
+          </h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+            {#each searchResults as track (track.id)}
+              <TrackCard
+                {track}
+                on:nowPlaying={(e) =>
+                  executeNowPlaying(e.detail.track, e.detail.postToBsky)}
+                on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                on:reaction={(e) => openReactionModal(e.detail)}
+              />
+            {/each}
+          </div>
+        {:else if searchQuery.length > 1}
+          <div class="text-center py-12 text-gray-500">
+            No tracks found for "{searchQuery}"
+          </div>
+        {:else}
+          <!-- Empty State / Recent History (Placeholder) -->
+          <div class="text-center py-20 opacity-30 select-none">
+            <Music size={80} class="mx-auto mb-6 text-gray-700" />
+            <p class="text-gray-500 text-lg">
+              Start typing to explore music...
+            </p>
+          </div>
+        {/if}
+      </div>
+    {:else if activeTab === "discovery"}
+      <div class="max-w-2xl mx-auto animate-fade-in pb-20">
+        {#await getGlobalTimeline()}
+          <div class="text-center py-20 text-gray-500">
+            <Loader2 class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500" />
+            <p>Loading the atmosphere...</p>
+          </div>
+        {:then timeline}
+          {#if timeline.length > 0}
+            <div class="space-y-8">
+              {#each timeline as item}
+                <div
+                  class="bg-gray-900/50 rounded-xl p-4 border border-gray-800"
+                >
+                  <!-- Header: User Action -->
+                  <div class="flex items-center gap-3 mb-3">
+                    <a
+                      href={`/profile/${item.author.did}`}
+                      class="flex-shrink-0"
+                    >
+                      {#if item.author.avatar}
+                        <img
+                          src={item.author.avatar}
+                          alt={item.author.handle}
+                          class="w-10 h-10 rounded-full border border-gray-700"
+                        />
+                      {:else}
+                        <div
+                          class="w-10 h-10 rounded-full bg-gray-800 border border-gray-700"
+                        ></div>
+                      {/if}
+                    </a>
+                    <div>
+                      <div class="text-sm text-gray-300">
+                        <span class="font-bold text-white">
+                          {item.author.displayName || item.author.handle}
+                        </span>
+                        {#if item.type === "history"}
+                          <span class="text-gray-500">listened to a track</span>
+                        {:else if item.type === "reaction"}
+                          <span class="text-gray-500">
+                            reacted with <span class="text-lg"
+                              >{item.record.emoji}</span
+                            >
+                          </span>
+                        {:else if item.type === "playlist"}
+                          <span class="text-gray-500">created a playlist</span>
+                        {/if}
+                      </div>
+                      <div class="text-xs text-gray-600">
+                        {new Date(item.indexedAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Content -->
+                  <div class="pl-12">
+                    {#if item.type === "history"}
+                      <TrackCard
+                        track={{
+                          id: item.record.trackUri, // Use Uri as ID
+                          title: item.record.track,
+                          artist: item.record.artist,
+                          album: item.record.album,
+                          artworkUrl: item.record.img,
+                          trackUri: item.record.trackUri,
+                          spotifyUrl: item.record.links?.spotify,
+                          youtubeMusicUrl: item.record.links?.youtube,
+                        }}
+                        on:nowPlaying={(e) =>
+                          executeNowPlaying(
+                            e.detail.track,
+                            e.detail.postToBsky,
+                          )}
+                        on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                        on:reaction={(e) => openReactionModal(e.detail)}
+                      />
+                    {:else if item.type === "reaction"}
+                      <TrackCard
+                        track={{
+                          id: item.record.subjectUri,
+                          trackUri: item.record.subjectUri,
+                          title: item.record.track || "Unknown Track",
+                          artist: item.record.artist || "Unknown Artist",
+                          album: item.record.album,
+                          artworkUrl: item.record.img || "/placeholder_art.png",
+                          spotifyUrl: item.record.links?.spotify,
+                          youtubeMusicUrl: item.record.links?.youtube,
+                        }}
+                        on:nowPlaying={(e) =>
+                          executeNowPlaying(
+                            e.detail.track,
+                            e.detail.postToBsky,
+                          )}
+                        on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                        on:reaction={(e) => openReactionModal(e.detail)}
+                      />
+                    {:else if item.type === "playlist"}
+                      <PlaylistCard
+                        playlist={item.record}
+                        author={item.author}
+                        rkey={item.uri.split("/").pop()}
+                      />
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div class="text-center py-20 text-gray-500">
+              <p>No actitivity yet. Be the first!</p>
+            </div>
+          {/if}
+        {:catch error}
+          <div class="text-center py-20 text-red-500">
+            Failed to load timeline: {error.message}
+          </div>
+        {/await}
+      </div>
+    {/if}
 
     <!-- Playlist Modal -->
     {#if showPlaylistModal}

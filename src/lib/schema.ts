@@ -24,6 +24,15 @@ export interface ReactionRecord {
   $type: typeof NSID_REACTION;
   subjectUri: string;
   emoji: string;
+  // Metadata snapshot
+  track: string;
+  artist: string;
+  album: string;
+  img: string;
+  links: {
+    spotify?: string;
+    youtube?: string;
+  };
   createdAt: string;
 }
 

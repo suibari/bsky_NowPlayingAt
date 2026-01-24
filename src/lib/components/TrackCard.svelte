@@ -25,6 +25,7 @@
 
   import { agent } from "$lib/stores";
   import { get } from "svelte/store";
+  import { publicAgent } from "$lib/atproto";
 
   const dispatch = createEventDispatcher();
 
@@ -79,10 +80,9 @@
 
       // Fetch profiles
       const allDids = Array.from(new Set(Object.values(groups).flat()));
-      const ag = get(agent);
       let profilesMap = new Map<string, ReactionUser>();
 
-      if (ag && allDids.length > 0) {
+      if (allDids.length > 0) {
         try {
           // Chunk requests if needed (limit 25)
           const chunks = [];
@@ -91,7 +91,9 @@
           }
 
           for (const chunk of chunks) {
-            const pRes = await ag.app.bsky.actor.getProfiles({ actors: chunk });
+            const pRes = await publicAgent.app.bsky.actor.getProfiles({
+              actors: chunk,
+            });
             pRes.data.profiles.forEach((p) => {
               profilesMap.set(p.did, {
                 did: p.did,

@@ -1,5 +1,7 @@
 import { get } from 'svelte/store';
 import { agent, userProfile } from '$lib/stores';
+import { publicAgent } from '$lib/atproto';
+import { getBacklinks } from '$lib/constellation';
 import type { Track } from '$lib/music';
 
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
@@ -63,6 +65,15 @@ export async function createReactionRecord(track: Track, emoji: string) {
       $type: NSID_REACTION,
       subjectUri: track.trackUri,
       emoji: emoji,
+      // Metadata Snapshot
+      track: track.title,
+      artist: track.artist,
+      album: track.album,
+      img: track.artworkUrl,
+      links: {
+        spotify: track.spotifyUrl,
+        youtube: track.youtubeMusicUrl
+      },
       createdAt: new Date().toISOString()
     }
   });
@@ -169,6 +180,9 @@ export async function postToFeed(track: Track, text?: string) {
 
 // --- CONFIG ---
 
+const HUB_DID = 'did:plc:uixgxpiqf4i63p6rgpu7ytmx';
+const HUB_REF = `at://${HUB_DID}/app.bsky.actor.profile/self`;
+
 export async function ensureConfig() {
   const ag = get(agent);
   const profile = get(userProfile);
@@ -181,26 +195,111 @@ export async function ensureConfig() {
       limit: 1
     });
 
-    if (res.data.records.length === 0) {
+    // Check if config points to correct Hub
+    if (res.data.records.length > 0) {
+      const rec = res.data.records[0].value as any;
+      if (rec.hubRef !== HUB_REF) {
+        console.log("Updating config linkage to Hub...");
+        const rkey = res.data.records[0].uri.split('/').pop();
+        await ag.com.atproto.repo.putRecord({
+          repo: profile.did,
+          collection: NSID_CONFIG,
+          rkey: rkey!,
+          record: {
+            $type: NSID_CONFIG,
+            hubRef: HUB_REF,
+            updatedAt: new Date().toISOString()
+          }
+        });
+      }
+    } else {
       console.log("Creating initial config...");
       await ag.com.atproto.repo.createRecord({
         repo: profile.did,
         collection: NSID_CONFIG,
         record: {
           $type: NSID_CONFIG,
-          hubRef: `at://${profile.did}`,
+          hubRef: HUB_REF,
           updatedAt: new Date().toISOString()
         }
       });
 
-      // Create Favorites Playlist
       await createPlaylist("Favorites");
-      console.log("Created Favorites playlist");
     }
   } catch (e) {
     console.warn("Failed to check/create config:", e);
   }
 }
+
+// --- GLOBAL TIMELINE ---
+
+export async function getGlobalTimeline() {
+  const ag = get(agent) || publicAgent;
+
+  // 1. Find Users via Constellation (Backlinks to Hub)
+  const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
+  const userDids = Array.from(new Set(backlinks.map(b => b.did)));
+
+  if (userDids.length === 0) return [];
+
+  // 2. Fetch Profiles & Records for each user
+  const timelineItems: any[] = [];
+
+  // Batch profile fetch
+  let profilesMap = new Map<string, any>();
+  try {
+    const chunks = [];
+    for (let i = 0; i < userDids.length; i += 25) {
+      chunks.push(userDids.slice(i, i + 25));
+    }
+    for (const chunk of chunks) {
+      const pRes = await ag.app.bsky.actor.getProfiles({ actors: chunk });
+      pRes.data.profiles.forEach((p: any) => profilesMap.set(p.did, p));
+    }
+  } catch (e) {
+    console.error("Failed to fetch timeline profiles", e);
+  }
+
+  // Fetch records per user
+  await Promise.all(userDids.map(async (did) => {
+    const profile = profilesMap.get(did);
+    // Skip if no profile (optional, but good for UI)
+    const pds = await getPdsEndpoint(did);
+    if (!pds) return;
+
+    const fetchCollection = async (collection: string, typeName: string) => {
+      try {
+        const url = `${pds}/xrpc/com.atproto.repo.listRecords?repo=${did}&collection=${collection}&limit=5`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          data.records.forEach((r: any) => {
+            timelineItems.push({
+              type: typeName,
+              author: profile || { did, handle: 'unknown' },
+              record: r.value,
+              uri: r.uri,
+              cid: r.cid,
+              indexedAt: r.value.postedAt || r.value.createdAt
+            });
+          });
+        }
+      } catch (e) { console.warn(`Failed fetch ${collection} for ${did}`, e); }
+    };
+
+    await Promise.all([
+      fetchCollection(NSID_HISTORY, 'history'),
+      fetchCollection(NSID_REACTION, 'reaction'),
+      fetchCollection(NSID_PLAYLIST, 'playlist')
+    ]);
+  }));
+
+  // 3. Sort by Date Descending
+  return timelineItems.sort((a, b) => {
+    return new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime();
+  });
+}
+
 // --- HYDRATION ---
 
 import { getPdsEndpoint } from '$lib/atproto';
