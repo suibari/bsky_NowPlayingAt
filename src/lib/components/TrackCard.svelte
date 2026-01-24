@@ -18,7 +18,9 @@
   export let showDelete: boolean = false;
   export let showDragHandle: boolean = false;
   export let isDragging: boolean = false; // Styling state
+
   export let index: number = 0; // For drag reference
+  export let isProcessing: boolean = false;
 
   const dispatch = createEventDispatcher();
 
@@ -262,10 +264,16 @@
 
         <button
           on:click={handleNowPlaying}
-          class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95"
+          disabled={isProcessing}
+          class="bg-green-500 hover:bg-green-400 disabled:bg-green-500/50 disabled:cursor-not-allowed text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95 disabled:active:scale-100"
           title="再生中にする"
         >
-          <Share2 size={16} /> #NowPlaying
+          {#if isProcessing}
+            <Loader2 size={16} class="animate-spin" />
+            処理中...
+          {:else}
+            <Share2 size={16} /> #NowPlaying
+          {/if}
         </button>
       </div>
 

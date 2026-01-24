@@ -31,6 +31,7 @@
   let targetTrack: Track | null = null;
   let myPlaylists: any[] = [];
   let loadingPlaylists = false;
+  let processingTrackId: string | null = null;
 
   async function handleSignIn() {
     if (!handleInput.includes(".")) {
@@ -62,21 +63,32 @@
   }
 
   async function executeNowPlaying(track: Track, postToBsky: boolean) {
-    if (!confirm(`"${track.title}" を再生履歴に追加しますか？`)) return;
+    if (processingTrackId) return; // Prevent double submission
+    processingTrackId = track.id;
 
     try {
-      // 1. Write to History (PDS)
-      await createHistoryRecord(track);
-
-      // 2. Post to Feed
       if (postToBsky) {
-        await postToFeed(track);
-      }
+        if (!confirm(`"${track.title}" をBlueskyに投稿しますか？`)) return;
 
-      alert("再生履歴に追加しました！");
+        // 1. Write to History (PDS)
+        await createHistoryRecord(track);
+
+        // 2. Post to Feed
+        await postToFeed(track);
+
+        alert("Blueskyに投稿しました！");
+      } else {
+        // No confirmation dialog when just saving to history
+        // 1. Write to History (PDS)
+        await createHistoryRecord(track);
+
+        alert("再生履歴に登録しました！");
+      }
     } catch (e) {
       console.error(e);
-      alert("投稿に失敗しました: " + e);
+      alert("処理に失敗しました: " + e);
+    } finally {
+      processingTrackId = null;
     }
   }
 
@@ -237,6 +249,7 @@
             {#each searchResults as track (track.id)}
               <TrackCard
                 {track}
+                isProcessing={processingTrackId === track.id}
                 on:nowPlaying={(e) =>
                   executeNowPlaying(e.detail.track, e.detail.postToBsky)}
                 on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
@@ -329,6 +342,8 @@
                           youtubeMusicUrl: item.record.links?.youtube,
                           comment: item.record.comment,
                         }}
+                        isProcessing={processingTrackId ===
+                          item.record.trackUri}
                         on:nowPlaying={(e) =>
                           executeNowPlaying(
                             e.detail.track,
@@ -359,6 +374,8 @@
                             spotifyUrl: item.record.links?.spotify,
                             youtubeMusicUrl: item.record.links?.youtube,
                           }}
+                          isProcessing={processingTrackId ===
+                            item.record.subjectUri}
                           on:nowPlaying={(e) =>
                             executeNowPlaying(
                               e.detail.track,
