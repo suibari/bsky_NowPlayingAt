@@ -24,7 +24,7 @@
 				agent.set(newAgent);
 
 				// 3. Fetch Profile
-				const profileRes = await newAgent.getProfile({ actor: session.did });
+				const profileRes = await publicAgent.getProfile({ actor: session.did });
 				userProfile.set(profileRes.data);
 
 				authState.set({ isLoading: false, error: null, isAuthenticated: true });

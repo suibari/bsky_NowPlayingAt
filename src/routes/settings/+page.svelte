@@ -2,10 +2,12 @@
   import { userProfile } from "$lib/stores";
   import { signOut } from "$lib/atproto";
   import { LogOut, ArrowLeft } from "lucide-svelte";
+  import { goto } from "$app/navigation";
 
-  function handleSignOut() {
+  async function handleSignOut() {
     if (!confirm("Are you sure you want to sign out?")) return;
-    signOut($userProfile?.did || "");
+    await signOut($userProfile?.did || "");
+    goto("/");
   }
 </script>
 

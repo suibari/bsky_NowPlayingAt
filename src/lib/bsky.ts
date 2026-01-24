@@ -337,8 +337,6 @@ export async function ensureConfig() {
 // --- GLOBAL TIMELINE ---
 
 export async function getGlobalTimeline() {
-  const ag = get(agent) || publicAgent;
-
   // 1. Find Users via Constellation (Backlinks to Hub)
   const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
   const userDids = Array.from(new Set(backlinks.map(b => b.did)));
@@ -356,7 +354,7 @@ export async function getGlobalTimeline() {
       chunks.push(userDids.slice(i, i + 25));
     }
     for (const chunk of chunks) {
-      const pRes = await ag.app.bsky.actor.getProfiles({ actors: chunk });
+      const pRes = await publicAgent.app.bsky.actor.getProfiles({ actors: chunk });
       pRes.data.profiles.forEach((p: any) => profilesMap.set(p.did, p));
     }
   } catch (e) {

@@ -17,6 +17,7 @@
     PlaylistRecord,
     Track as SchemaTrack,
   } from "$lib/schema";
+  import { publicAgent } from "$lib/atproto";
 
   // $page.params is reactive but derived, so we react to it.
   $: did = $page.params.did;
@@ -48,7 +49,7 @@
     loading = true;
     try {
       // 1. Get Profile
-      const pRes = await $agent.getProfile({ actor: actorDid });
+      const pRes = await publicAgent.getProfile({ actor: actorDid });
       profile = pRes.data;
 
       // 2. Get Playlists
