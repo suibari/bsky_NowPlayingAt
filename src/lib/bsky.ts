@@ -2,7 +2,8 @@ import { get } from 'svelte/store';
 import { agent, userProfile } from '$lib/stores';
 import { publicAgent } from '$lib/atproto';
 import { getBacklinks } from '$lib/constellation';
-import type { Track } from '$lib/music';
+import type { Track as MusicTrack } from '$lib/music';
+import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
 import { RichText } from '@atproto/api';
 
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
@@ -12,14 +13,14 @@ export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 // --- HISTORY ---
 
-export async function createHistoryRecord(track: Track) {
+export async function createHistoryRecord(track: MusicTrack) {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
 
   await ensureConfig();
 
-  const record = {
+  const record: HistoryRecord = {
     $type: NSID_HISTORY,
     track: track.title,
     artist: track.artist,
@@ -36,11 +37,11 @@ export async function createHistoryRecord(track: Track) {
   return await ag.com.atproto.repo.createRecord({
     repo: profile.did,
     collection: NSID_HISTORY,
-    record: record
+    record: record as any
   });
 }
 
-export async function getHistory(did: string) {
+export async function getHistory(did: string): Promise<{ uri: string, cid: string, value: HistoryRecord }[]> {
   const ag = get(agent);
   if (!ag) throw new Error("Not authenticated");
 
@@ -49,7 +50,7 @@ export async function getHistory(did: string) {
     collection: NSID_HISTORY,
     limit: 50
   });
-  return res.data.records;
+  return res.data.records as unknown as { uri: string, cid: string, value: HistoryRecord }[];
 }
 
 // --- REACTIONS ---
@@ -69,7 +70,7 @@ export async function deleteReactionRecord(rkey: string) {
 export async function createReactionRecord(opts: {
   subjectUri: string;
   emoji: string;
-  track?: Track;
+  track?: MusicTrack;
   playlist?: { record: any; author: { did: string; handle: string; avatar?: string; displayName?: string } }
 }) {
   const ag = get(agent);
@@ -105,7 +106,7 @@ export async function createReactionRecord(opts: {
   return await ag.com.atproto.repo.createRecord({
     repo: profile.did,
     collection: NSID_REACTION,
-    record: record
+    record: record as any
   });
 }
 
@@ -128,7 +129,7 @@ export async function createPlaylist(name: string) {
   });
 }
 
-export async function getPlaylists(did: string) {
+export async function getPlaylists(did: string): Promise<{ uri: string, cid: string, value: PlaylistRecord }[]> {
   const ag = get(agent);
   if (!ag) throw new Error("Not authenticated");
 
@@ -136,7 +137,7 @@ export async function getPlaylists(did: string) {
     repo: did,
     collection: NSID_PLAYLIST
   });
-  return res.data.records;
+  return res.data.records as unknown as { uri: string, cid: string, value: PlaylistRecord }[];
 }
 
 export async function getPlaylist(did: string, rkey: string) {
@@ -151,7 +152,7 @@ export async function getPlaylist(did: string, rkey: string) {
   return res.data;
 }
 
-export async function addToPlaylist(playlistUri: string, track: Track, currentPlaylistRecordWrapper: any) {
+export async function addToPlaylist(playlistUri: string, track: MusicTrack, currentPlaylistRecordWrapper: { uri: string, cid: string, value: PlaylistRecord }) {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
@@ -159,7 +160,7 @@ export async function addToPlaylist(playlistUri: string, track: Track, currentPl
   // currentPlaylistRecordWrapper is { uri, cid, value: { name, tracks, ... } }
   const content = currentPlaylistRecordWrapper.value;
 
-  const newTracks = [...(content.tracks || []), {
+  const newTracks: SchemaTrack[] = [...(content.tracks || []), {
     track: track.title,
     artist: track.artist,
     album: track.album,
@@ -184,7 +185,7 @@ export async function addToPlaylist(playlistUri: string, track: Track, currentPl
 
 // --- FEED ---
 
-export async function postToFeed(track: Track, text?: string) {
+export async function postToFeed(track: MusicTrack, text?: string) {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
@@ -401,7 +402,6 @@ export async function getGlobalTimeline() {
 // --- HYDRATION ---
 
 import { getPdsEndpoint } from '$lib/atproto';
-import { type ConstellationRecord, type ReactionRecord } from '$lib/schema';
 
 export async function hydrateReactions(records: ConstellationRecord[]): Promise<{ record: ReactionRecord, authorDid: string, uri: string }[]> {
   const results: { record: ReactionRecord, authorDid: string, uri: string }[] = [];

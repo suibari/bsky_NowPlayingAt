@@ -6,8 +6,7 @@ export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 // Constellation Source Path
 export const REACTION_SOURCE = `${NSID_REACTION}:subjectUri`;
 
-export interface HistoryRecord {
-  $type: typeof NSID_HISTORY;
+export interface Track {
   track: string;
   artist: string;
   album: string;
@@ -17,26 +16,20 @@ export interface HistoryRecord {
     spotify?: string;
     youtube?: string;
   };
+}
+
+export interface HistoryRecord extends Track {
+  $type: typeof NSID_HISTORY;
   postedAt: string;
 }
 
-export interface ReactionRecord {
+export interface ReactionRecord extends Partial<Track> {
   $type: typeof NSID_REACTION;
   subjectUri: string;
   emoji: string;
 
   // Metadata
   kind?: 'track' | 'playlist';
-
-  // Track Metadata (Flat fields for backward compat/legacy structure)
-  track?: string;
-  artist?: string;
-  album?: string;
-  img?: string;
-  links?: {
-    spotify?: string;
-    youtube?: string;
-  };
 
   // Playlist Metadata (Object)
   playlist?: {
@@ -51,7 +44,7 @@ export interface ReactionRecord {
 export interface PlaylistRecord {
   $type: typeof NSID_PLAYLIST;
   name: string;
-  tracks: any[]; // We can refine this if needed, but 'any' structure matches current map usage
+  tracks: Track[];
   createdAt: string;
 }
 

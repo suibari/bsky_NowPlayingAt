@@ -12,6 +12,11 @@
   import { Loader2, Music, Disc, Plus, X, Settings } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import type { Track } from "$lib/music";
+  import type {
+    HistoryRecord,
+    PlaylistRecord,
+    Track as SchemaTrack,
+  } from "$lib/schema";
 
   // $page.params is reactive but derived, so we react to it.
   $: did = $page.params.did;
@@ -20,15 +25,15 @@
   $: isOwner = $userProfile?.did === did;
 
   let profile: any = null;
-  let history: any[] = [];
-  let playlists: any[] = [];
+  let history: { uri: string; value: HistoryRecord }[] = [];
+  let playlists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
   let loading = true;
   let activeTab = "playlists"; // 'playlists' | 'history'
 
   // Playlist Modal State (For 'Add to Playlist' from History)
   let showPlaylistModal = false;
   let targetTrackForPlaylist: Track | null = null;
-  let myPlaylists: any[] = [];
+  let myPlaylists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
 
   onMount(async () => {
     // loadData handled by reactivity below
@@ -75,7 +80,10 @@
 
   // --- Handlers for TrackCard ---
 
-  function mapHistoryToTrack(item: any): Track {
+  function mapHistoryToTrack(item: {
+    uri: string;
+    value: HistoryRecord;
+  }): Track {
     const val = item.value;
     return {
       id: val.trackUri, // Using URI as ID since we store it
@@ -105,7 +113,11 @@
     }
   }
 
-  async function handleAddToPlaylist(playlist: any) {
+  async function handleAddToPlaylist(playlist: {
+    uri: string;
+    cid: string;
+    value: PlaylistRecord;
+  }) {
     if (!targetTrackForPlaylist) return;
     try {
       await addToPlaylist(playlist.uri, targetTrackForPlaylist, playlist);
@@ -233,7 +245,7 @@
                 >
               </div>
               <div class="text-xs text-gray-400 truncate">
-                {pl.value.tracks?.map((t: any) => t.track).join(", ") ||
+                {pl.value.tracks?.map((t: SchemaTrack) => t.track).join(", ") ||
                   "Empty playlist"}
               </div>
             </a>
