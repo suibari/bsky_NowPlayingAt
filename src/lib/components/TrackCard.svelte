@@ -237,44 +237,46 @@
         on:reaction={handleReaction}
       />
 
-      <div
-        class="flex justify-between items-center bg-gray-800/50 p-3 rounded-lg"
-      >
-        <div class="flex-grow mr-4">
+      <div class="bg-gray-800/50 p-3 rounded-lg flex flex-col gap-3">
+        <!-- Row 1: Comment Input -->
+        <div class="w-full">
           <input
             type="text"
             bind:value={comment}
             placeholder="コメントを追加..."
-            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1 text-sm text-white focus:ring-1 focus:ring-green-500 focus:outline-none placeholder-gray-600"
+            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-green-500 focus:outline-none placeholder-gray-600"
             on:click|stopPropagation
             on:keydown|stopPropagation
           />
         </div>
 
-        <label
-          class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 select-none mr-4"
-        >
-          <input
-            type="checkbox"
-            bind:checked={postToBsky}
-            class="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500 bg-gray-700"
-          />
-          Blueskyに投稿
-        </label>
+        <!-- Row 2: Actions (Checkbox & Post Button) -->
+        <div class="flex justify-between items-center flex-wrap gap-2">
+          <label
+            class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 select-none"
+          >
+            <input
+              type="checkbox"
+              bind:checked={postToBsky}
+              class="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500 bg-gray-700"
+            />
+            Blueskyに投稿
+          </label>
 
-        <button
-          on:click={handleNowPlaying}
-          disabled={isProcessing}
-          class="bg-green-500 hover:bg-green-400 disabled:bg-green-500/50 disabled:cursor-not-allowed text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95 disabled:active:scale-100"
-          title="再生中にする"
-        >
-          {#if isProcessing}
-            <Loader2 size={16} class="animate-spin" />
-            処理中...
-          {:else}
-            <Share2 size={16} /> #NowPlaying
-          {/if}
-        </button>
+          <button
+            on:click={handleNowPlaying}
+            disabled={isProcessing}
+            class="bg-green-500 hover:bg-green-400 disabled:bg-green-500/50 disabled:cursor-not-allowed text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95 disabled:active:scale-100"
+            title="再生中にする"
+          >
+            {#if isProcessing}
+              <Loader2 size={16} class="animate-spin" />
+              処理中...
+            {:else}
+              <Share2 size={16} /> #NowPlaying
+            {/if}
+          </button>
+        </div>
       </div>
 
       <div class="flex gap-2">
