@@ -309,17 +309,9 @@
           subjectUri={playlistRecord.uri}
           playlist={{
             record: playlistRecord.value,
-            author: {
+            author: authorProfile || {
               did: did || "",
-              handle: "User", // Ideally fetch profile to get handle/avatar, for now placeholder or use loaded profile?
-              // We don't have profile loaded here independently, we'd need to fetch.
-              // For MVP let's pass partial or fetch inside.
-              // Actually ReactionBar fetches profiles for display.
-              // But for *creating* the reaction, we need to save the Author's info in the record?
-              // No, 'playlist' metadata usually contains the Playlist Author info.
-              // Let's pass basic info we have or placeholder.
-              // Since we don't have 'profile' object here, we might want to fetch it.
-              // But let's skip stalling navigation.
+              handle: "User",
             },
           }}
         />
