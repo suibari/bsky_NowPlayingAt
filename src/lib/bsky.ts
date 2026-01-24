@@ -3,6 +3,7 @@ import { agent, userProfile } from '$lib/stores';
 import { publicAgent } from '$lib/atproto';
 import { getBacklinks } from '$lib/constellation';
 import type { Track } from '$lib/music';
+import { RichText } from '@atproto/api';
 
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
@@ -188,20 +189,88 @@ export async function postToFeed(track: Track, text?: string) {
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
 
-  const postText = text || `#NowPlaying ${track.title} - ${track.artist} \n\n${track.trackUri}`;
+  // 1. Determine Target Link & Description
+  let targetUrl = track.trackUri;
+  let serviceName = "Apple Music";
 
+  if (track.spotifyUrl) {
+    targetUrl = track.spotifyUrl;
+    serviceName = "Spotify";
+  } else if (track.youtubeMusicUrl) {
+    targetUrl = track.youtubeMusicUrl;
+    serviceName = "YouTube Music";
+  }
+
+  // 2. Handle Thumbnail Upload
+  let thumbBlob = undefined;
+  if (track.artworkUrl) {
+    try {
+      // Fetch image
+      const res = await fetch(track.artworkUrl.replace('100x100', '600x600'));
+      if (res.ok) {
+        const blob = await res.blob();
+        // Limit size if necessary (Bluesky limit is ~1MB for blobs, strictly enforced)
+        // iTunes 600x600 JPEGs are usually < 100KB, so safe.
+        const uploadRes = await ag.uploadBlob(blob, { encoding: "image/jpeg" });
+        thumbBlob = uploadRes.data.blob;
+      }
+    } catch (e) {
+      console.warn("Failed to upload thumbnail for post", e);
+    }
+  }
+
+  // 3. Construct Text & Facets
+  const profileLink = `https://nowplayingat.suibari.com/profile/${profile.did}`;
+  const linkLabel = "💿なうぷれあっとで見る";
+
+  // We construct the text segments
+  const segments = [
+    `#NowPlaying #なうぷれ`,
+    `\n${track.title} - ${track.artist}\n\n`,
+    linkLabel
+  ];
+
+  const finalString = segments.join('');
+
+  const rt = new RichText({ text: finalString });
+  await rt.detectFacets(ag); // Detect hashtags in the first part
+
+  const linkStartRequest = finalString.indexOf(linkLabel);
+
+  // Calculate byte offsets for the link label
+  const enc = new TextEncoder();
+  const leadingText = finalString.substring(0, linkStartRequest);
+  const linkText = finalString.substring(linkStartRequest, linkStartRequest + linkLabel.length);
+
+  const startByte = enc.encode(leadingText).byteLength;
+  const endByte = startByte + enc.encode(linkText).byteLength;
+
+  if (!rt.facets) rt.facets = [];
+  rt.facets.push({
+    index: {
+      byteStart: startByte,
+      byteEnd: endByte
+    },
+    features: [{
+      $type: 'app.bsky.richtext.facet#link',
+      uri: profileLink
+    }]
+  });
+
+  // 4. Construct Embed (External Link Card)
   const embed = {
     $type: 'app.bsky.embed.external',
     external: {
-      uri: track.trackUri,
+      uri: targetUrl,
       title: `${track.title} - ${track.artist}`,
-      description: `Listen on Apple Music`,
-      thumb: undefined
+      description: `Listen on ${serviceName}`,
+      thumb: thumbBlob
     }
   };
 
   return await ag.post({
-    text: postText,
+    text: rt.text,
+    facets: rt.facets,
     embed: embed,
     createdAt: new Date().toISOString()
   });
