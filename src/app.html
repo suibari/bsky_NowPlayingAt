@@ -1,11 +1,26 @@
 <!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		%sveltekit.head%
-	</head>
-	<body data-sveltekit-preload-data="hover">
-		<div style="display: contents">%sveltekit.body%</div>
-	</body>
+<html lang="ja">
+
+<head>
+	<meta charset="utf-8" />
+	<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta property="og:image" content="https://nowplayingat.suibari.com/ogp.png" />
+	<title>なうぷれあっと</title>
+	<meta name="description" content="音楽共有ATprotoサービス" />
+	<meta property="og:title" content="なうぷれあっと" />
+	<meta property="og:description" content="音楽共有ATprotoサービス" />
+	<meta property="og:url" content="https://nowplayingat.suibari.com/" />
+	<meta property="og:type" content="website" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="なうぷれあっと" />
+	<meta name="twitter:description" content="音楽共有ATprotoサービス" />
+	<meta name="twitter:image" content="https://nowplayingat.suibari.com/ogp.png" />
+	%sveltekit.head%
+</head>
+
+<body data-sveltekit-preload-data="hover">
+	<div style="display: contents">%sveltekit.body%</div>
+</body>
+
 </html>
