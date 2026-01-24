@@ -24,15 +24,27 @@ export interface ReactionRecord {
   $type: typeof NSID_REACTION;
   subjectUri: string;
   emoji: string;
-  // Metadata snapshot
-  track: string;
-  artist: string;
-  album: string;
-  img: string;
-  links: {
+
+  // Metadata
+  kind?: 'track' | 'playlist';
+
+  // Track Metadata (Flat fields for backward compat/legacy structure)
+  track?: string;
+  artist?: string;
+  album?: string;
+  img?: string;
+  links?: {
     spotify?: string;
     youtube?: string;
   };
+
+  // Playlist Metadata (Object)
+  playlist?: {
+    uri: string;
+    title: string;
+    author: { did: string; handle: string; avatar?: string; displayName?: string };
+  };
+
   createdAt: string;
 }
 

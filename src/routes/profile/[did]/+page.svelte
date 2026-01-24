@@ -117,7 +117,11 @@
   async function handleReaction(emoji: string) {
     if (!targetTrackForReaction) return;
     try {
-      await createReactionRecord(targetTrackForReaction, emoji);
+      await createReactionRecord({
+        subjectUri: targetTrackForReaction.trackUri,
+        emoji: emoji,
+        track: targetTrackForReaction,
+      });
       alert(`Reacted with ${emoji}!`);
       showReactionModal = false;
     } catch (e) {

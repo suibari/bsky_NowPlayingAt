@@ -136,7 +136,11 @@
   async function handleReaction(emoji: string) {
     if (!targetTrackForReaction) return;
     try {
-      await createReactionRecord(targetTrackForReaction, emoji);
+      await createReactionRecord({
+        subjectUri: targetTrackForReaction.trackUri,
+        emoji: emoji,
+        track: targetTrackForReaction,
+      });
       alert(`Reacted with ${emoji}!`);
       showReactionModal = false;
     } catch (e) {
@@ -373,25 +377,37 @@
                         on:reaction={(e) => openReactionModal(e.detail)}
                       />
                     {:else if item.type === "reaction"}
-                      <TrackCard
-                        track={{
-                          id: item.record.subjectUri,
-                          trackUri: item.record.subjectUri,
-                          title: item.record.track || "Unknown Track",
-                          artist: item.record.artist || "Unknown Artist",
-                          album: item.record.album,
-                          artworkUrl: item.record.img || "/placeholder_art.png",
-                          spotifyUrl: item.record.links?.spotify,
-                          youtubeMusicUrl: item.record.links?.youtube,
-                        }}
-                        on:nowPlaying={(e) =>
-                          executeNowPlaying(
-                            e.detail.track,
-                            e.detail.postToBsky,
-                          )}
-                        on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                        on:reaction={(e) => openReactionModal(e.detail)}
-                      />
+                      {#if item.record.kind === "playlist" && item.record.playlist}
+                        <PlaylistCard
+                          playlist={item.record.playlist.record || {
+                            name: item.record.playlist.title,
+                            tracks: [],
+                          }}
+                          author={item.record.playlist.author}
+                          rkey={item.record.playlist.uri.split("/").pop()}
+                        />
+                      {:else}
+                        <TrackCard
+                          track={{
+                            id: item.record.subjectUri,
+                            trackUri: item.record.subjectUri,
+                            title: item.record.track || "Unknown Track",
+                            artist: item.record.artist || "Unknown Artist",
+                            album: item.record.album,
+                            artworkUrl:
+                              item.record.img || "/placeholder_art.png",
+                            spotifyUrl: item.record.links?.spotify,
+                            youtubeMusicUrl: item.record.links?.youtube,
+                          }}
+                          on:nowPlaying={(e) =>
+                            executeNowPlaying(
+                              e.detail.track,
+                              e.detail.postToBsky,
+                            )}
+                          on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                          on:reaction={(e) => openReactionModal(e.detail)}
+                        />
+                      {/if}
                     {:else if item.type === "playlist"}
                       <PlaylistCard
                         playlist={item.record}

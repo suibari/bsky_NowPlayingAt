@@ -2,9 +2,10 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { agent, userProfile } from "$lib/stores";
-  import { getPlaylist, createReactionRecord, addToPlaylist } from "$lib/bsky";
+  import { getPlaylist, addToPlaylist } from "$lib/bsky";
   import { Loader2, X } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
+  import ReactionBar from "$lib/components/ReactionBar.svelte";
   import type { Track } from "$lib/music";
 
   // React to params
@@ -20,26 +21,7 @@
   // Drag State
   let draggingIndex: number | null = null;
 
-  // Modal State
-  let showReactionModal = false;
-  let targetTrackForReaction: Track | null = null;
-  const popularEmojis = [
-    "🔥",
-    "❤️",
-    "🥺",
-    "🎧",
-    "🕺",
-    "🤘",
-    "🎹",
-    "✨",
-    "💯",
-    "😭",
-    "😴",
-    "🍺",
-    "💿",
-    "🚀",
-  ];
-
+  // Playlist Modal State (Add to OTHER playlist)
   let showPlaylistModal = false;
   let targetTrackForPlaylist: Track | null = null;
   let myPlaylists: any[] = [];
@@ -138,22 +120,6 @@
     };
   }
 
-  function openReactionModal(track: Track) {
-    targetTrackForReaction = track;
-    showReactionModal = true;
-  }
-
-  async function handleReaction(emoji: string) {
-    if (!targetTrackForReaction) return;
-    try {
-      await createReactionRecord(targetTrackForReaction, emoji);
-      alert(`Reacted with ${emoji}!`);
-      showReactionModal = false;
-    } catch (e) {
-      alert("Failed to react: " + e);
-    }
-  }
-
   function openPlaylistModal(track: Track) {
     // Only if user is logged in
     targetTrackForPlaylist = track;
@@ -199,7 +165,7 @@
       <h1 class="text-4xl font-black text-white mb-2">
         {(playlistRecord.value as any).name || "Unnamed Playlist"}
       </h1>
-      <p class="text-gray-400">
+      <p class="text-gray-400 mb-4">
         Created by <a
           href={`/profile/${did}`}
           class="text-green-500 hover:underline">User</a
@@ -211,6 +177,31 @@
           >
         {/if}
       </p>
+
+      <!-- Playlist Reaction -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-500 uppercase font-bold tracking-wider"
+          >Reactions:</span
+        >
+        <ReactionBar
+          subjectUri={playlistRecord.uri}
+          playlist={{
+            record: playlistRecord.value,
+            author: {
+              did: did || "",
+              handle: "User", // Ideally fetch profile to get handle/avatar, for now placeholder or use loaded profile?
+              // We don't have profile loaded here independently, we'd need to fetch.
+              // For MVP let's pass partial or fetch inside.
+              // Actually ReactionBar fetches profiles for display.
+              // But for *creating* the reaction, we need to save the Author's info in the record?
+              // No, 'playlist' metadata usually contains the Playlist Author info.
+              // Let's pass basic info we have or placeholder.
+              // Since we don't have 'profile' object here, we might want to fetch it.
+              // But let's skip stalling navigation.
+            },
+          }}
+        />
+      </div>
     </div>
 
     <div class="space-y-4">
@@ -223,7 +214,6 @@
           showDragHandle={isOwner}
           isDragging={draggingIndex === index}
           {index}
-          on:reaction={(e) => openReactionModal(e.detail)}
           on:delete={(e) => removeTrack(e.detail)}
           on:dragstart={(e) => handleDragStart(e, index)}
           on:dragover={(e) => handleDragOver(e, index)}
@@ -242,41 +232,5 @@
     </div>
   {:else}
     <div class="text-center mt-20 text-red-500">Playlist not found</div>
-  {/if}
-
-  <!-- Reaction Modal -->
-  {#if showReactionModal}
-    <div
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      on:click|self={() => (showReactionModal = false)}
-      role="button"
-      tabindex="0"
-      on:keydown={(e) => e.key === "Escape" && (showReactionModal = false)}
-    >
-      <div
-        class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-sm shadow-2xl"
-      >
-        <div class="flex justify-between items-center mb-6">
-          <h2 class="text-xl font-bold text-white">Pick a Vibe</h2>
-          <button
-            on:click={() => (showReactionModal = false)}
-            class="text-gray-400 hover:text-white"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div class="grid grid-cols-5 gap-3 mb-6">
-          {#each popularEmojis as emoji}
-            <button
-              on:click={() => handleReaction(emoji)}
-              class="text-2xl hover:scale-125 transition-transform p-2 hover:bg-white/10 rounded-lg"
-            >
-              {emoji}
-            </button>
-          {/each}
-        </div>
-      </div>
-    </div>
   {/if}
 </div>

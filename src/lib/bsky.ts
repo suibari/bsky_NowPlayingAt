@@ -53,29 +53,46 @@ export async function getHistory(did: string) {
 
 // --- REACTIONS ---
 
-export async function createReactionRecord(track: Track, emoji: string) {
+export async function createReactionRecord(opts: {
+  subjectUri: string;
+  emoji: string;
+  track?: Track;
+  playlist?: { record: any; author: { did: string; handle: string; avatar?: string; displayName?: string } }
+}) {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
 
+  const record: any = {
+    $type: NSID_REACTION,
+    subjectUri: opts.subjectUri,
+    emoji: opts.emoji,
+    createdAt: new Date().toISOString()
+  };
+
+  if (opts.track) {
+    record.kind = 'track';
+    record.track = opts.track.title;
+    record.artist = opts.track.artist;
+    record.album = opts.track.album;
+    record.img = opts.track.artworkUrl;
+    record.links = {
+      spotify: opts.track.spotifyUrl,
+      youtube: opts.track.youtubeMusicUrl
+    };
+  } else if (opts.playlist) {
+    record.kind = 'playlist';
+    record.playlist = {
+      uri: opts.subjectUri,
+      title: opts.playlist.record.name,
+      author: opts.playlist.author
+    };
+  }
+
   return await ag.com.atproto.repo.createRecord({
     repo: profile.did,
     collection: NSID_REACTION,
-    record: {
-      $type: NSID_REACTION,
-      subjectUri: track.trackUri,
-      emoji: emoji,
-      // Metadata Snapshot
-      track: track.title,
-      artist: track.artist,
-      album: track.album,
-      img: track.artworkUrl,
-      links: {
-        spotify: track.spotifyUrl,
-        youtube: track.youtubeMusicUrl
-      },
-      createdAt: new Date().toISOString()
-    }
+    record: record
   });
 }
 
