@@ -2,12 +2,15 @@
   import { createEventDispatcher, onMount } from "svelte";
   import { Plus, Loader2 } from "lucide-svelte";
   import { getBacklinks } from "$lib/constellation";
-  import { hydrateReactions, createReactionRecord } from "$lib/bsky";
+  import {
+    hydrateReactions,
+    createReactionRecord,
+    deleteReactionRecord,
+  } from "$lib/bsky";
   import { REACTION_SOURCE } from "$lib/schema";
   import { publicAgent } from "$lib/atproto";
   import type { Track } from "$lib/music";
   import type { PlaylistRecord } from "$lib/schema";
-
   import { userProfile } from "$lib/stores";
   import { get } from "svelte/store";
 
@@ -34,6 +37,7 @@
     handle: string;
     avatar?: string;
     displayName?: string;
+    reactionUri?: string;
   }
   interface ReactionGroup {
     emoji: string;
@@ -73,15 +77,22 @@
       const res = await getBacklinks(subjectUri, REACTION_SOURCE);
       const hydrated = await hydrateReactions(res);
 
-      const groups: Record<string, string[]> = {};
-      hydrated.forEach(({ record, authorDid }) => {
+      // Group by emoji -> [{did, uri}]
+      const groups: Record<string, { did: string; uri: string }[]> = {};
+      hydrated.forEach(({ record, authorDid, uri }) => {
         if (record.emoji) {
           if (!groups[record.emoji]) groups[record.emoji] = [];
-          groups[record.emoji].push(authorDid);
+          groups[record.emoji].push({ did: authorDid, uri });
         }
       });
 
-      const allDids = Array.from(new Set(Object.values(groups).flat()));
+      const allDids = Array.from(
+        new Set(
+          Object.values(groups)
+            .flat()
+            .map((i) => i.did),
+        ),
+      );
       let profilesMap = new Map<string, ReactionUser>();
 
       if (allDids.length > 0) {
@@ -108,10 +119,16 @@
         }
       }
 
-      reactions = Object.entries(groups).map(([emoji, dids]) => ({
+      reactions = Object.entries(groups).map(([emoji, items]) => ({
         emoji,
-        users: dids
-          .map((did) => profilesMap.get(did) || { did, handle: "Unknown" })
+        users: items
+          .map((item) => {
+            const p = profilesMap.get(item.did);
+            const user = p
+              ? { ...p }
+              : { did: item.did, handle: "Unknown", displayName: "Unknown" };
+            return { ...user, reactionUri: item.uri } as ReactionUser;
+          })
           .filter((u): u is ReactionUser => !!u),
       }));
     } catch (e) {
@@ -120,7 +137,7 @@
     loadingReactions = false;
   }
 
-  async function handleAddReaction(emoji: string) {
+  async function handleToggleReaction(emoji: string) {
     if (!track && !playlist) return;
 
     // Optimistic Update
@@ -135,35 +152,71 @@
         displayName: currentUser.displayName,
       };
 
+      let existingUserIndex = -1;
+      let existingUser: ReactionUser | undefined;
+
       if (existingGroup) {
-        // Avoid duplicate pushing if already reacted?
-        // For now assuming allow multiple or just pushing for UI feedback.
-        // Check if user already in group?
-        if (!existingGroup.users.find((u) => u.did === currentUser.did)) {
-          existingGroup.users = [...existingGroup.users, optimisticUser];
-          reactions = reactions; // Trigger reactivity
+        existingUserIndex = existingGroup.users.findIndex(
+          (u) => u.did === currentUser.did,
+        );
+        existingUser = existingGroup.users[existingUserIndex];
+      }
+
+      if (existingUser && existingGroup) {
+        // REMOVE
+        const oldUsers = [...existingGroup.users];
+        existingGroup.users.splice(existingUserIndex, 1);
+        if (existingGroup.users.length === 0) {
+          reactions.splice(reactions.indexOf(existingGroup), 1);
+        }
+        reactions = reactions;
+
+        try {
+          if (existingUser.reactionUri) {
+            const rkey = existingUser.reactionUri.split("/").pop();
+            if (rkey) await deleteReactionRecord(rkey);
+          } else {
+            console.warn("No URI for reaction, cannot delete remotely yet.");
+            loadReactions();
+          }
+        } catch (e) {
+          console.error("Failed to delete reaction", e);
+          alert("Failed to remove reaction.");
+          loadReactions();
         }
       } else {
-        reactions = [...reactions, { emoji, users: [optimisticUser] }];
+        // ADD
+        if (existingGroup) {
+          existingGroup.users = [...existingGroup.users, optimisticUser];
+          reactions = reactions;
+        } else {
+          reactions = [...reactions, { emoji, users: [optimisticUser] }];
+        }
+
+        try {
+          const res = await createReactionRecord({
+            subjectUri,
+            emoji,
+            track,
+            playlist,
+          });
+          // Update optimistic user with URI
+          const g = reactions.find((r) => r.emoji === emoji);
+          const u = g?.users.find((u) => u.did === currentUser.did);
+          if (u) {
+            u.reactionUri = (res as any).uri;
+          }
+          dispatch("reaction", emoji);
+        } catch (e) {
+          console.error("Failed to save reaction:", e);
+          alert("Failed to save reaction.");
+          loadReactions();
+        }
       }
     }
-
-    try {
-      await createReactionRecord({
-        subjectUri,
-        emoji,
-        track,
-        playlist,
-      });
-      // No reloadReactions() here to avoid flicker if indexer is slow.
-      // We trust the optimistic update.
-      dispatch("reaction", emoji);
-    } catch (e) {
-      console.error("Failed to save reaction:", e);
-      alert("Failed to save reaction.");
-      loadReactions(); // Revert on failure
-    }
   }
+
+  const handleAddReaction = handleToggleReaction;
 </script>
 
 <div class="flex flex-wrap items-center gap-2 min-h-[2rem]">
@@ -205,14 +258,14 @@
     </div>
   {:else if reactions.length > 0}
     {#each reactions as rx}
-      <div
+      <button
         class="relative group"
         on:mouseenter={() => (hoveredEmoji = rx.emoji)}
         on:mouseleave={() => (hoveredEmoji = null)}
-        role="group"
+        on:click={() => handleToggleReaction(rx.emoji)}
       >
         <div
-          class="flex items-center gap-1 bg-gray-800/80 rounded-full px-3 py-1 border border-gray-700 font-bold text-white shadow-sm cursor-help select-none hover:border-green-500/50 transition-colors"
+          class="flex items-center gap-1 bg-gray-800/80 rounded-full px-3 py-1 border border-gray-700 font-bold text-white shadow-sm cursor-pointer select-none hover:border-green-500/50 transition-colors"
         >
           <span class="text-sm">{rx.emoji}</span>
           <span class="text-xs text-green-500 ml-1">{rx.users.length}</span>
@@ -254,7 +307,7 @@
             </div>
           </div>
         {/if}
-      </div>
+      </button>
     {/each}
   {:else}
     <span class="text-xs text-gray-600 italic ml-1">No reactions yet</span>

@@ -14,7 +14,7 @@
   import ReactionBar from "$lib/components/ReactionBar.svelte";
 
   export let track: Track;
-  export let isOwner: boolean = false;
+
   export let showDelete: boolean = false;
   export let showDragHandle: boolean = false;
   export let isDragging: boolean = false; // Styling state

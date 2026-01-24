@@ -236,7 +236,6 @@
           {#each history as item}
             <TrackCard
               track={mapHistoryToTrack(item)}
-              isOwner={false}
               on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
             />
           {/each}

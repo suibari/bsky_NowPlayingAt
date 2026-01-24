@@ -53,6 +53,18 @@ export async function getHistory(did: string) {
 
 // --- REACTIONS ---
 
+export async function deleteReactionRecord(rkey: string) {
+  const ag = get(agent);
+  const profile = get(userProfile);
+  if (!ag || !profile) throw new Error("Not authenticated");
+
+  return await ag.com.atproto.repo.deleteRecord({
+    repo: profile.did,
+    collection: NSID_REACTION,
+    rkey: rkey
+  });
+}
+
 export async function createReactionRecord(opts: {
   subjectUri: string;
   emoji: string;
@@ -322,8 +334,8 @@ export async function getGlobalTimeline() {
 import { getPdsEndpoint } from '$lib/atproto';
 import { type ConstellationRecord, type ReactionRecord } from '$lib/schema';
 
-export async function hydrateReactions(records: ConstellationRecord[]): Promise<{ record: ReactionRecord, authorDid: string }[]> {
-  const results: { record: ReactionRecord, authorDid: string }[] = [];
+export async function hydrateReactions(records: ConstellationRecord[]): Promise<{ record: ReactionRecord, authorDid: string, uri: string }[]> {
+  const results: { record: ReactionRecord, authorDid: string, uri: string }[] = [];
   const pdsCache = new Map<string, string | null>();
 
   // Process in parallel
@@ -348,7 +360,8 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
         if (json.value) {
           results.push({
             record: json.value as ReactionRecord,
-            authorDid: rec.did
+            authorDid: rec.did,
+            uri: json.uri || `at://${rec.did}/${rec.collection}/${rec.rkey}`
           });
         }
       }

@@ -209,7 +209,6 @@
       {#each tracks as track, index (track.trackUri + index)}
         <TrackCard
           track={mapToTrack(track)}
-          isOwner={false}
           showDelete={isOwner}
           showDragHandle={isOwner}
           isDragging={draggingIndex === index}
