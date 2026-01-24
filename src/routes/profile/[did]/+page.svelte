@@ -9,7 +9,7 @@
     createReactionRecord,
     addToPlaylist,
   } from "$lib/bsky";
-  import { Loader2, Music, Disc, Plus, X } from "lucide-svelte";
+  import { Loader2, Music, Disc, Plus, X, Settings } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import type { Track } from "$lib/music";
 
@@ -118,26 +118,38 @@
 </script>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto">
-  <a
-    href="/"
-    class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 mb-6 transition-colors"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      ><line x1="19" y1="12" x2="5" y2="12" /><polyline
-        points="12 19 5 12 12 5"
-      /></svg
+  <div class="flex justify-between items-center mb-6">
+    <a
+      href="/"
+      class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 transition-colors"
     >
-    Back to Home
-  </a>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        ><line x1="19" y1="12" x2="5" y2="12" /><polyline
+          points="12 19 5 12 12 5"
+        /></svg
+      >
+      Back to Home
+    </a>
+
+    {#if isOwner}
+      <a
+        href="/settings"
+        class="text-gray-400 hover:text-white transition-colors p-2"
+        title="Settings"
+      >
+        <Settings size={20} />
+      </a>
+    {/if}
+  </div>
 
   {#if loading}
     <div class="flex justify-center mt-20">

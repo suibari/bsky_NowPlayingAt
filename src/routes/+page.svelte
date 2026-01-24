@@ -1,6 +1,6 @@
 <script lang="ts">
   import { authState, userProfile } from "$lib/stores";
-  import { signIn, signOut } from "$lib/atproto";
+  import { signIn } from "$lib/atproto";
   import {
     createHistoryRecord,
     postToFeed,
@@ -139,13 +139,6 @@
             >{$userProfile?.displayName || $userProfile?.handle}</span
           >
         </a>
-
-        <button
-          class="px-3 py-1 rounded-md bg-gray-900 border border-gray-800 hover:bg-red-900/20 hover:border-red-900/50 hover:text-red-400 text-xs text-gray-400 transition-all ml-2"
-          on:click={() => signOut($userProfile?.did || "")}
-        >
-          Sign Out
-        </button>
       </div>
     </div>
 
