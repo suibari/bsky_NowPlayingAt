@@ -8,6 +8,7 @@
     createPlaylist,
     createReactionRecord,
     addToPlaylist,
+    deleteHistoryRecord,
   } from "$lib/bsky";
   import { Loader2, Music, Disc, Plus, X, Settings } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
@@ -127,6 +128,27 @@
       showPlaylistModal = false;
     } catch (e) {
       alert("Failed to add: " + e);
+    }
+  }
+
+  async function handleDeleteHistory(idx: number) {
+    if (!confirm("Remove this track from history?")) return;
+    const item = history[idx];
+    if (!item) return;
+
+    // Optimistic update
+    const oldHistory = [...history];
+    history = history.filter((_, i) => i !== idx);
+
+    try {
+      const rkey = item.uri.split("/").pop();
+      if (rkey) {
+        await deleteHistoryRecord(rkey);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to delete history item");
+      history = oldHistory; // Revert
     }
   }
 </script>
@@ -259,10 +281,13 @@
       {:else}
         <!-- HISTORY LIST -->
         <div class="space-y-4">
-          {#each history as item}
+          {#each history as item, i}
             <TrackCard
               track={mapHistoryToTrack(item)}
+              showDelete={isOwner}
+              index={i}
               on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+              on:delete={(e) => handleDeleteHistory(e.detail)}
             />
           {/each}
           {#if history.length === 0}

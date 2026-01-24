@@ -18,7 +18,7 @@ export async function createHistoryRecord(track: MusicTrack) {
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
 
-  await ensureConfig();
+  // await ensureConfig();
 
   const record: HistoryRecord = {
     $type: NSID_HISTORY,
@@ -53,6 +53,18 @@ export async function getHistory(did: string): Promise<{ uri: string, cid: strin
     limit: 50
   });
   return res.data.records as unknown as { uri: string, cid: string, value: HistoryRecord }[];
+}
+
+export async function deleteHistoryRecord(rkey: string) {
+  const ag = get(agent);
+  const profile = get(userProfile);
+  if (!ag || !profile) throw new Error("Not authenticated");
+
+  return await ag.com.atproto.repo.deleteRecord({
+    repo: profile.did,
+    collection: NSID_HISTORY,
+    rkey: rkey
+  });
 }
 
 // --- REACTIONS ---
@@ -154,6 +166,18 @@ export async function getPlaylist(did: string, rkey: string) {
     rkey: rkey
   });
   return res.data;
+}
+
+export async function deletePlaylist(rkey: string) {
+  const ag = get(agent);
+  const profile = get(userProfile);
+  if (!ag || !profile) throw new Error("Not authenticated");
+
+  return await ag.com.atproto.repo.deleteRecord({
+    repo: profile.did,
+    collection: NSID_PLAYLIST,
+    rkey: rkey
+  });
 }
 
 export async function addToPlaylist(playlistUri: string, track: MusicTrack, currentPlaylistRecordWrapper: { uri: string, cid: string, value: PlaylistRecord }) {

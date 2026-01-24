@@ -4,8 +4,8 @@
   import { publicAgent } from "$lib/atproto";
   import { RichText } from "@atproto/api";
   import { agent, userProfile } from "$lib/stores";
-  import { getPlaylist, addToPlaylist } from "$lib/bsky";
-  import { Loader2, X, Share2 } from "lucide-svelte";
+  import { getPlaylist, addToPlaylist, deletePlaylist } from "$lib/bsky";
+  import { Loader2, X, Share2, Trash2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReactionBar from "$lib/components/ReactionBar.svelte";
   import { generatePlaylistThumbnail } from "$lib/thumbnail";
@@ -222,6 +222,24 @@
     // Given complexity, let's keep it simple or implement if time permits.
     // Let's try to implement.
   }
+
+  async function handleDeletePlaylist() {
+    if (
+      !confirm(
+        "Are you sure you want to delete this playlist? This cannot be undone.",
+      )
+    )
+      return;
+    try {
+      if (rkey) {
+        await deletePlaylist(rkey);
+        alert("Playlist deleted.");
+        window.location.href = `/profile/${did}`;
+      }
+    } catch (e) {
+      alert("Failed to delete playlist: " + e);
+    }
+  }
 </script>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto relative">
@@ -248,13 +266,15 @@
     </a>
 
     <!-- Share Button -->
-    <button
-      on:click={openShareModal}
-      class="p-2 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
-      title="Share Playlist"
-    >
-      <Share2 size={24} />
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        on:click={openShareModal}
+        class="p-2 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+        title="Share Playlist"
+      >
+        <Share2 size={24} />
+      </button>
+    </div>
   </div>
 
   {#if loading}
@@ -263,9 +283,20 @@
     </div>
   {:else if playlistRecord}
     <div class="mb-8 border-b border-gray-800 pb-6 relative">
-      <h1 class="text-4xl font-black text-white mb-2 pr-12">
-        {(playlistRecord.value as any).name || "Unnamed Playlist"}
-      </h1>
+      <div class="flex justify-between items-start gap-4">
+        <h1 class="text-4xl font-black text-white mb-2 pr-12 break-words">
+          {(playlistRecord.value as any).name || "Unnamed Playlist"}
+        </h1>
+        {#if isOwner}
+          <button
+            on:click={handleDeletePlaylist}
+            class="p-2 rounded-full hover:bg-gray-800 text-gray-400 hover:text-red-500 transition-colors shrink-0 mt-1"
+            title="Delete Playlist"
+          >
+            <Trash2 size={24} />
+          </button>
+        {/if}
+      </div>
       <p class="text-gray-400 mb-4 flex items-center gap-1">
         Created by
         <a
