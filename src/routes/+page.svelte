@@ -481,8 +481,24 @@
           </h2>
 
           <div class="space-y-4 text-sm text-gray-300 leading-relaxed">
+            <div>
+              <p>
+                なうぷれあっと（以下、本アプリ）は AT protocol
+                の音楽共有サービスです。
+              </p>
+              <ul class="list-disc pl-5 mt-1">
+                <li>自分の再生した曲を検索してシェアしよう！</li>
+                <li>オリジナルのプレイリストを作ってシェアしよう！</li>
+                <li>
+                  ビビッときた曲、プレイリストには絵文字リアクションを送ろう！
+                </li>
+              </ul>
+            </div>
+
+            <hr class="border-gray-800" />
+
             <p>
-              なうぷれあっと（以下、本アプリ）は
+              本アプリは
               <a
                 href="https://bsky.app/profile/suibari.com"
                 target="_blank"
