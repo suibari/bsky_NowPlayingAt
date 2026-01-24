@@ -206,8 +206,8 @@ export async function ensureConfig() {
 import { getPdsEndpoint } from '$lib/atproto';
 import { type ConstellationRecord, type ReactionRecord } from '$lib/schema';
 
-export async function hydrateReactions(records: ConstellationRecord[]): Promise<ReactionRecord[]> {
-  const results: ReactionRecord[] = [];
+export async function hydrateReactions(records: ConstellationRecord[]): Promise<{ record: ReactionRecord, authorDid: string }[]> {
+  const results: { record: ReactionRecord, authorDid: string }[] = [];
   const pdsCache = new Map<string, string | null>();
 
   // Process in parallel
@@ -230,7 +230,10 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
         const json = await res.json();
         // json.value is the record
         if (json.value) {
-          results.push(json.value as ReactionRecord);
+          results.push({
+            record: json.value as ReactionRecord,
+            authorDid: rec.did
+          });
         }
       }
     } catch (e) {

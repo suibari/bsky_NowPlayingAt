@@ -23,19 +23,31 @@
   export let isDragging: boolean = false; // Styling state
   export let index: number = 0; // For drag reference
 
+  import { agent } from "$lib/stores";
+  import { get } from "svelte/store";
+
   const dispatch = createEventDispatcher();
 
   let expanded = false;
   let postToBsky = false;
 
   // Reaction State (Grouped)
+  interface ReactionUser {
+    did: string;
+    handle: string;
+    avatar?: string;
+    displayName?: string;
+  }
   interface ReactionGroup {
     emoji: string;
-    count: number;
+    users: ReactionUser[];
   }
   let reactions: ReactionGroup[] = [];
   let loadingReactions = false;
   let loadedReactions = false;
+
+  // Hover State
+  let hoveredEmoji: string | null = null;
 
   // Link Resolution
   let resolvingLink: "spotify" | "ytmusic" | null = null;
@@ -54,20 +66,52 @@
     loadingReactions = true;
     try {
       const res = await getBacklinks(track.trackUri, REACTION_SOURCE);
+      const hydrated = await hydrateReactions(res);
 
-      const records = await hydrateReactions(res);
+      // Group by emoji -> dids
+      const groups: Record<string, string[]> = {};
+      hydrated.forEach(({ record, authorDid }) => {
+        if (record.emoji) {
+          if (!groups[record.emoji]) groups[record.emoji] = [];
+          groups[record.emoji].push(authorDid);
+        }
+      });
 
-      const counts: Record<string, number> = {};
+      // Fetch profiles
+      const allDids = Array.from(new Set(Object.values(groups).flat()));
+      const ag = get(agent);
+      let profilesMap = new Map<string, ReactionUser>();
 
-      for (const r of records) {
-        if (r.emoji) {
-          counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+      if (ag && allDids.length > 0) {
+        try {
+          // Chunk requests if needed (limit 25)
+          const chunks = [];
+          for (let i = 0; i < allDids.length; i += 25) {
+            chunks.push(allDids.slice(i, i + 25));
+          }
+
+          for (const chunk of chunks) {
+            const pRes = await ag.app.bsky.actor.getProfiles({ actors: chunk });
+            pRes.data.profiles.forEach((p) => {
+              profilesMap.set(p.did, {
+                did: p.did,
+                handle: p.handle,
+                avatar: p.avatar,
+                displayName: p.displayName,
+              });
+            });
+          }
+        } catch (e) {
+          console.error("Failed to fetch profiles", e);
         }
       }
 
-      reactions = Object.entries(counts).map(([emoji, count]) => ({
+      // Build reaction groups
+      reactions = Object.entries(groups).map(([emoji, dids]) => ({
         emoji,
-        count,
+        users: dids
+          .map((did) => profilesMap.get(did) || { did, handle: "Unknown" })
+          .filter((u): u is ReactionUser => !!u),
       }));
 
       loadedReactions = true;
@@ -253,27 +297,84 @@
       on:click|stopPropagation={() => {}}
     >
       <!-- Reactions Showcase -->
-      <div class="mb-2">
+      <div class="flex flex-wrap items-center gap-2 min-h-[2rem]">
+        <!-- Add Reaction Button (Left) -->
+        <button
+          on:click={handleReaction}
+          class="flex items-center justify-center w-8 h-8 rounded-full bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors border border-gray-700"
+          title="Add Reaction"
+        >
+          <Plus size={16} />
+        </button>
+
         {#if loadingReactions}
           <div class="flex items-center gap-2 text-xs text-gray-500">
-            <Loader2 size={12} class="animate-spin" /> Loading reactions...
+            <Loader2 size={12} class="animate-spin" />
           </div>
         {:else if reactions.length > 0}
-          <div class="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
-            {#each reactions as rx}
+          <!-- Reaction Badges -->
+          {#each reactions as rx}
+            <div
+              class="relative group"
+              on:mouseenter={() => (hoveredEmoji = rx.emoji)}
+              on:mouseleave={() => (hoveredEmoji = null)}
+              role="group"
+            >
               <div
-                class="flex items-center gap-1 bg-gray-800/80 rounded-full px-3 py-1 border border-gray-700 font-bold text-white shadow-sm"
-                title={`${rx.count} reactions`}
+                class="flex items-center gap-1 bg-gray-800/80 rounded-full px-3 py-1 border border-gray-700 font-bold text-white shadow-sm cursor-help select-none"
               >
                 <span class="text-sm">{rx.emoji}</span>
-                <span class="text-xs text-green-500 ml-1">{rx.count}</span>
+                <span class="text-xs text-green-500 ml-1"
+                  >{rx.users.length}</span
+                >
               </div>
-            {/each}
-          </div>
+
+              <!-- Hover Tooltip -->
+              {#if hoveredEmoji === rx.emoji}
+                <div
+                  class="absolute bottom-full left-1/2 -translate-x-1/2 z-50 flex flex-col items-center pb-2 animate-fade-in"
+                >
+                  <div
+                    class="w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-2 flex flex-col gap-1"
+                  >
+                    <div
+                      class="text-xs text-gray-500 font-bold px-1 mb-1 border-b border-gray-800 pb-1"
+                    >
+                      Reacted by:
+                    </div>
+                    {#each rx.users as user}
+                      <a
+                        href={`/profile/${user.did}`}
+                        class="flex items-center gap-2 p-1 hover:bg-gray-800 rounded transition-colors group/user"
+                      >
+                        {#if user ? user.avatar : false}
+                          <img
+                            src={user.avatar}
+                            alt={user.handle}
+                            class="w-5 h-5 rounded-full bg-gray-800"
+                          />
+                        {:else}
+                          <div class="w-5 h-5 rounded-full bg-gray-700"></div>
+                        {/if}
+                        <div class="flex flex-col min-w-0">
+                          <span
+                            class="text-xs font-bold text-white truncate group-hover/user:text-green-400"
+                            >{user
+                              ? user.displayName || user.handle
+                              : "Unknown"}</span
+                          >
+                        </div>
+                      </a>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+          {/each}
         {:else}
-          <p class="text-xs text-gray-600 italic">
-            No reactions yet. Be the first!
-          </p>
+          <span class="text-xs text-gray-600 italic ml-1"
+            >No reactions yet. Be the first!</span
+          >
         {/if}
       </div>
 
@@ -307,12 +408,7 @@
         >
           <Plus size={16} /> Add to Playlist
         </button>
-        <button
-          on:click={handleReaction}
-          class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
-        >
-          <MessageSquarePlus size={16} /> React
-        </button>
+        <!-- React button removed from here, moved to top -->
       </div>
     </div>
   {/if}
