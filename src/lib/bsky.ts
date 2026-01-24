@@ -4,7 +4,7 @@ import { publicAgent } from '$lib/atproto';
 import { getBacklinks } from '$lib/constellation';
 import type { Track as MusicTrack } from '$lib/music';
 import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
-import { RichText } from '@atproto/api';
+import { RichText, Agent } from '@atproto/api';
 
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
@@ -43,10 +43,11 @@ export async function createHistoryRecord(track: MusicTrack) {
 }
 
 export async function getHistory(did: string): Promise<{ uri: string, cid: string, value: HistoryRecord }[]> {
-  const ag = get(agent);
-  if (!ag) throw new Error("Not authenticated");
+  const pds = await getPdsEndpoint(did);
+  if (!pds) return [];
 
-  const res = await ag.com.atproto.repo.listRecords({
+  const pdsAgent = new Agent({ service: pds });
+  const res = await pdsAgent.com.atproto.repo.listRecords({
     repo: did,
     collection: NSID_HISTORY,
     limit: 50
@@ -131,10 +132,11 @@ export async function createPlaylist(name: string) {
 }
 
 export async function getPlaylists(did: string): Promise<{ uri: string, cid: string, value: PlaylistRecord }[]> {
-  const ag = get(agent);
-  if (!ag) throw new Error("Not authenticated");
+  const pds = await getPdsEndpoint(did);
+  if (!pds) return [];
 
-  const res = await ag.com.atproto.repo.listRecords({
+  const pdsAgent = new Agent({ service: pds });
+  const res = await pdsAgent.com.atproto.repo.listRecords({
     repo: did,
     collection: NSID_PLAYLIST
   });
@@ -142,10 +144,11 @@ export async function getPlaylists(did: string): Promise<{ uri: string, cid: str
 }
 
 export async function getPlaylist(did: string, rkey: string) {
-  const ag = get(agent);
-  if (!ag) throw new Error("Not authenticated");
+  const pds = await getPdsEndpoint(did);
+  if (!pds) throw new Error("PDS not found");
 
-  const res = await ag.com.atproto.repo.getRecord({
+  const pdsAgent = new Agent({ service: pds });
+  const res = await pdsAgent.com.atproto.repo.getRecord({
     repo: did,
     collection: NSID_PLAYLIST,
     rkey: rkey
@@ -327,7 +330,7 @@ export async function ensureConfig() {
         }
       });
 
-      await createPlaylist("Favorites");
+      await createPlaylist("お気に入り");
     }
   } catch (e) {
     console.warn("Failed to check/create config:", e);
@@ -368,23 +371,27 @@ export async function getGlobalTimeline() {
     const pds = await getPdsEndpoint(did);
     if (!pds) return;
 
+    // Use Agent instead of fetch
+    const pdsAgent = new Agent({ service: pds });
+
     const fetchCollection = async (collection: string, typeName: string) => {
       try {
-        const url = `${pds}/xrpc/com.atproto.repo.listRecords?repo=${did}&collection=${collection}&limit=5`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          data.records.forEach((r: any) => {
-            timelineItems.push({
-              type: typeName,
-              author: profile || { did, handle: 'unknown' },
-              record: r.value,
-              uri: r.uri,
-              cid: r.cid,
-              indexedAt: r.value.postedAt || r.value.createdAt
-            });
+        const res = await pdsAgent.com.atproto.repo.listRecords({
+          repo: did,
+          collection: collection,
+          limit: 5
+        });
+
+        res.data.records.forEach((r: any) => {
+          timelineItems.push({
+            type: typeName,
+            author: profile || { did, handle: 'unknown' },
+            record: r.value,
+            uri: r.uri,
+            cid: r.cid,
+            indexedAt: r.value.postedAt || r.value.createdAt
           });
-        }
+        });
       } catch (e) { console.warn(`Failed fetch ${collection} for ${did}`, e); }
     };
 
@@ -421,20 +428,19 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
 
       if (!pds) return;
 
-      // Direct XRPC fetch to PDS
-      const url = `${pds}/xrpc/com.atproto.repo.getRecord?repo=${rec.did}&collection=${rec.collection}&rkey=${rec.rkey}`;
-      const res = await fetch(url);
+      const pdsAgent = new Agent({ service: pds });
+      const res = await pdsAgent.com.atproto.repo.getRecord({
+        repo: rec.did,
+        collection: rec.collection,
+        rkey: rec.rkey
+      });
 
-      if (res.ok) {
-        const json = await res.json();
-        // json.value is the record
-        if (json.value) {
-          results.push({
-            record: json.value as ReactionRecord,
-            authorDid: rec.did,
-            uri: json.uri || `at://${rec.did}/${rec.collection}/${rec.rkey}`
-          });
-        }
+      if (res.success && res.data.value) {
+        results.push({
+          record: res.data.value as unknown as ReactionRecord,
+          authorDid: rec.did,
+          uri: res.data.uri || `at://${rec.did}/${rec.collection}/${rec.rkey}`
+        });
       }
     } catch (e) {
       console.warn(`Failed to hydrate reaction for ${rec.did}:`, e);
