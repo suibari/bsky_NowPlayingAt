@@ -67,16 +67,16 @@
   }
 
   async function handleCreatePlaylist() {
-    const name = prompt("Enter playlist name:");
+    const name = prompt("プレイリスト名を入力してください:");
     if (!name) return;
 
     try {
       await createPlaylist(name);
       // Refresh playlists
       playlists = await getPlaylists(did!);
-      alert("Playlist created!");
+      alert("プレイリストを作成しました！");
     } catch (e) {
-      alert("Failed to create playlist: " + e);
+      alert("作成に失敗しました: " + e);
     }
   }
 
@@ -124,15 +124,15 @@
     if (!targetTrackForPlaylist) return;
     try {
       await addToPlaylist(playlist.uri, targetTrackForPlaylist, playlist);
-      alert(`Added to ${playlist.value.name}!`);
+      alert(`"${playlist.value.name}" に追加しました！`);
       showPlaylistModal = false;
     } catch (e) {
-      alert("Failed to add: " + e);
+      alert("追加に失敗しました: " + e);
     }
   }
 
   async function handleDeleteHistory(idx: number) {
-    if (!confirm("Remove this track from history?")) return;
+    if (!confirm("再生履歴から削除しますか？")) return;
     const item = history[idx];
     if (!item) return;
 
@@ -147,7 +147,7 @@
       }
     } catch (e) {
       console.error(e);
-      alert("Failed to delete history item");
+      alert("再生履歴の削除に失敗しました");
       history = oldHistory; // Revert
     }
   }
@@ -173,7 +173,7 @@
           points="12 19 5 12 12 5"
         /></svg
       >
-      Back to Home
+      ホームに戻る
     </a>
 
     {#if isOwner}
@@ -219,7 +219,7 @@
           : 'border-transparent text-gray-400 hover:text-gray-200'}"
         on:click={() => (activeTab = "playlists")}
       >
-        Playlists
+        プレイリスト
       </button>
       <button
         class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
@@ -228,7 +228,7 @@
           : 'border-transparent text-gray-400 hover:text-gray-200'}"
         on:click={() => (activeTab = "history")}
       >
-        History
+        履歴
       </button>
     </div>
 
@@ -247,7 +247,7 @@
                 size={32}
               />
               <span class="text-gray-500 group-hover:text-white font-medium"
-                >Create New Playlist</span
+                >新規プレイリスト作成</span
               >
             </button>
           {/if}
@@ -265,17 +265,17 @@
                   <h3 class="font-bold text-lg text-white">{pl.value.name}</h3>
                 </div>
                 <span class="text-xs text-gray-500"
-                  >{pl.value.tracks?.length || 0} tracks</span
+                  >{pl.value.tracks?.length || 0} 曲</span
                 >
               </div>
               <div class="text-xs text-gray-400 truncate">
                 {pl.value.tracks?.map((t: SchemaTrack) => t.track).join(", ") ||
-                  "Empty playlist"}
+                  "空のプレイリスト"}
               </div>
             </a>
           {/each}
           {#if playlists.length === 0 && !isOwner}
-            <p class="text-gray-500 italic">No playlists found.</p>
+            <p class="text-gray-500 italic">プレイリストが見つかりません。</p>
           {/if}
         </div>
       {:else}
@@ -291,7 +291,7 @@
             />
           {/each}
           {#if history.length === 0}
-            <p class="text-gray-500 italic">No history yet.</p>
+            <p class="text-gray-500 italic">履歴がまだありません。</p>
           {/if}
         </div>
       {/if}
@@ -311,7 +311,7 @@
         class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
       >
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-white">Add to Playlist</h2>
+          <h2 class="text-xl font-bold text-white">プレイリストに追加</h2>
           <button
             on:click={() => (showPlaylistModal = false)}
             class="text-gray-400 hover:text-white"
@@ -328,13 +328,15 @@
               >
                 <span class="font-medium text-white">{pl.value.name}</span>
                 <span class="text-xs text-gray-500"
-                  >{pl.value.tracks?.length || 0} songs</span
+                  >{pl.value.tracks?.length || 0} 曲</span
                 >
               </button>
             {/each}
           </div>
         {:else}
-          <div class="text-center text-gray-500 py-6">No playlists found.</div>
+          <div class="text-center text-gray-500 py-6">
+            プレイリストが見つかりません。
+          </div>
         {/if}
       </div>
     </div>

@@ -5,7 +5,7 @@
   import { goto } from "$app/navigation";
 
   async function handleSignOut() {
-    if (!confirm("Are you sure you want to sign out?")) return;
+    if (!confirm("サインアウトしますか？")) return;
     await signOut($userProfile?.did || "");
     goto("/");
   }
@@ -17,10 +17,10 @@
     class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 mb-8 transition-colors"
   >
     <ArrowLeft size={20} />
-    Back to Home
+    ホームに戻る
   </a>
 
-  <h1 class="text-3xl font-black text-white mb-8">Settings</h1>
+  <h1 class="text-3xl font-black text-white mb-8">設定</h1>
 
   {#if $userProfile}
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
@@ -46,15 +46,15 @@
           class="w-full flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 border border-red-900/50 text-red-400 font-bold py-3 rounded-lg transition-colors"
         >
           <LogOut size={20} />
-          Sign Out
+          サインアウト
         </button>
       </div>
     </div>
   {:else}
     <div class="text-center text-gray-500">
-      <p>Not signed in.</p>
+      <p>サインインしていません。</p>
       <a href="/" class="text-green-500 hover:underline mt-2 inline-block"
-        >Go to Login</a
+        >ログイン画面へ</a
       >
     </div>
   {/if}

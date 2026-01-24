@@ -57,7 +57,7 @@
     </div>
 
     {#if playlist.tracks}
-      <p class="text-xs text-gray-500 mt-1">{playlist.tracks.length} tracks</p>
+      <p class="text-xs text-gray-500 mt-1">{playlist.tracks.length} 曲</p>
     {/if}
   </div>
 </div>

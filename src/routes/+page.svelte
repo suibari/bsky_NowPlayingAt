@@ -42,7 +42,7 @@
     } catch (e) {
       console.error(e);
       isSigningIn = false;
-      alert("Sign in failed: " + e);
+      alert("サインインに失敗しました: " + e);
     }
   }
 
@@ -62,7 +62,7 @@
   }
 
   async function executeNowPlaying(track: Track, postToBsky: boolean) {
-    if (!confirm(`Post "${track.title}" to NowPlaying?`)) return;
+    if (!confirm(`"${track.title}" を再生履歴に追加しますか？`)) return;
 
     try {
       // 1. Write to History (PDS)
@@ -73,10 +73,10 @@
         await postToFeed(track);
       }
 
-      alert("Posted NowPlaying successfully!");
+      alert("再生履歴に追加しました！");
     } catch (e) {
       console.error(e);
-      alert("Failed to post: " + e);
+      alert("投稿に失敗しました: " + e);
     }
   }
 
@@ -101,10 +101,10 @@
     if (!targetTrack) return;
     try {
       await addToPlaylist(playlist.uri, targetTrack, playlist);
-      alert(`Added to ${playlist.value.name}!`);
+      alert(`"${playlist.value.name}" に追加しました！`);
       showPlaylistModal = false;
     } catch (e) {
-      alert("Failed to add: " + e);
+      alert("追加に失敗しました: " + e);
     }
   }
 
@@ -295,15 +295,17 @@
                           {item.author.displayName || item.author.handle}
                         </span>
                         {#if item.type === "history"}
-                          <span class="text-gray-500">listened to a track</span>
+                          <span class="text-gray-500">が聴いています</span>
                         {:else if item.type === "reaction"}
                           <span class="text-gray-500">
-                            reacted with <span class="text-lg"
+                            がリアクションしました <span class="text-lg"
                               >{item.record.emoji}</span
                             >
                           </span>
                         {:else if item.type === "playlist"}
-                          <span class="text-gray-500">created a playlist</span>
+                          <span class="text-gray-500"
+                            >がプレイリストを作成しました</span
+                          >
                         {/if}
                       </div>
                       <div class="text-xs text-gray-600">
@@ -378,7 +380,7 @@
             </div>
           {:else}
             <div class="text-center py-20 text-gray-500">
-              <p>No actitivity yet. Be the first!</p>
+              <p>まだリアクションがありません。一番乗りしましょう！</p>
             </div>
           {/if}
         {:catch error}
@@ -402,7 +404,7 @@
           class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
         >
           <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-white">Add to Playlist</h2>
+            <h2 class="text-xl font-bold text-white">プレイリストに追加</h2>
             <button
               on:click={() => (showPlaylistModal = false)}
               class="text-gray-400 hover:text-white"
@@ -424,14 +426,14 @@
                 >
                   <span class="font-medium text-white">{pl.value.name}</span>
                   <span class="text-xs text-gray-500"
-                    >{pl.value.tracks?.length || 0} songs</span
+                    >{pl.value.tracks?.length || 0} 曲</span
                   >
                 </button>
               {/each}
             </div>
           {:else}
             <div class="text-center py-8 text-gray-500">
-              No playlists found. Go to your profile to create one!
+              プレイリストが見つかりません。プロフィールページから作成してください！
             </div>
           {/if}
         </div>
@@ -545,7 +547,7 @@
         <h1 class="text-5xl font-black tracking-tighter text-white mb-2">
           なうぷれ<span class="text-green-500">あっと</span>
         </h1>
-        <p class="text-gray-400 text-lg">Share your vibe on the Atmosphere.</p>
+        <p class="text-gray-400 text-lg">Share your vibe on AT protocol.</p>
       </div>
 
       <form on:submit|preventDefault={handleSignIn} class="space-y-6">
@@ -573,16 +575,12 @@
           class="w-full bg-green-500 hover:bg-green-400 text-black font-extrabold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
         >
           {#if isSigningIn}
-            <Loader2 class="animate-spin" size={24} /> Connecting...
+            <Loader2 class="animate-spin" size={24} /> 接続中...
           {:else}
-            Sign In
+            サインイン
           {/if}
         </button>
       </form>
-
-      <div class="mt-8 text-center text-xs text-gray-600">
-        Powered by AT Protocol & Itunes Search
-      </div>
     </div>
   </div>
 {/if}

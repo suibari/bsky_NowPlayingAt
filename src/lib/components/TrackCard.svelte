@@ -162,7 +162,7 @@
       <button
         on:click={() => resolveAndOpen("spotify")}
         class="text-gray-400 hover:text-green-500 transition-colors p-1"
-        title="Play on Spotify"
+        title="Spotifyで再生"
         disabled={resolvingLink === "spotify"}
       >
         {#if resolvingLink === "spotify"}
@@ -187,7 +187,7 @@
       <button
         on:click={() => resolveAndOpen("ytmusic")}
         class="text-gray-400 hover:text-red-500 transition-colors p-1"
-        title="Play on YouTube Music"
+        title="YouTube Musicで再生"
         disabled={resolvingLink === "ytmusic"}
       >
         {#if resolvingLink === "ytmusic"}
@@ -214,7 +214,7 @@
         <button
           on:click={handleDelete}
           class="text-gray-600 hover:text-red-500 transition-colors p-1 ml-1"
-          title="Remove Track"
+          title="削除"
         >
           <Trash2 size={20} />
         </button>
@@ -242,7 +242,7 @@
           <input
             type="text"
             bind:value={comment}
-            placeholder="Add a comment..."
+            placeholder="コメントを追加..."
             class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-1 text-sm text-white focus:ring-1 focus:ring-green-500 focus:outline-none placeholder-gray-600"
             on:click|stopPropagation
             on:keydown|stopPropagation
@@ -257,13 +257,13 @@
             bind:checked={postToBsky}
             class="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500 bg-gray-700"
           />
-          Post to Bluesky
+          Blueskyに投稿
         </label>
 
         <button
           on:click={handleNowPlaying}
           class="bg-green-500 hover:bg-green-400 text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95"
-          title="Share to NowPlaying Feed"
+          title="再生中にする"
         >
           <Share2 size={16} /> #NowPlaying
         </button>
@@ -274,7 +274,7 @@
           on:click={handleAddToPlaylist}
           class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
         >
-          <Plus size={16} /> Add to Playlist
+          <Plus size={16} /> プレイリストに追加
         </button>
       </div>
     </div>
