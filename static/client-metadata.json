@@ -1,4 +1,5 @@
 {
+  "client_id": "https://nowplayingat.suibari.com/client-metadata.json",
   "client_name": "なうぷれあっと",
   "client_uri": "https://nowplayingat.suibari.com",
   "redirect_uris": [
