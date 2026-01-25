@@ -57,13 +57,25 @@ export async function generatePlaylistThumbnail(tracks: Track[]): Promise<Blob |
         resolve(null);
         return;
       }
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(null);
-      // Request higher resolution
+
+      const load = (src: string, isRetry = false) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = () => {
+          if (!isRetry) {
+            // Retry with proxy
+            load(`/api/proxy-image?url=${encodeURIComponent(url)}`, true);
+          } else {
+            resolve(null);
+          }
+        };
+        img.src = src;
+      };
+
+      // Request higher resolution for initial attempt
       const finalUrl = url.replace("100x100bb", "600x600bb");
-      img.src = finalUrl;
+      load(finalUrl);
     });
   };
 
