@@ -326,7 +326,8 @@ export async function postToFeed(track: MusicTrack, text?: string) {
     text: rt.text,
     facets: rt.facets,
     embed: embed,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    langs: ["ja"],
   });
 }
 

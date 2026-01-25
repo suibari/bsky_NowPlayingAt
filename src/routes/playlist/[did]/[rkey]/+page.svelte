@@ -87,6 +87,7 @@
         facets: rt.facets,
         embed: embed,
         createdAt: new Date().toISOString(),
+        langs: ["ja"],
       });
 
       alert("Shared to Bluesky!");
