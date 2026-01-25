@@ -10,4 +10,11 @@ declare global {
 	}
 }
 
-export {};
+declare module 'svelte/elements' {
+	export interface HTMLAttributes<T> {
+		"on:swipeLeft"?: (event: CustomEvent<void>) => void;
+		"on:swipeRight"?: (event: CustomEvent<void>) => void;
+	}
+}
+
+export { };
