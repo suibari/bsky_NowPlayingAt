@@ -13,7 +13,7 @@ export function swipe(node: HTMLElement, parameters = { threshold: 50, timeout: 
         startX = touch.clientX;
         startY = touch.clientY;
         startTime = Date.now();
-        console.log('Touch start:', startX, startY);
+        // console.log('Touch start:', startX, startY);
     }
 
     function handleTouchEnd(e: TouchEvent) {
@@ -27,25 +27,25 @@ export function swipe(node: HTMLElement, parameters = { threshold: 50, timeout: 
         const diffY = endY - startY;
         const duration = endTime - startTime;
 
-        console.log('Touch end:', endX, endY, 'Diff:', diffX, diffY, 'Duration:', duration);
+        // console.log('Touch end:', endX, endY, 'Diff:', diffX, diffY, 'Duration:', duration);
 
         // Check if swipe is fast enough
         if (duration > parameters.timeout) {
-            console.log('Swipe timeout');
+            // console.log('Swipe timeout');
             return;
         }
 
         // Check if horizontal swipe is dominant and exceeds threshold
         if (Math.abs(diffX) > parameters.threshold && Math.abs(diffX) > Math.abs(diffY)) {
             if (diffX > 0) {
-                console.log('Dispatching swipeRight');
+                // console.log('Dispatching swipeRight');
                 node.dispatchEvent(new CustomEvent('swipeRight'));
             } else {
-                console.log('Dispatching swipeLeft');
+                // console.log('Dispatching swipeLeft');
                 node.dispatchEvent(new CustomEvent('swipeLeft'));
             }
         } else {
-            console.log('Swipe threshold not met or vertical dominant', Math.abs(diffX), parameters.threshold);
+            // console.log('Swipe threshold not met or vertical dominant', Math.abs(diffX), parameters.threshold);
         }
     }
 

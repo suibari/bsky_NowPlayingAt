@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
 import { agent, userProfile } from '$lib/stores';
-import { publicAgent } from '$lib/atproto';
+import { publicAgent, getPdsEndpoint } from '$lib/atproto';
 import { getBacklinks } from '$lib/constellation';
 import type { Track as MusicTrack } from '$lib/music';
 import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
@@ -487,8 +487,6 @@ export async function getGlobalTimeline() {
 
 // --- HYDRATION ---
 
-import { getPdsEndpoint } from '$lib/atproto';
-
 export async function hydrateReactions(records: ConstellationRecord[]): Promise<{ record: ReactionRecord, authorDid: string, uri: string }[]> {
   const results: { record: ReactionRecord, authorDid: string, uri: string }[] = [];
   const pdsCache = new Map<string, string | null>();
@@ -526,4 +524,135 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
 
   await Promise.all(promises);
   return results;
+}
+
+// --- HOT CONTENT ---
+
+export async function getHotContent() {
+  // 1. Find Users via Constellation
+  const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
+  const userDids = Array.from(new Set(backlinks.map(b => b.did)));
+
+  if (userDids.length === 0) return { tracks: [], playlists: [] };
+
+  // 2. Fetch Reactions & Profiles
+  const reactions: any[] = [];
+  const profilesMap = new Map<string, any>();
+
+  // Batch profile fetch
+  try {
+    const chunks = [];
+    for (let i = 0; i < userDids.length; i += 25) {
+      chunks.push(userDids.slice(i, i + 25));
+    }
+    for (const chunk of chunks) {
+      const pRes = await publicAgent.app.bsky.actor.getProfiles({ actors: chunk });
+      pRes.data.profiles.forEach((p: any) => profilesMap.set(p.did, p));
+    }
+  } catch (e) {
+    console.error("Failed to fetch profiles for hot content", e);
+  }
+
+  // Fetch reactions per user
+  await Promise.all(userDids.map(async (did) => {
+    const pds = await getPdsEndpoint(did);
+    if (!pds) return;
+
+    const pdsAgent = new Agent({ service: pds });
+    try {
+      const res = await pdsAgent.com.atproto.repo.listRecords({
+        repo: did,
+        collection: NSID_REACTION,
+        limit: 50 // Fetch more history for aggregation
+      });
+
+      res.data.records.forEach((r: any) => {
+        reactions.push({
+          ...r.value,
+          author: profilesMap.get(did) || { did, handle: 'unknown' },
+          uri: r.uri
+        });
+      });
+    } catch (e) {
+      // minimal error logging
+    }
+  }));
+
+  // 3. Aggregate
+  const trackStats = new Map<string, { count: number, record: any, authors: any[] }>();
+  // Key: subjectUri
+
+  const playlistStats = new Map<string, { count: number, record: any, authors: any[] }>();
+  // Key: playlist uri
+
+  reactions.forEach(r => {
+    if (r.kind === 'playlist' && r.playlist?.uri) {
+      const key = r.playlist.uri;
+      if (!playlistStats.has(key)) {
+        playlistStats.set(key, { count: 0, record: r, authors: [] });
+      }
+      const stat = playlistStats.get(key)!;
+      stat.count++;
+      if (!stat.authors.find((a: any) => a.did === r.author.did)) {
+        stat.authors.push(r.author);
+      }
+    } else if ((r.kind === 'track' || !r.kind) && r.subjectUri) { // Default to track if no kind
+      const key = r.subjectUri;
+      if (!trackStats.has(key)) {
+        trackStats.set(key, { count: 0, record: r, authors: [] });
+      }
+      const stat = trackStats.get(key)!;
+      stat.count++;
+      if (!stat.authors.find((a: any) => a.did === r.author.did)) {
+        stat.authors.push(r.author);
+      }
+    }
+  });
+
+  // 4. Format & Sort
+  const hotTracks = Array.from(trackStats.values())
+    .sort((a, b) => b.count - a.count)
+    .map(s => ({
+      ...s.record, // Base track info
+      reactionCount: s.count,
+      recentReactors: s.authors.slice(0, 5)
+    }));
+
+  // Hydrate top playlists
+  const hotPlaylistsRaw = Array.from(playlistStats.values()).sort((a, b) => b.count - a.count);
+  const topPlaylists = hotPlaylistsRaw.slice(0, 20);
+  const hydratedPlaylists = [];
+
+  for (const item of topPlaylists) {
+    try {
+      // item.record.playlist.uri -> at://did/collection/rkey
+      const uri = item.record.playlist.uri;
+      if (!uri) continue;
+
+      const parts = uri.split('/');
+      const rkey = parts.pop();
+      const collection = parts.pop();
+      const did = parts.pop();
+
+      if (did && rkey) {
+        const data = await getPlaylist(did, rkey);
+        if (data && data.value) {
+          hydratedPlaylists.push({
+            playlist: data.value, // The full record
+            author: item.record.playlist.author, // The creator
+            reactionCount: item.count,
+            recentReactors: item.authors.slice(0, 5),
+            uri: uri
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to hydrate hot playlist", item.record.playlist.uri);
+    }
+  }
+
+  return {
+    tracks: hotTracks,
+    playlists: hydratedPlaylists
+  };
 }

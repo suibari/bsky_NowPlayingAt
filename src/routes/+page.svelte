@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { authState, userProfile } from "$lib/stores";
   import { signIn } from "$lib/atproto";
   import {
@@ -7,16 +8,57 @@
     getPlaylists,
     addToPlaylist,
     getGlobalTimeline,
+    getHotContent,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import InfoModal from "$lib/components/InfoModal.svelte";
   import { Loader2, Music, X, Plus, Info } from "lucide-svelte";
+  import { swipe } from "$lib/actions/swipe";
 
   let handleInput = "";
   let isSigningIn = false;
-  let activeTab: "search" | "discovery" = "search";
+  let activeTab: "search" | "hot" | "discovery" = "search";
+  let hotTab: "tracks" | "playlists" = "tracks";
+
+  // Data State
+  let hotTracks: any[] = [];
+  let hotPlaylists: any[] = [];
+  let discoveryTimeline: any[] = [];
+
+  let loadingHot = true;
+  let loadingDiscovery = true;
+
+  onMount(() => {
+    // Start background fetches
+    loadHotContent();
+    loadDiscoveryContent();
+  });
+
+  async function loadHotContent() {
+    loadingHot = true;
+    try {
+      const data = await getHotContent();
+      hotTracks = data.tracks;
+      hotPlaylists = data.playlists;
+    } catch (e) {
+      console.error("Failed to load hot content", e);
+    } finally {
+      loadingHot = false;
+    }
+  }
+
+  async function loadDiscoveryContent() {
+    loadingDiscovery = true;
+    try {
+      discoveryTimeline = await getGlobalTimeline();
+    } catch (e) {
+      console.error("Failed to load discovery content", e);
+    } finally {
+      loadingDiscovery = false;
+    }
+  }
 
   // Info Modal
   let showInfoModal = false;
@@ -123,16 +165,18 @@
 
   // --- REACTION LOGIC ---
 
-  import { swipe } from "$lib/actions/swipe";
-
   function handleSwipeLeft() {
     if (activeTab === "search") {
+      activeTab = "hot";
+    } else if (activeTab === "hot") {
       activeTab = "discovery";
     }
   }
 
   function handleSwipeRight() {
     if (activeTab === "discovery") {
+      activeTab = "hot";
+    } else if (activeTab === "hot") {
       activeTab = "search";
     }
   }
@@ -191,7 +235,16 @@
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
         >
-          Song Search
+          Search
+        </button>
+        <button
+          on:click={() => (activeTab = "hot")}
+          class="px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+          'hot'
+            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+            : 'text-gray-400 hover:text-white'}"
+        >
+          What's hot
         </button>
         <button
           on:click={() => (activeTab = "discovery")}
@@ -291,133 +344,94 @@
             </div>
           {/if}
         </div>
-      {:else if activeTab === "discovery"}
-        <div class="max-w-2xl mx-auto animate-fade-in pb-20">
-          {#await getGlobalTimeline()}
+      {:else if activeTab === "hot"}
+        <!-- WHAT'S HOT SECTION -->
+        <div class="max-w-4xl mx-auto animate-fade-in pb-20">
+          <!-- Sub Tabs -->
+          <div class="flex justify-center mb-8">
+            <div
+              class="inline-flex bg-black/40 border border-gray-800 rounded-lg p-1"
+            >
+              <button
+                on:click={() => (hotTab = "tracks")}
+                class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
+                'tracks'
+                  ? 'bg-gray-700 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-200'}"
+              >
+                Top Tracks
+              </button>
+              <button
+                on:click={() => (hotTab = "playlists")}
+                class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
+                'playlists'
+                  ? 'bg-gray-700 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-200'}"
+              >
+                Top Playlists
+              </button>
+            </div>
+          </div>
+
+          {#if loadingHot}
             <div class="text-center py-20 text-gray-500">
               <Loader2
                 class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
               />
-              <p>Loading everyone's activity...</p>
+              <p>Trending music loading...</p>
             </div>
-          {:then timeline}
-            {#if timeline.length > 0}
-              <div class="space-y-8">
-                {#each timeline as item}
-                  <div
-                    class="bg-gray-900/50 rounded-xl p-4 border border-gray-800"
-                  >
-                    <!-- Header: User Action -->
-                    <div class="flex items-center gap-3 mb-3">
-                      <a
-                        href={`/profile/${item.author.did}`}
-                        class="flex-shrink-0"
-                      >
-                        {#if item.author.avatar}
-                          <img
-                            src={item.author.avatar}
-                            alt={item.author.handle}
-                            class="w-10 h-10 rounded-full border border-gray-700"
-                          />
-                        {:else}
-                          <div
-                            class="w-10 h-10 rounded-full bg-gray-800 border border-gray-700"
-                          ></div>
-                        {/if}
-                      </a>
-                      <div>
-                        <div class="text-sm text-gray-300">
-                          <span class="font-bold text-white">
-                            {item.author.displayName || item.author.handle}
-                          </span>
-                          {#if item.type === "history"}
-                            <span class="text-gray-500">が聴いています</span>
-                          {:else if item.type === "reaction"}
-                            <span class="text-gray-500">
-                              がリアクションしました <span class="text-lg"
-                                >{item.record.emoji}</span
-                              >
-                            </span>
-                          {:else if item.type === "playlist"}
-                            <span class="text-gray-500"
-                              >がプレイリストを作成しました</span
-                            >
-                          {/if}
-                        </div>
-                        <div class="text-xs text-gray-600">
-                          {new Date(item.indexedAt).toLocaleString()}
-                        </div>
-                      </div>
-                    </div>
+          {:else if hotTab === "tracks"}
+            {#if hotTracks.length > 0}
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                {#each hotTracks as track}
+                  <div class="relative group">
+                    <!-- Rank Badge -->
+                    <!-- <div class="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-green-500 text-black font-black flex items-center justify-center z-10 shadow-lg border-2 border-black">
+                             {hotTracks.indexOf(track) + 1}
+                          </div> -->
 
-                    <!-- Content -->
-                    <div class="pl-12">
-                      {#if item.type === "history"}
-                        <TrackCard
-                          track={{
-                            id: item.record.trackUri, // Use Uri as ID
-                            title: item.record.track,
-                            artist: item.record.artist,
-                            album: item.record.album,
-                            artworkUrl: item.record.img,
-                            trackUri: item.record.trackUri,
-                            spotifyUrl: item.record.links?.spotify,
-                            youtubeMusicUrl: item.record.links?.youtube,
-                            appleMusicUrl: item.record.links?.appleMusic,
-                            comment: item.record.comment,
-                            provider: item.record.provider || "itunes",
-                          }}
-                          isProcessing={processingTrackId ===
-                            item.record.trackUri}
-                          on:nowPlaying={(e) =>
-                            executeNowPlaying(
-                              e.detail.track,
-                              e.detail.postToBsky,
-                            )}
-                          on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                        />
-                      {:else if item.type === "reaction"}
-                        {#if item.record.kind === "playlist" && item.record.playlist}
-                          <PlaylistCard
-                            playlist={item.record.playlist.record || {
-                              name: item.record.playlist.title,
-                              tracks: [],
-                            }}
-                            author={item.record.playlist.author}
-                            rkey={item.record.playlist.uri.split("/").pop()}
-                          />
-                        {:else}
-                          <TrackCard
-                            track={{
-                              id: item.record.subjectUri,
-                              trackUri: item.record.subjectUri,
-                              title: item.record.track || "Unknown Track",
-                              artist: item.record.artist || "Unknown Artist",
-                              album: item.record.album,
-                              artworkUrl:
-                                item.record.img || "/placeholder_art.png",
-                              spotifyUrl: item.record.links?.spotify,
-                              youtubeMusicUrl: item.record.links?.youtube,
-                              appleMusicUrl: item.record.links?.appleMusic,
-                              provider: item.record.provider || "itunes",
-                            }}
-                            isProcessing={processingTrackId ===
-                              item.record.subjectUri}
-                            on:nowPlaying={(e) =>
-                              executeNowPlaying(
-                                e.detail.track,
-                                e.detail.postToBsky,
-                              )}
-                            on:addToPlaylist={(e) =>
-                              openPlaylistModal(e.detail)}
-                          />
-                        {/if}
-                      {:else if item.type === "playlist"}
-                        <PlaylistCard
-                          playlist={item.record}
-                          author={item.author}
-                          rkey={item.uri.split("/").pop()}
-                        />
+                    <TrackCard
+                      track={{
+                        id: track.trackUri, // Use Uri as ID
+                        title: track.track,
+                        artist: track.artist,
+                        album: track.album,
+                        artworkUrl: track.img,
+                        trackUri: track.trackUri,
+                        spotifyUrl: track.links?.spotify,
+                        youtubeMusicUrl: track.links?.youtube,
+                        appleMusicUrl: track.links?.appleMusic,
+                        provider: track.provider || "itunes",
+                      }}
+                      isProcessing={processingTrackId === track.trackUri}
+                      on:nowPlaying={(e) =>
+                        executeNowPlaying(e.detail.track, e.detail.postToBsky)}
+                      on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                    />
+
+                    <!-- Reaction Count Display -->
+                    <div
+                      class="mt-1 flex items-center px-1 text-xs text-gray-500 gap-2"
+                    >
+                      <span class="text-green-500 font-bold"
+                        >{track.reactionCount} reactions</span
+                      >
+                      {#if track.recentReactors && track.recentReactors.length > 0}
+                        <div class="flex -space-x-1">
+                          {#each track.recentReactors as u}
+                            <a
+                              href={`/profile/${u.did}`}
+                              title={u.displayName || u.handle}
+                              class="relative z-0 hover:z-10 transition-transform hover:scale-110"
+                            >
+                              <img
+                                src={u.avatar}
+                                alt={u.handle}
+                                class="w-4 h-4 rounded-full border border-black"
+                              />
+                            </a>
+                          {/each}
+                        </div>
                       {/if}
                     </div>
                   </div>
@@ -425,14 +439,196 @@
               </div>
             {:else}
               <div class="text-center py-20 text-gray-500">
-                <p>まだリアクションがありません。一番乗りしましょう！</p>
+                <Music size={48} class="mx-auto mb-4 opacity-30" />
+                <p>No trending tracks yet.</p>
               </div>
             {/if}
-          {:catch error}
-            <div class="text-center py-20 text-red-500">
-              Failed to load timeline: {error.message}
+          {:else}
+            <!-- PLAYLISTS -->
+            {#if hotPlaylists.length > 0}
+              <div class="space-y-4">
+                {#each hotPlaylists as item}
+                  <div
+                    class="bg-gray-900/40 p-3 rounded-xl border border-gray-800/50 hover:bg-gray-900/60 transition-colors"
+                  >
+                    <PlaylistCard
+                      playlist={item.playlist}
+                      author={item.author}
+                      rkey={item.uri.split("/").pop()}
+                    />
+                    <div
+                      class="mt-2 flex items-center justify-between text-xs text-gray-500 px-1"
+                    >
+                      <div class="flex items-center gap-2">
+                        <span
+                          class="text-green-500 font-bold flex items-center gap-1"
+                        >
+                          {item.reactionCount} reactions
+                        </span>
+                        {#if item.recentReactors && item.recentReactors.length > 0}
+                          <div class="flex -space-x-1">
+                            {#each item.recentReactors as u}
+                              <a
+                                href={`/profile/${u.did}`}
+                                title={u.displayName || u.handle}
+                                class="relative z-0 hover:z-10 transition-transform hover:scale-110"
+                              >
+                                <img
+                                  src={u.avatar}
+                                  alt={u.handle}
+                                  class="w-4 h-4 rounded-full border border-black"
+                                />
+                              </a>
+                            {/each}
+                          </div>
+                        {/if}
+                      </div>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {:else}
+              <div class="text-center py-20 text-gray-500">
+                <p>No trending playlists yet.</p>
+              </div>
+            {/if}
+          {/if}
+        </div>
+      {:else if activeTab === "discovery"}
+        <div class="max-w-2xl mx-auto animate-fade-in pb-20">
+          {#if loadingDiscovery}
+            <div class="text-center py-20 text-gray-500">
+              <Loader2
+                class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
+              />
+              <p>Loading everyone's activity...</p>
             </div>
-          {/await}
+          {:else if discoveryTimeline.length > 0}
+            <div class="space-y-8">
+              {#each discoveryTimeline as item}
+                <div
+                  class="bg-gray-900/50 rounded-xl p-4 border border-gray-800"
+                >
+                  <!-- Header: User Action -->
+                  <div class="flex items-center gap-3 mb-3">
+                    <a
+                      href={`/profile/${item.author.did}`}
+                      class="flex-shrink-0"
+                    >
+                      {#if item.author.avatar}
+                        <img
+                          src={item.author.avatar}
+                          alt={item.author.handle}
+                          class="w-10 h-10 rounded-full border border-gray-700"
+                        />
+                      {:else}
+                        <div
+                          class="w-10 h-10 rounded-full bg-gray-800 border border-gray-700"
+                        ></div>
+                      {/if}
+                    </a>
+                    <div>
+                      <div class="text-sm text-gray-300">
+                        <span class="font-bold text-white">
+                          {item.author.displayName || item.author.handle}
+                        </span>
+                        {#if item.type === "history"}
+                          <span class="text-gray-500">が聴いています</span>
+                        {:else if item.type === "reaction"}
+                          <span class="text-gray-500">
+                            がリアクションしました <span class="text-lg"
+                              >{item.record.emoji}</span
+                            >
+                          </span>
+                        {:else if item.type === "playlist"}
+                          <span class="text-gray-500"
+                            >がプレイリストを作成しました</span
+                          >
+                        {/if}
+                      </div>
+                      <div class="text-xs text-gray-600">
+                        {new Date(item.indexedAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Content -->
+                  <div class="pl-12">
+                    {#if item.type === "history"}
+                      <TrackCard
+                        track={{
+                          id: item.record.trackUri,
+                          title: item.record.track,
+                          artist: item.record.artist,
+                          album: item.record.album,
+                          artworkUrl: item.record.img,
+                          trackUri: item.record.trackUri,
+                          spotifyUrl: item.record.links?.spotify,
+                          youtubeMusicUrl: item.record.links?.youtube,
+                          appleMusicUrl: item.record.links?.appleMusic,
+                          comment: item.record.comment,
+                          provider: item.record.provider || "itunes",
+                        }}
+                        isProcessing={processingTrackId ===
+                          item.record.trackUri}
+                        on:nowPlaying={(e) =>
+                          executeNowPlaying(
+                            e.detail.track,
+                            e.detail.postToBsky,
+                          )}
+                        on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                      />
+                    {:else if item.type === "reaction"}
+                      {#if item.record.kind === "playlist" && item.record.playlist}
+                        <PlaylistCard
+                          playlist={item.record.playlist.record || {
+                            name: item.record.playlist.title,
+                            tracks: [],
+                          }}
+                          author={item.record.playlist.author}
+                          rkey={item.record.playlist.uri.split("/").pop()}
+                        />
+                      {:else}
+                        <TrackCard
+                          track={{
+                            id: item.record.subjectUri,
+                            trackUri: item.record.subjectUri,
+                            title: item.record.track || "Unknown Track",
+                            artist: item.record.artist || "Unknown Artist",
+                            album: item.record.album,
+                            artworkUrl:
+                              item.record.img || "/placeholder_art.png",
+                            spotifyUrl: item.record.links?.spotify,
+                            youtubeMusicUrl: item.record.links?.youtube,
+                            appleMusicUrl: item.record.links?.appleMusic,
+                            provider: item.record.provider || "itunes",
+                          }}
+                          isProcessing={processingTrackId ===
+                            item.record.subjectUri}
+                          on:nowPlaying={(e) =>
+                            executeNowPlaying(
+                              e.detail.track,
+                              e.detail.postToBsky,
+                            )}
+                          on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                        />
+                      {/if}
+                    {:else if item.type === "playlist"}
+                      <PlaylistCard
+                        playlist={item.record}
+                        author={item.author}
+                        rkey={item.uri.split("/").pop()}
+                      />
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div class="text-center py-20 text-gray-500">
+              <p>まだリアクションがありません。一番乗りしましょう！</p>
+            </div>
+          {/if}
         </div>
       {/if}
     </div>
