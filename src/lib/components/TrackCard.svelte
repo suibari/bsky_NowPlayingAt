@@ -21,6 +21,7 @@
 
   export let index: number = 0; // For drag reference
   export let isProcessing: boolean = false;
+  export let reactionGroups: any[] = [];
 
   const dispatch = createEventDispatcher();
 
@@ -270,6 +271,7 @@
       <ReactionBar
         subjectUri={track.trackUri}
         {track}
+        initialReactions={reactionGroups}
         on:reaction={handleReaction}
       />
 

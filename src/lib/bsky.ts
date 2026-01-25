@@ -579,33 +579,45 @@ export async function getHotContent() {
   }));
 
   // 3. Aggregate
-  const trackStats = new Map<string, { count: number, record: any, authors: any[] }>();
+  const trackStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
   // Key: subjectUri
 
-  const playlistStats = new Map<string, { count: number, record: any, authors: any[] }>();
+  const playlistStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
   // Key: playlist uri
 
   reactions.forEach(r => {
+    let stat;
     if (r.kind === 'playlist' && r.playlist?.uri) {
       const key = r.playlist.uri;
       if (!playlistStats.has(key)) {
-        playlistStats.set(key, { count: 0, record: r, authors: [] });
+        playlistStats.set(key, { count: 0, record: r, authors: [], reactions: {} });
       }
-      const stat = playlistStats.get(key)!;
-      stat.count++;
-      if (!stat.authors.find((a: any) => a.did === r.author.did)) {
-        stat.authors.push(r.author);
-      }
+      stat = playlistStats.get(key)!;
     } else if ((r.kind === 'track' || !r.kind) && r.subjectUri) { // Default to track if no kind
       const key = r.subjectUri;
       if (!trackStats.has(key)) {
-        trackStats.set(key, { count: 0, record: r, authors: [] });
+        trackStats.set(key, { count: 0, record: r, authors: [], reactions: {} });
       }
-      const stat = trackStats.get(key)!;
+      stat = trackStats.get(key)!;
+    }
+
+    if (stat) {
       stat.count++;
+      // Add author to recent list if unique
       if (!stat.authors.find((a: any) => a.did === r.author.did)) {
         stat.authors.push(r.author);
       }
+
+      // Group by emoji
+      const emoji = r.emoji || "👍";
+      if (!stat.reactions[emoji]) stat.reactions[emoji] = [];
+      stat.reactions[emoji].push({
+        did: r.author.did,
+        handle: r.author.handle,
+        avatar: r.author.avatar,
+        displayName: r.author.displayName,
+        reactionUri: r.uri
+      });
     }
   });
 
@@ -615,7 +627,11 @@ export async function getHotContent() {
     .map(s => ({
       ...s.record, // Base track info
       reactionCount: s.count,
-      recentReactors: s.authors.slice(0, 5)
+      recentReactors: s.authors.slice(0, 5),
+      reactionGroups: Object.entries(s.reactions).map(([emoji, users]) => ({
+        emoji,
+        users
+      }))
     }));
 
   // Hydrate top playlists
@@ -642,7 +658,11 @@ export async function getHotContent() {
             author: item.record.playlist.author, // The creator
             reactionCount: item.count,
             recentReactors: item.authors.slice(0, 5),
-            uri: uri
+            uri: uri,
+            reactionGroups: Object.entries(item.reactions).map(([emoji, users]) => ({
+              emoji,
+              users
+            }))
           });
         }
       }

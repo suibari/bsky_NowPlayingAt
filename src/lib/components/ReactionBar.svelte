@@ -29,6 +29,8 @@
       }
     | undefined = undefined;
 
+  export let initialReactions: ReactionGroup[] = [];
+
   const dispatch = createEventDispatcher();
 
   // Reaction State (Grouped)
@@ -67,7 +69,11 @@
   ];
 
   onMount(() => {
-    loadReactions();
+    if (initialReactions && initialReactions.length > 0) {
+      reactions = initialReactions;
+    } else {
+      loadReactions();
+    }
   });
 
   async function loadReactions() {

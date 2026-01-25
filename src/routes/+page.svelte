@@ -403,6 +403,7 @@
                         appleMusicUrl: track.links?.appleMusic,
                         provider: track.provider || "itunes",
                       }}
+                      reactionGroups={track.reactionGroups}
                       isProcessing={processingTrackId === track.trackUri}
                       on:nowPlaying={(e) =>
                         executeNowPlaying(e.detail.track, e.detail.postToBsky)}
