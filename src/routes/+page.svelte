@@ -561,17 +561,79 @@
       <div
         class="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent z-10"
       ></div>
-      <!-- Animated Background Elements -->
-      <div
-        class="w-full h-full flex flex-wrap opacity-20 transform scale-110 blur-sm"
-      >
+
+      <!-- Artwork Reel Background -->
+      {#await getGlobalTimeline() then timeline}
+        {@const artworks = timeline
+          .filter((t) => t.type === "history" && t.record.img)
+          .map((t) => t.record.img)
+          .sort(() => Math.random() - 0.5) // Shuffle
+          .slice(0, 30)}
+        <!-- Limit to 30 items -->
+
+        {#if artworks.length > 0}
+          <div
+            class="absolute inset-0 flex flex-col justify-center opacity-30 select-none pointer-events-none"
+          >
+            <!-- Row 1: Left to Right -->
+            <div class="flex gap-4 animate-marquee whitespace-nowrap mb-6">
+              {#each [...artworks, ...artworks] as art}
+                <img
+                  src={art.replace("100x100", "600x600")}
+                  alt="bg"
+                  class="w-48 h-48 object-cover rounded-xl shadow-2xl grayscale hover:grayscale-0 transition-all duration-700"
+                />
+              {/each}
+            </div>
+            <!-- Row 2: Right to Left -->
+            <div
+              class="flex gap-4 animate-marquee-reverse whitespace-nowrap mb-6"
+            >
+              {#each [...artworks, ...artworks].reverse() as art}
+                <img
+                  src={art.replace("100x100", "600x600")}
+                  alt="bg"
+                  class="w-48 h-48 object-cover rounded-xl shadow-2xl grayscale hover:grayscale-0 transition-all duration-700"
+                />
+              {/each}
+            </div>
+            <!-- Row 3: Left to Right (slower) -->
+            <div class="flex gap-4 animate-marquee-slow whitespace-nowrap">
+              {#each [...artworks, ...artworks].sort(() => Math.random() - 0.5) as art}
+                <img
+                  src={art.replace("100x100", "600x600")}
+                  alt="bg"
+                  class="w-48 h-48 object-cover rounded-xl shadow-2xl grayscale hover:grayscale-0 transition-all duration-700"
+                />
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <!-- Fallback animated blobs if no data -->
+          <div
+            class="w-full h-full flex flex-wrap opacity-20 transform scale-110 blur-sm"
+          >
+            <div
+              class="w-1/2 h-1/2 bg-green-900 rounded-full mix-blend-screen filter blur-3xl animate-blob"
+            ></div>
+            <div
+              class="w-1/2 h-1/2 bg-blue-900 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000"
+            ></div>
+          </div>
+        {/if}
+      {:catch}
+        <!-- Fallback on error -->
         <div
-          class="w-1/2 h-1/2 bg-green-900 rounded-full mix-blend-screen filter blur-3xl animate-blob"
-        ></div>
-        <div
-          class="w-1/2 h-1/2 bg-blue-900 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000"
-        ></div>
-      </div>
+          class="w-full h-full flex flex-wrap opacity-20 transform scale-110 blur-sm"
+        >
+          <div
+            class="w-1/2 h-1/2 bg-green-900 rounded-full mix-blend-screen filter blur-3xl animate-blob"
+          ></div>
+          <div
+            class="w-1/2 h-1/2 bg-blue-900 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000"
+          ></div>
+        </div>
+      {/await}
     </div>
 
     <!-- Login Card -->
@@ -579,7 +641,9 @@
       class="relative z-20 bg-black/60 backdrop-blur-xl p-10 rounded-3xl border border-gray-800 w-full max-w-md shadow-2xl"
     >
       <div class="text-center mb-10">
-        <h1 class="text-5xl font-black tracking-tighter text-white mb-2">
+        <h1
+          class="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-2 whitespace-nowrap"
+        >
           なうぷれ<span class="text-green-500">あっと</span>
         </h1>
         <p class="text-gray-400 text-lg">Share your vibe on AT protocol.</p>
@@ -653,5 +717,36 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  /* Marquee Animations */
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes marquee-reverse {
+    0% {
+      transform: translateX(-50%);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  .animate-marquee {
+    animation: marquee 40s linear infinite;
+    width: max-content;
+  }
+  .animate-marquee-reverse {
+    animation: marquee-reverse 50s linear infinite; /* Slightly different speed */
+    width: max-content;
+  }
+  .animate-marquee-slow {
+    animation: marquee 60s linear infinite;
+    width: max-content;
   }
 </style>
