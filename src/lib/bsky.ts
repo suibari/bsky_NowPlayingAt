@@ -261,7 +261,7 @@ export async function postToFeed(track: MusicTrack, text?: string) {
   const segments = [
     `#NowPlaying #なうぷれ`,
     comment ? `\n\n${comment}` : "",
-    `\n${track.title} - ${track.artist}\n\n`,
+    `\n\n${track.title} - ${track.artist}\n`,
     linkLabel
   ];
 
