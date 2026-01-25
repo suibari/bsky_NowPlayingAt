@@ -7,6 +7,7 @@ export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 export const REACTION_SOURCE = `${NSID_REACTION}:subjectUri`;
 
 export interface Track {
+  provider?: string;
   track: string;
   artist: string;
   album: string;

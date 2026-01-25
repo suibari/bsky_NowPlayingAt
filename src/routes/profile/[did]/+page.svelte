@@ -89,6 +89,8 @@
     const val = item.value;
     return {
       id: val.trackUri, // Using URI as ID since we store it
+      // @ts-ignore
+      provider: val.provider || "itunes",
       title: val.track,
       artist: val.artist,
       album: val.album,

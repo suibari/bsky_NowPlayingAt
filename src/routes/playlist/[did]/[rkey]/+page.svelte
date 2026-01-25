@@ -187,11 +187,13 @@
   function mapToTrack(item: any): Track {
     return {
       id: item.trackUri, // Using URI as ID since we store it
+      // @ts-ignore
+      provider: item.provider || "itunes",
+      trackUri: item.trackUri,
       title: item.track,
       artist: item.artist,
       album: item.album,
       artworkUrl: item.img || "",
-      trackUri: item.trackUri,
       spotifyUrl: item.links?.spotify,
       youtubeMusicUrl: item.links?.youtube,
     };

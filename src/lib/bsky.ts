@@ -22,6 +22,7 @@ export async function createHistoryRecord(track: MusicTrack) {
 
   const record: HistoryRecord = {
     $type: NSID_HISTORY,
+    provider: track.provider,
     track: track.title,
     artist: track.artist,
     album: track.album,
@@ -100,6 +101,7 @@ export async function createReactionRecord(opts: {
 
   if (opts.track) {
     record.kind = 'track';
+    record.provider = opts.track.provider;
     record.track = opts.track.title;
     record.artist = opts.track.artist;
     record.album = opts.track.album;
@@ -189,6 +191,7 @@ export async function addToPlaylist(playlistUri: string, track: MusicTrack, curr
   const content = currentPlaylistRecordWrapper.value;
 
   const newTracks: SchemaTrack[] = [...(content.tracks || []), {
+    provider: track.provider,
     track: track.title,
     artist: track.artist,
     album: track.album,
