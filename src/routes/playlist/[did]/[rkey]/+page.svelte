@@ -74,7 +74,7 @@
         external: {
           uri: window.location.href,
           title: playlistName,
-          description: `Playlist created by ${authorName} on Atmosphere`,
+          description: `Playlist created by ${authorName} on なうぷれあっと`,
         },
       };
 

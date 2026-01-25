@@ -341,7 +341,7 @@
                           spotifyUrl: item.record.links?.spotify,
                           youtubeMusicUrl: item.record.links?.youtube,
                           comment: item.record.comment,
-                          provider: item.record.provider || 'itunes',
+                          provider: item.record.provider || "itunes",
                         }}
                         isProcessing={processingTrackId ===
                           item.record.trackUri}
@@ -374,7 +374,7 @@
                               item.record.img || "/placeholder_art.png",
                             spotifyUrl: item.record.links?.spotify,
                             youtubeMusicUrl: item.record.links?.youtube,
-                            provider: item.record.provider || 'itunes',
+                            provider: item.record.provider || "itunes",
                           }}
                           isProcessing={processingTrackId ===
                             item.record.subjectUri}
@@ -538,7 +538,7 @@
                 </li>
                 <li>
                   <a
-                    href="https://github.com/suibari/atmosphere"
+                    href="https://github.com/suibari/bsky_NowPlayingAt"
                     target="_blank"
                     class="text-green-500 hover:underline"
                     >GitHub (Source Code)</a
