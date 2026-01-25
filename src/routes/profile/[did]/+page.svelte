@@ -41,12 +41,12 @@
     // loadData handled by reactivity below
   });
 
-  $: if ($agent && did) {
+  $: if (did) {
     loadData(did);
   }
 
   async function loadData(actorDid: string) {
-    if (!$agent || !actorDid) return;
+    if (!actorDid) return;
     loading = true;
     try {
       // 1. Get Profile

@@ -113,12 +113,12 @@
     isOwner = $userProfile.did === did;
   }
 
-  $: if (did && rkey && $agent) {
+  $: if (did && rkey) {
     loadPlaylist(did, rkey);
   }
 
   async function loadPlaylist(playlistDid: string, playlistRkey: string) {
-    if (!$agent) return;
+    // if (!$agent) return; // Allow public access
     loading = true;
     try {
       const [res, profileRes] = await Promise.all([
