@@ -34,8 +34,13 @@ export const GET: RequestHandler = async ({ url }) => {
         });
 
     // 2. Discogs Search
+    console.log(`[Search] Discogs query: ${query}`);
+    const discogsUrl = `https://api.discogs.com/database/search?q=${encodedQuery}&type=release&per_page=20&token=${DISCOGS_TOKEN}`;
+    // Mask token for logging if desired, or just log the base URL
+    console.log(`[Search] Fetching from Discogs...`);
+
     const discogsPromise = fetch(
-        `https://api.discogs.com/database/search?q=${encodedQuery}&type=release&per_page=20&token=${DISCOGS_TOKEN}`,
+        discogsUrl,
         {
             headers: {
                 'User-Agent': 'NowPlayingAt/1.0', // Discogs requires a User-Agent
@@ -43,8 +48,17 @@ export const GET: RequestHandler = async ({ url }) => {
         }
     )
         .then(async (res) => {
-            if (!res.ok) throw new Error(`Discogs error: ${res.status}`);
+            console.log(`[Search] Discogs response status: ${res.status}`);
+            console.log(`[Search] Discogs rate limit rem: ${res.headers.get('X-Discogs-Ratelimit-Remaining')}`);
+
+            if (!res.ok) {
+                const text = await res.text();
+                console.error(`[Search] Discogs error body: ${text}`);
+                throw new Error(`Discogs error: ${res.status}`);
+            }
             const data = await res.json();
+            console.log(`[Search] Discogs results count: ${data.results?.length}`);
+
             return data.results.map((item: any) => ({
                 id: `discogs:${item.id}`,
                 provider: 'discogs',
