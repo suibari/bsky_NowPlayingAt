@@ -10,36 +10,13 @@ export const GET: RequestHandler = async ({ url }) => {
 
     const encodedQuery = encodeURIComponent(query);
 
-    // 1. iTunes Search
-    const itunesPromise = fetch(
-        `https://itunes.apple.com/search?term=${encodedQuery}&entity=song&limit=20`
-    )
-        .then(async (res) => {
-            if (!res.ok) throw new Error(`iTunes error: ${res.status}`);
-            const data = await res.json();
-            return data.results.map((item: any) => ({
-                id: `itunes:${item.trackId}`,
-                provider: 'itunes',
-                title: item.trackName,
-                artist: item.artistName,
-                album: item.collectionName,
-                artworkUrl: item.artworkUrl100?.replace('100x100', '600x600'),
-                previewUrl: item.previewUrl,
-                trackUri: item.trackViewUrl,
-            }));
-        })
-        .catch((e) => {
-            console.error('iTunes search failed:', e);
-            return [];
-        });
-
-    // 2. Discogs Search
+    // 1. Discogs Search
     console.log(`[Search] Discogs query: ${query}`);
     const discogsUrl = `https://api.discogs.com/database/search?q=${encodedQuery}&type=release&per_page=20&token=${DISCOGS_TOKEN}`;
     // Mask token for logging if desired, or just log the base URL
     console.log(`[Search] Fetching from Discogs...`);
 
-    const discogsPromise = fetch(
+    const discogsResults = await fetch(
         discogsUrl,
         {
             headers: {
@@ -75,14 +52,5 @@ export const GET: RequestHandler = async ({ url }) => {
             return [];
         });
 
-    const [itunesResults, discogsResults] = await Promise.all([
-        itunesPromise,
-        discogsPromise,
-    ]);
-
-    // Merge (interleave or just concat)
-    // Let's concat for simplicity, with iTunes first as they are usually better formatted for single tracks
-    const combined = [...itunesResults, ...discogsResults];
-
-    return json(combined);
+    return json(discogsResults);
 };
