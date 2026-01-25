@@ -101,6 +101,22 @@
                                 >GitHub (Source Code)</a
                             >
                         </li>
+                        <li>
+                            <a
+                                href="https://www.apple.com/jp/itunes/"
+                                target="_blank"
+                                class="text-green-500 hover:underline"
+                                >iTunes Store</a
+                            >
+                        </li>
+                        <li>
+                            <a
+                                href="https://www.discogs.com/"
+                                target="_blank"
+                                class="text-green-500 hover:underline"
+                                >Discogs</a
+                            >
+                        </li>
                     </ul>
                 </div>
             </div>

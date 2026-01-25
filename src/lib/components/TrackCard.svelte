@@ -29,16 +29,23 @@
   let comment = "";
 
   // Link Resolution
-  let resolvingLink: "spotify" | "ytmusic" | null = null;
+  let resolvingLink: "spotify" | "ytmusic" | "appleMusic" | null = null;
   let cachedSpotify: string | undefined = track.spotifyUrl;
   let cachedYtMusic: string | undefined = track.youtubeMusicUrl;
+  let cachedAppleMusic: string | undefined = track.appleMusicUrl;
 
   function toggleExpand() {
     expanded = !expanded;
   }
 
-  async function resolveAndOpen(platform: "spotify" | "ytmusic") {
-    let targetUrl = platform === "spotify" ? cachedSpotify : cachedYtMusic;
+  async function resolveAndOpen(
+    platform: "spotify" | "ytmusic" | "appleMusic",
+  ) {
+    let targetUrl: string | undefined;
+
+    if (platform === "spotify") targetUrl = cachedSpotify;
+    else if (platform === "ytmusic") targetUrl = cachedYtMusic;
+    else if (platform === "appleMusic") targetUrl = cachedAppleMusic;
 
     if (targetUrl) {
       window.open(targetUrl, "_blank");
@@ -52,9 +59,12 @@
         if (platform === "spotify") {
           cachedSpotify = res.linksByPlatform.spotify?.url;
           targetUrl = cachedSpotify;
-        } else {
+        } else if (platform === "ytmusic") {
           cachedYtMusic = res.linksByPlatform.youtubeMusic?.url;
           targetUrl = cachedYtMusic;
+        } else if (platform === "appleMusic") {
+          cachedAppleMusic = res.linksByPlatform.appleMusic?.url;
+          targetUrl = cachedAppleMusic;
         }
       }
 
@@ -64,8 +74,17 @@
         const query = encodeURIComponent(`${track.artist} ${track.title}`);
         if (platform === "spotify") {
           window.open(`https://open.spotify.com/search/${query}`, "_blank");
-        } else {
+        } else if (platform === "ytmusic") {
           window.open(`https://music.youtube.com/search?q=${query}`, "_blank");
+        } else if (platform === "appleMusic") {
+          // Apple Music search URL is slightly more complex or just use google search?
+          // Using a generic search or geo specific. iTunes link maker is hard to deep link search.
+          // Fallback to simple google search for "apple music <artist> <track>" might be better or just alert.
+          // But actually, https://music.apple.com/us/search?term= works.
+          window.open(
+            `https://music.apple.com/jp/search?term=${query}`,
+            "_blank",
+          );
         }
       }
     } catch (e) {
@@ -198,6 +217,31 @@
           >
             <path
               d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 19.2c-3.977 0-7.2-3.223-7.2-7.2s3.223-7.2 7.2-7.2 7.2 3.223 7.2 7.2-3.223 7.2-7.2 7.2zm-2.4-10.8v7.2l6-3.6z"
+            />
+          </svg>
+        {/if}
+      </button>
+
+      <button
+        on:click={() => resolveAndOpen("appleMusic")}
+        class="text-gray-400 hover:text-pink-500 transition-colors p-1"
+        title="Apple Musicで再生"
+        disabled={resolvingLink === "appleMusic"}
+      >
+        {#if resolvingLink === "appleMusic"}
+          <Loader2 size={20} class="animate-spin" />
+        {:else}
+          <!-- Apple Music Icon -->
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            class="transform scale-110"
+          >
+            <path
+              d="M18.7107 19.5002C17.7951 20.8403 16.7891 22.3117 15.1466 22.3117C13.5358 22.3117 13.0457 21.3768 11.2338 21.3768C9.39003 21.3768 8.84759 22.2801 7.30064 22.3117C5.68984 22.3432 4.29344 20.6206 3.16334 18.9663C0.844788 15.5898 2.58554 10.3708 5.43809 10.3393C6.98504 10.3077 8.0924 11.3804 9.03632 11.3804C10.0118 11.3804 10.8928 10.1501 12.6234 10.1185C13.5044 10.1185 15.1781 10.434 16.2165 11.9799C16.1221 12.043 13.913 13.3364 13.9444 16.1439C13.9759 18.51 16.0277 19.3424 16.1221 19.3739C16.0592 19.5316 19.1827 18.8077 18.7107 19.5002ZM12.3087 7.02704C13.0639 6.08064 13.6015 4.75549 13.4442 3.46231C12.3114 3.52541 10.9268 4.25096 10.1397 5.16579C9.38453 6.04909 8.75519 7.374 8.94399 8.66723C10.1397 8.76186 11.5534 8.00499 12.3087 7.02704Z"
             />
           </svg>
         {/if}

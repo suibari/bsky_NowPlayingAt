@@ -341,6 +341,7 @@
                           trackUri: item.record.trackUri,
                           spotifyUrl: item.record.links?.spotify,
                           youtubeMusicUrl: item.record.links?.youtube,
+                          appleMusicUrl: item.record.links?.appleMusic,
                           comment: item.record.comment,
                           provider: item.record.provider || "itunes",
                         }}
@@ -375,6 +376,7 @@
                               item.record.img || "/placeholder_art.png",
                             spotifyUrl: item.record.links?.spotify,
                             youtubeMusicUrl: item.record.links?.youtube,
+                            appleMusicUrl: item.record.links?.appleMusic,
                             provider: item.record.provider || "itunes",
                           }}
                           isProcessing={processingTrackId ===
@@ -594,6 +596,9 @@
           {/if}
         </button>
       </form>
+      <div class="mt-8 text-center text-xs text-gray-500 font-medium">
+        Powered by AT protocol, iTunes and Discogs
+      </div>
     </div>
   </div>
 {/if}

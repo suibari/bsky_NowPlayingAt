@@ -9,6 +9,7 @@ export interface Track {
   trackUri: string; // The Store/Web URL
   spotifyUrl?: string; // Resolved by Odesli
   youtubeMusicUrl?: string; // Resolved by Odesli
+  appleMusicUrl?: string; // Resolved by Odesli
   comment?: string; // User comment
 }
 
