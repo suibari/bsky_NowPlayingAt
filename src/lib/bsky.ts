@@ -5,6 +5,7 @@ import { getBacklinks } from '$lib/constellation';
 import type { Track as MusicTrack } from '$lib/music';
 import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
 import { RichText, Agent } from '@atproto/api';
+import { resolveLinks } from '$lib/odesli';
 
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
@@ -220,6 +221,24 @@ export async function postToFeed(track: MusicTrack, text?: string) {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
+
+  // 0. Resolve Links if missing (e.g. from Search)
+  if (!track.spotifyUrl && !track.youtubeMusicUrl) {
+    console.log("Resolving links for:", track.trackUri);
+    try {
+      const links = await resolveLinks(track.trackUri);
+      if (links) {
+        if (links.linksByPlatform.spotify) {
+          track.spotifyUrl = links.linksByPlatform.spotify.url;
+        }
+        if (links.linksByPlatform.youtubeMusic) {
+          track.youtubeMusicUrl = links.linksByPlatform.youtubeMusic.url;
+        }
+      }
+    } catch (e) {
+      console.warn("Link resolution failed during post:", e);
+    }
+  }
 
   // 1. Determine Target Link & Description
   let targetUrl = track.trackUri;
