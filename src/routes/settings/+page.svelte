@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { userProfile } from "$lib/stores";
+  import { userProfile, authState, agent } from "$lib/stores";
   import { signOut } from "$lib/atproto";
   import { LogOut, ArrowLeft } from "lucide-svelte";
   import { goto } from "$app/navigation";
@@ -7,6 +7,12 @@
   async function handleSignOut() {
     if (!confirm("サインアウトしますか？")) return;
     await signOut($userProfile?.did || "");
+
+    // Clear stores
+    authState.set({ isLoading: false, error: null, isAuthenticated: false });
+    userProfile.set(null);
+    agent.set(null);
+
     goto("/");
   }
 </script>
