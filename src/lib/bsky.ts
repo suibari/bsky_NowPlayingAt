@@ -429,6 +429,56 @@ export async function getGlobalTimeline() {
     ]);
   }));
 
+  // 2.5 Hydrate Playlist Reactions
+  // Collect all playlist URIs that need fetching
+  const playlistsToFetch = new Map<string, { did: string, rkey: string }>();
+
+  timelineItems.forEach(item => {
+    if (item.type === 'reaction' && item.record.kind === 'playlist' && item.record.playlist?.uri) {
+      const uri = item.record.playlist.uri;
+      if (!playlistsToFetch.has(uri)) {
+        try {
+          // uri: at://did/collection/rkey
+          const parts = uri.split('/');
+          const rkey = parts.pop();
+          const collection = parts.pop();
+          const did = parts.pop();
+          if (did && rkey) {
+            playlistsToFetch.set(uri, { did, rkey });
+          }
+        } catch (e) {
+          console.warn("Invalid playlist URI:", uri);
+        }
+      }
+    }
+  });
+
+  // Fetch unique playlists
+  const fetchedPlaylists = new Map<string, any>();
+  await Promise.all(Array.from(playlistsToFetch.entries()).map(async ([uri, { did, rkey }]) => {
+    try {
+      // We can reuse getPlaylist if available, or just fetch directly.
+      // Since getPlaylist is async and exported, let's use it.
+      // However, we need to handle potential failures gracefully.
+      const data = await getPlaylist(did, rkey);
+      if (data && data.value) {
+        fetchedPlaylists.set(uri, data.value);
+      }
+    } catch (e) {
+      console.warn(`Failed to hydrate playlist ${uri}:`, e);
+    }
+  }));
+
+  // Assign fetched records back to items
+  timelineItems.forEach(item => {
+    if (item.type === 'reaction' && item.record.kind === 'playlist' && item.record.playlist?.uri) {
+      const fetched = fetchedPlaylists.get(item.record.playlist.uri);
+      if (fetched) {
+        item.record.playlist.record = fetched;
+      }
+    }
+  });
+
   // 3. Sort by Date Descending
   return timelineItems.sort((a, b) => {
     return new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime();
