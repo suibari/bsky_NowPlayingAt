@@ -36,16 +36,22 @@ export const GET: RequestHandler = async ({ url }) => {
             const data = await res.json();
             console.log(`[Search] Discogs results count: ${data.results?.length}`);
 
-            return data.results.map((item: any) => ({
-                id: `discogs:${item.id}`,
-                provider: 'discogs',
-                title: item.title, // "Artist - Title" format often
-                artist: item.title.split(' - ')[0] || 'Unknown', // Naive parsing, Discogs often returns "Artist - Title"
-                album: item.title.split(' - ')[1] || item.title, // Fallback
-                artworkUrl: item.cover_image, // Discogs image (might fail 403 hotlinking, checking later)
-                trackUri: `https://www.discogs.com${item.uri}`,
-                previewUrl: null, // Discogs doesn't easily provide preview
-            }));
+            return data.results.map((item: any) => {
+                const parts = item.title.split(' - ');
+                const artist = parts.length > 1 ? parts[0] : 'Unknown';
+                const title = parts.length > 1 ? parts.slice(1).join(' - ') : item.title;
+
+                return {
+                    id: `discogs:${item.id}`,
+                    provider: 'discogs',
+                    title: title,
+                    artist: artist,
+                    album: title, // Discogs "release" is basically the album
+                    artworkUrl: item.cover_image, // Discogs image (might fail 403 hotlinking, checking later)
+                    trackUri: `https://www.discogs.com${item.uri}`,
+                    previewUrl: null, // Discogs doesn't easily provide preview
+                };
+            });
         })
         .catch((e) => {
             console.error('Discogs search failed:', e);
