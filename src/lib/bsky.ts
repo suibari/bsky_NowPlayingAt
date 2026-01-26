@@ -83,6 +83,32 @@ export async function deleteReactionRecord(rkey: string) {
   });
 }
 
+export async function getMyRecentReaction(subjectUri: string): Promise<{ uri: string; value: ReactionRecord } | null> {
+  const ag = get(agent);
+  const profile = get(userProfile);
+  if (!ag || !profile) return null;
+
+  try {
+    const res = await ag.com.atproto.repo.listRecords({
+      repo: profile.did,
+      collection: NSID_REACTION,
+      limit: 100 // Check last 100 reactions
+    });
+
+    const match = res.data.records.find((r: any) => r.value.subjectUri === subjectUri);
+
+    if (match) {
+      return {
+        uri: match.uri,
+        value: match.value as unknown as ReactionRecord
+      };
+    }
+  } catch (e) {
+    console.warn("Failed to check my recent reaction", e);
+  }
+  return null;
+}
+
 export async function createReactionRecord(opts: {
   subjectUri: string;
   emoji: string;
@@ -92,6 +118,10 @@ export async function createReactionRecord(opts: {
   const ag = get(agent);
   const profile = get(userProfile);
   if (!ag || !profile) throw new Error("Not authenticated");
+
+  if (!opts.subjectUri) {
+    throw new Error("Cannot create reaction: subjectUri is missing");
+  }
 
   const record: any = {
     $type: NSID_REACTION,
@@ -551,7 +581,13 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
 export async function getHotContent() {
   // 1. Find Users via Constellation
   const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
-  const userDids = Array.from(new Set(backlinks.map(b => b.did)));
+  const uniqueDids = new Set(backlinks.map(b => b.did));
+
+  // Ensure "I" am included if logged in
+  const me = get(userProfile);
+  if (me) uniqueDids.add(me.did);
+
+  const userDids = Array.from(uniqueDids);
 
   if (userDids.length === 0) return { tracks: [], playlists: [] };
 

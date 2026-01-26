@@ -34,16 +34,18 @@ async function searchITunes(encodedQuery: string): Promise<Track[]> {
     );
     if (!res.ok) throw new Error(`iTunes error: ${res.status}`);
     const data = await res.json();
-    return data.results.map((item: any) => ({
-      id: `itunes:${item.trackId}`,
-      provider: 'itunes',
-      title: item.trackName,
-      artist: item.artistName,
-      album: item.collectionName,
-      artworkUrl: item.artworkUrl100?.replace('100x100', '600x600'),
-      previewUrl: item.previewUrl,
-      trackUri: item.trackViewUrl,
-    }));
+    return data.results
+      .filter((item: any) => item.wrapperType === 'track' && item.trackViewUrl) // Ensure it's a track with a URL
+      .map((item: any) => ({
+        id: `itunes:${item.trackId}`,
+        provider: 'itunes',
+        title: item.trackName,
+        artist: item.artistName,
+        album: item.collectionName,
+        artworkUrl: item.artworkUrl100?.replace('100x100', '600x600'),
+        previewUrl: item.previewUrl,
+        trackUri: item.trackViewUrl,
+      }));
   } catch (e) {
     console.error("iTunes search failed (client):", e);
     return [];

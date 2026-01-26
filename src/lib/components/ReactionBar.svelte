@@ -6,6 +6,7 @@
     hydrateReactions,
     createReactionRecord,
     deleteReactionRecord,
+    getMyRecentReaction,
   } from "$lib/bsky";
   import { REACTION_SOURCE } from "$lib/schema";
   import { publicAgent } from "$lib/atproto";
@@ -80,7 +81,12 @@
     if (!subjectUri) return;
     loadingReactions = true;
     try {
-      const res = await getBacklinks(subjectUri, REACTION_SOURCE);
+      // Parallel fetch: Indexer (Everyone) + PDS (Me)
+      const [res, myReaction] = await Promise.all([
+        getBacklinks(subjectUri, REACTION_SOURCE),
+        getMyRecentReaction(subjectUri),
+      ]);
+
       const hydrated = await hydrateReactions(res);
 
       // Group by emoji -> [{did, uri}]
@@ -92,6 +98,19 @@
         }
       });
 
+      // Merge My Reaction if missing
+      if (myReaction) {
+        const me = get(userProfile);
+        if (me) {
+          const emoji = myReaction.value.emoji || "👍";
+          if (!groups[emoji]) groups[emoji] = [];
+          // Check if already present
+          if (!groups[emoji].find((r) => r.did === me.did)) {
+            groups[emoji].push({ did: me.did, uri: myReaction.uri });
+          }
+        }
+      }
+
       const allDids = Array.from(
         new Set(
           Object.values(groups)
@@ -101,11 +120,24 @@
       );
       let profilesMap = new Map<string, ReactionUser>();
 
-      if (allDids.length > 0) {
+      // Ensure we have 'my' profile locally to avoid fetch if possible
+      const currentUser = get(userProfile);
+      if (currentUser) {
+        profilesMap.set(currentUser.did, {
+          did: currentUser.did,
+          handle: currentUser.handle,
+          avatar: currentUser.avatar,
+          displayName: currentUser.displayName,
+        });
+      }
+
+      const didsToFetch = allDids.filter((did) => !profilesMap.has(did));
+
+      if (didsToFetch.length > 0) {
         try {
           const chunks = [];
-          for (let i = 0; i < allDids.length; i += 25) {
-            chunks.push(allDids.slice(i, i + 25));
+          for (let i = 0; i < didsToFetch.length; i += 25) {
+            chunks.push(didsToFetch.slice(i, i + 25));
           }
           for (const chunk of chunks) {
             const pRes = await publicAgent.app.bsky.actor.getProfiles({
@@ -129,6 +161,7 @@
         emoji,
         users: items
           .map((item) => {
+            // Priority: profilesMap, then fallback
             const p = profilesMap.get(item.did);
             const user = p
               ? { ...p }
