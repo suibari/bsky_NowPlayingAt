@@ -1,6 +1,7 @@
 export interface ArtworkResult {
   blob: Blob;
-  url: string; // source URL for storage in history records
+  url: string;       // artwork CDN URL, for history img field
+  trackUrl?: string; // Apple Music trackViewUrl, set when iTunes was the source
 }
 
 /**
@@ -56,11 +57,12 @@ export async function fetchArtwork(
     );
     if (searchRes.ok) {
       const searchData = await searchRes.json();
-      const url: string | undefined =
-        searchData?.results?.[0]?.artworkUrl100?.replace('100x100bb', '600x600bb');
+      const result = searchData?.results?.[0];
+      const url: string | undefined = result?.artworkUrl100?.replace('100x100bb', '600x600bb');
+      const trackUrl: string | undefined = result?.trackViewUrl;
       if (url) {
         const imgRes = await fetch(url);
-        if (imgRes.ok) return { blob: await imgRes.blob(), url };
+        if (imgRes.ok) return { blob: await imgRes.blob(), url, trackUrl };
       }
     }
   } catch {

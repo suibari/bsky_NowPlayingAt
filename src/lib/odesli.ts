@@ -10,6 +10,24 @@ export interface OdesliResult {
   };
 }
 
+/**
+ * Pick the best streaming service link from Odesli results.
+ * Priority: Spotify > YouTube Music > Apple Music > fallbackUrl.
+ * preResolved lets callers short-circuit when links were already fetched client-side.
+ */
+export function pickBestServiceLink(
+  links: OdesliResult | null,
+  fallbackUrl: string,
+  preResolved?: { spotifyUrl?: string; youtubeMusicUrl?: string },
+): { url: string; name: string } {
+  if (preResolved?.spotifyUrl) return { url: preResolved.spotifyUrl, name: 'Spotify' };
+  if (preResolved?.youtubeMusicUrl) return { url: preResolved.youtubeMusicUrl, name: 'YouTube Music' };
+  if (links?.linksByPlatform.spotify) return { url: links.linksByPlatform.spotify.url, name: 'Spotify' };
+  if (links?.linksByPlatform.youtubeMusic) return { url: links.linksByPlatform.youtubeMusic.url, name: 'YouTube Music' };
+  if (links?.linksByPlatform.appleMusic) return { url: links.linksByPlatform.appleMusic.url, name: 'Apple Music' };
+  return { url: fallbackUrl, name: 'Apple Music' };
+}
+
 export async function resolveLinks(url: string): Promise<OdesliResult | null> {
   const encodedUrl = encodeURIComponent(url);
   const apiUrl = `https://api.song.link/v1-alpha.1/links?url=${encodedUrl}`;

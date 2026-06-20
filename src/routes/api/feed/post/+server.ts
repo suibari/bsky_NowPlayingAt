@@ -4,7 +4,7 @@ import { Agent, RichText } from '@atproto/api';
 import { getDid } from '$lib/server/session';
 import { createOAuthClient } from '$lib/server/oauth';
 import { publicAgent } from '$lib/atproto';
-import { resolveLinks } from '$lib/odesli';
+import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 import { fetchArtwork } from '$lib/server/artwork';
 
 export const POST: RequestHandler = async (event) => {
@@ -17,23 +17,16 @@ export const POST: RequestHandler = async (event) => {
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 
-  // Resolve links if missing
+  // Resolve streaming links: skip Odesli if client already resolved them
+  let odesliLinks = null;
   if (!track.spotifyUrl && !track.youtubeMusicUrl && track.trackUri) {
-    try {
-      const links = await resolveLinks(track.trackUri);
-      if (links) {
-        if (links.linksByPlatform.spotify) track.spotifyUrl = links.linksByPlatform.spotify.url;
-        if (links.linksByPlatform.youtubeMusic) track.youtubeMusicUrl = links.linksByPlatform.youtubeMusic.url;
-      }
-    } catch {
-      // ignore
-    }
+    odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
   }
-
-  let targetUrl = track.trackUri;
-  let serviceName = 'Apple Music';
-  if (track.spotifyUrl) { targetUrl = track.spotifyUrl; serviceName = 'Spotify'; }
-  else if (track.youtubeMusicUrl) { targetUrl = track.youtubeMusicUrl; serviceName = 'YouTube Music'; }
+  const { url: targetUrl, name: serviceName } = pickBestServiceLink(
+    odesliLinks,
+    track.trackUri,
+    { spotifyUrl: track.spotifyUrl, youtubeMusicUrl: track.youtubeMusicUrl },
+  );
 
   // Upload thumbnail: existing URL first, then MusicBrainz+CAA, then iTunes
   let thumbBlob = undefined;

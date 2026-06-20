@@ -4,6 +4,7 @@ import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
 import { createOAuthClient } from '$lib/server/oauth';
 import { fetchArtwork } from '$lib/server/artwork';
+import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
 const LINK_LABEL = '💿なうぷれあっとで見る';
@@ -23,18 +24,32 @@ export const POST: RequestHandler = async (event) => {
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 
-  // Get artwork: MusicBrainz + CAA (primary) → iTunes (fallback)
+  // Artwork: MusicBrainz+CAA (primary) → iTunes (fallback, also yields trackUrl)
   let artworkUrl: string | undefined;
   let thumbBlob: any = undefined;
+  let trackUrl: string | undefined;
   try {
     const artwork = await fetchArtwork(artist, title);
     if (artwork) {
       const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
       thumbBlob = uploadRes.data.blob;
       artworkUrl = artwork.url;
+      trackUrl = artwork.trackUrl;
     }
   } catch (e) {
     console.warn('[auto-post] artwork fetch/upload failed:', e);
+  }
+
+  // Resolve streaming links via Odesli (needs a starting Apple Music URL from iTunes)
+  let targetUrl: string | undefined = trackUrl;
+  let serviceName = 'Apple Music';
+  if (trackUrl) {
+    try {
+      const links = await resolveLinks(trackUrl);
+      ({ url: targetUrl, name: serviceName } = pickBestServiceLink(links, trackUrl));
+    } catch {
+      // keep Apple Music URL as fallback
+    }
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
@@ -55,7 +70,17 @@ export const POST: RequestHandler = async (event) => {
   });
 
   const postRecord: any = { text: rt.text, facets: rt.facets, createdAt: new Date().toISOString() };
-  if (thumbBlob) {
+  if (targetUrl) {
+    postRecord.embed = {
+      $type: 'app.bsky.embed.external',
+      external: {
+        uri: targetUrl,
+        title: `${title} - ${artist}`,
+        description: `Listen on ${serviceName}`,
+        thumb: thumbBlob,
+      },
+    };
+  } else if (thumbBlob) {
     postRecord.embed = {
       $type: 'app.bsky.embed.images',
       images: [{ image: thumbBlob, alt: `${title} - ${artist}` }],
