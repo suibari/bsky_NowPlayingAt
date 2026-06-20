@@ -44,21 +44,15 @@ export const POST: RequestHandler = async (event) => {
     }
   }
 
-  // Resolve streaming link from search results
+  // Resolve streaming link via Odesli — same flow as feed/post
+  // trackUri can be iTunes (Apple Music) or Discogs; Odesli handles both
   const track = tracks[0];
   let targetUrl: string | undefined;
   let serviceName = 'Apple Music';
 
-  if (track?.provider === 'discogs') {
-    targetUrl = track.trackUri;
-    serviceName = 'Discogs';
-  } else if (track?.trackUri) {
-    try {
-      const links = await resolveLinks(track.trackUri);
-      ({ url: targetUrl, name: serviceName } = pickBestServiceLink(links, track.trackUri));
-    } catch {
-      targetUrl = track.trackUri;
-    }
+  if (track?.trackUri) {
+    const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
+    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
@@ -88,11 +82,6 @@ export const POST: RequestHandler = async (event) => {
         description: `Listen on ${serviceName}`,
         thumb: thumbBlob,
       },
-    };
-  } else if (thumbBlob) {
-    postRecord.embed = {
-      $type: 'app.bsky.embed.images',
-      images: [{ image: thumbBlob, alt: `${title} - ${artist}` }],
     };
   }
 
