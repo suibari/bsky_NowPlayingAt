@@ -1,7 +1,20 @@
 export interface ArtworkResult {
   blob: Blob;
   url: string;       // artwork CDN URL, for history img field
-  trackUrl?: string; // Apple Music trackViewUrl, set when iTunes was the source
+  trackUrl?: string; // Apple Music trackViewUrl, for Odesli link resolution
+}
+
+async function fetchItunesTrackUrl(artist: string, title: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(
+      `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&limit=1`,
+    );
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    return data?.results?.[0]?.trackViewUrl;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -43,7 +56,10 @@ export async function fetchArtwork(
       if (mbid) {
         const caaUrl = `https://coverartarchive.org/release/${mbid}/front`;
         const caaRes = await fetch(caaUrl);
-        if (caaRes.ok) return { blob: await caaRes.blob(), url: caaUrl };
+        if (caaRes.ok) {
+          const trackUrl = await fetchItunesTrackUrl(artist, title);
+          return { blob: await caaRes.blob(), url: caaUrl, trackUrl };
+        }
       }
     }
   } catch {
