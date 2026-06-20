@@ -21,6 +21,9 @@ export const POST: RequestHandler = async (event) => {
   const { did, artist, title, album } = await event.request.json();
   if (!did || !artist || !title) throw error(400, 'did, artist, title required');
 
+  const warnings: string[] = [];
+
+  try {
   const oauthClient = createOAuthClient(event.url.origin);
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
@@ -121,8 +124,17 @@ export const POST: RequestHandler = async (event) => {
       },
     });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.warn('[auto-post] history record failed:', e);
+    warnings.push(`history: ${msg}`);
   }
 
-  return json({ ok: true });
+  return json({ ok: true, warnings: warnings.length ? warnings : undefined });
+
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const stack = e instanceof Error ? e.stack : undefined;
+    console.error('[auto-post] error:', e);
+    return json({ ok: false, error: message, stack }, { status: 500 });
+  }
 };
