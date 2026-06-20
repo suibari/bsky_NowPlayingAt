@@ -28,7 +28,23 @@ export const POST: RequestHandler = async (event) => {
   const tracks = await searchTracks(artist, title).catch(() => []);
   const track = tracks[0];
 
-  // サムネイルアップロード（Discogs cover_image を直接フェッチ）
+  // 制約（設計メモ）:
+  //   - iTunes Search API はサーバーサイドで叩くとレートリミットに即ヒットするためクライアント専用
+  //     → auto_post では Apple Music URL を取得できない
+  //   - Discogs URL は Odesli 非対応（HTTP 400）のためストリーミングリンクへの変換不可
+  //     → Discogs しかない auto_post では Odesli によるリンク解決が失敗する場合がある
+  //   フォールバック: ストリーミングリンクが取れない場合はジャケット画像のみ添付
+
+  // ストリーミングリンク解決: Discogs trackUri → Odesli
+  let targetUrl: string | undefined;
+  let serviceName = 'Apple Music';
+  if (track?.trackUri) {
+    const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
+    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
+    if (targetUrl === track.trackUri) targetUrl = undefined;
+  }
+
+  // サムネイルは常にアップロード試みる（リンクカードにもフォールバック画像にも使う）
   let thumbBlob: any = undefined;
   const artworkUrl: string | undefined = track?.artworkUrl || undefined;
   if (artworkUrl) {
@@ -41,16 +57,6 @@ export const POST: RequestHandler = async (event) => {
     } catch (e) {
       console.warn('[auto-post] thumbnail upload failed:', e);
     }
-  }
-
-  // ストリーミングリンク解決: Discogs trackUri → Odesli
-  // Odesli が Discogs URL のまま返した場合 → embed なし
-  let targetUrl: string | undefined;
-  let serviceName = 'Apple Music';
-  if (track?.trackUri) {
-    const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
-    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
-    if (targetUrl === track.trackUri) targetUrl = undefined;
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
@@ -72,6 +78,7 @@ export const POST: RequestHandler = async (event) => {
 
   const postRecord: any = { text: rt.text, facets: rt.facets, createdAt: new Date().toISOString() };
   if (targetUrl) {
+    // ストリーミングリンクカード（サムネイル付き）
     postRecord.embed = {
       $type: 'app.bsky.embed.external',
       external: {
@@ -80,6 +87,12 @@ export const POST: RequestHandler = async (event) => {
         description: `Listen on ${serviceName}`,
         thumb: thumbBlob,
       },
+    };
+  } else if (thumbBlob) {
+    // フォールバック: ストリーミングリンクなし → ジャケット画像のみ添付
+    postRecord.embed = {
+      $type: 'app.bsky.embed.images',
+      images: [{ image: thumbBlob, alt: `${title} - ${artist}` }],
     };
   }
 
