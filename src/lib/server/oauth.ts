@@ -63,17 +63,35 @@ const runtimeImplementation = {
   },
 };
 
+// CF Workers doesn't support redirect: 'error' in fetch options.
+// @atproto-labs/did-resolver and @atproto-labs/handle-resolver use it as a
+// security measure to prevent redirect following. Convert to 'manual' and
+// throw manually if a 3xx is returned, preserving the same semantics.
+function cfFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const redirect = input instanceof Request ? input.redirect : init?.redirect;
+  if (redirect === 'error') {
+    const req = new Request(input as RequestInfo, { redirect: 'manual' });
+    return globalThis.fetch(req).then((res) => {
+      if (res.status >= 300 && res.status < 400) {
+        throw new TypeError('redirect is not allowed');
+      }
+      return res;
+    });
+  }
+  return globalThis.fetch(input as RequestInfo, init);
+}
+
 // DoH handle resolver — no node:dns dependency.
 // Using Google DoH (/resolve = JSON format) to avoid any potential CF Workers
 // self-loop when calling cloudflare-dns.com from within Cloudflare.
 const handleResolver = new AtprotoDohHandleResolver({
   dohEndpoint: 'https://dns.google/resolve',
-  fetch: globalThis.fetch,
+  fetch: cfFetch,
 });
 
 function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
   return new OAuthClient({
-    fetch: globalThis.fetch,
+    fetch: cfFetch,
     handleResolver,
     runtimeImplementation,
     stateStore,
