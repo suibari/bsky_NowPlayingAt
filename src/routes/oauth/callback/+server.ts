@@ -1,0 +1,41 @@
+import { redirect, error } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import { createOAuthClient } from '$lib/server/oauth';
+import { setDidCookie } from '$lib/server/session';
+import { publicAgent } from '$lib/atproto';
+import { upsertSession } from '$lib/server/db';
+
+export const GET: RequestHandler = async (event) => {
+  const params = event.url.searchParams;
+
+  try {
+    const oauthClient = createOAuthClient(event.url.origin);
+    const { session } = await oauthClient.callback(params);
+    const did = session.did;
+
+    // Fetch handle from public API
+    let handle: string = did;
+    try {
+      const profile = await publicAgent.getProfile({ actor: did as any });
+      handle = profile.data.handle;
+    } catch {
+      // fallback to DID
+    }
+
+    // Persist to nowplayingat_sessions (creates row if not exists, preserves lastfm settings)
+    try {
+      await upsertSession({ did, bsky_handle: handle, lastfm_username: '', enabled: false });
+    } catch {
+      // Row may already exist; ignore
+    }
+
+    setDidCookie(event, did);
+  } catch (e) {
+    console.error('OAuth callback error:', e);
+    throw error(500, 'OAuth callback failed');
+  }
+
+  // throw redirect outside try-catch: SvelteKit's redirect() throws a Redirect object,
+  // not a Response instance, so it would be caught and mishandled if inside try-catch.
+  throw redirect(302, '/');
+};

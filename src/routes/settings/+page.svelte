@@ -1,19 +1,67 @@
 <script lang="ts">
   import { userProfile, authState, agent } from "$lib/stores";
   import { signOut } from "$lib/atproto";
-  import { LogOut, ArrowLeft } from "lucide-svelte";
+  import { LogOut, ArrowLeft, Music } from "lucide-svelte";
   import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+
+  let lastfmUsername = "";
+  let autoEnabled = false;
+  let savingLastfm = false;
+  let lastfmSaved = false;
+  let lastfmError = "";
+
+  onMount(async () => {
+    // Load existing Last.fm registration
+    try {
+      const res = await fetch("/api/register");
+      if (res.ok) {
+        const data = await res.json();
+        lastfmUsername = data.lastfm_username ?? "";
+        autoEnabled = data.enabled ?? false;
+      }
+    } catch {
+      // not registered yet
+    }
+  });
 
   async function handleSignOut() {
     if (!confirm("サインアウトしますか？")) return;
-    await signOut($userProfile?.did || "");
+    await signOut();
 
-    // Clear stores
     authState.set({ isLoading: false, error: null, isAuthenticated: false });
     userProfile.set(null);
     agent.set(null);
 
     goto("/");
+  }
+
+  async function saveLastfm() {
+    if (!lastfmUsername.trim()) return;
+    savingLastfm = true;
+    lastfmSaved = false;
+    lastfmError = "";
+
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lastfm_username: lastfmUsername.trim(),
+          enabled: autoEnabled,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        lastfmError = err.error ?? "保存に失敗しました";
+      } else {
+        lastfmSaved = true;
+      }
+    } catch {
+      lastfmError = "ネットワークエラーが発生しました";
+    } finally {
+      savingLastfm = false;
+    }
   }
 </script>
 
@@ -29,7 +77,8 @@
   <h1 class="text-3xl font-black text-white mb-8">設定</h1>
 
   {#if $userProfile}
-    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
+    <!-- Profile -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
       <div class="flex items-center gap-4 mb-6">
         {#if $userProfile.avatar}
           <img
@@ -56,12 +105,62 @@
         </button>
       </div>
     </div>
+
+    <!-- Auto Now Playing -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+      <div class="flex items-center gap-3 mb-4">
+        <Music size={22} class="text-green-400" />
+        <h2 class="text-xl font-bold text-white">自動Now Playing投稿（β）</h2>
+      </div>
+      <p class="text-gray-400 text-sm mb-6">
+        Last.fm と連携することで、スマートフォン・PC で再生した曲を Bluesky に自動で投稿できます。<br />
+        対応サービス: Spotify / Amazon Music / Apple Music など Last.fm スクロブル対応アプリ全般
+      </p>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1" for="lastfm">Last.fm ユーザー名</label>
+          <input
+            id="lastfm"
+            type="text"
+            bind:value={lastfmUsername}
+            placeholder="your_lastfm_username"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
+          />
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-400">自動投稿</span>
+          <button
+            on:click={() => (autoEnabled = !autoEnabled)}
+            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {autoEnabled ? 'bg-green-500' : 'bg-gray-600'}"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {autoEnabled ? 'translate-x-6' : 'translate-x-1'}"
+            ></span>
+          </button>
+        </div>
+
+        {#if lastfmError}
+          <p class="text-red-400 text-sm">{lastfmError}</p>
+        {/if}
+        {#if lastfmSaved}
+          <p class="text-green-400 text-sm">保存しました</p>
+        {/if}
+
+        <button
+          on:click={saveLastfm}
+          disabled={savingLastfm || !lastfmUsername.trim()}
+          class="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold py-3 rounded-lg transition-colors"
+        >
+          {savingLastfm ? "保存中..." : "保存する"}
+        </button>
+      </div>
+    </div>
   {:else}
     <div class="text-center text-gray-500">
       <p>サインインしていません。</p>
-      <a href="/" class="text-green-500 hover:underline mt-2 inline-block"
-        >ログイン画面へ</a
-      >
+      <a href="/" class="text-green-500 hover:underline mt-2 inline-block">ログイン画面へ</a>
     </div>
   {/if}
 </div>
