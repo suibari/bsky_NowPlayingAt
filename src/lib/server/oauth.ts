@@ -63,9 +63,11 @@ const runtimeImplementation = {
   },
 };
 
-// DoH handle resolver — no node:dns dependency
+// DoH handle resolver — no node:dns dependency.
+// Using Google DoH (/resolve = JSON format) to avoid any potential CF Workers
+// self-loop when calling cloudflare-dns.com from within Cloudflare.
 const handleResolver = new AtprotoDohHandleResolver({
-  dohEndpoint: 'https://cloudflare-dns.com/dns-query',
+  dohEndpoint: 'https://dns.google/resolve',
   fetch: globalThis.fetch,
 });
 
@@ -82,7 +84,9 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
 }
 
 export function createOAuthClient(origin: string): OAuthClient {
-  const isLocal = origin !== PROD_ORIGIN;
+  // Only http: origins (localhost / 127.0.0.1) are local dev.
+  // https: origins — including Cloudflare Pages Preview — use the production client.
+  const isLocal = new URL(origin).protocol === 'http:';
 
   if (isLocal) {
     // ATProto loopback client:
@@ -102,11 +106,15 @@ export function createOAuthClient(origin: string): OAuthClient {
     });
   }
 
+  // For production AND Preview (any https: origin), use the production client_id.
+  // The redirect_uri uses the actual request origin so Preview callbacks work,
+  // but it must also be listed in /client-metadata.json on PROD_ORIGIN.
+  const redirectUri = `${origin}/oauth/callback`;
   return makeClient({
     client_id: `${PROD_ORIGIN}/client-metadata.json`,
     client_name: 'なうぷれあっと',
     client_uri: PROD_ORIGIN,
-    redirect_uris: [`${PROD_ORIGIN}/oauth/callback`],
+    redirect_uris: [redirectUri],
     scope: SCOPE,
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],

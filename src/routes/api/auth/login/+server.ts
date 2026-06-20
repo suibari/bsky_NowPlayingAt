@@ -14,8 +14,8 @@ export const GET: RequestHandler = async (event) => {
     });
     console.log('[login] authorize URL:', url.toString());
     return json({ url: url.toString() });
-  } catch (e) {
-    console.error('OAuth login error:', e);
+  } catch (e: any) {
+    console.error('OAuth login error:', e?.message, 'cause:', e?.cause?.message ?? e?.cause, 'stack:', e?.stack);
     throw error(500, 'Failed to start OAuth flow');
   }
 };

@@ -3,8 +3,8 @@
   "client_name": "なうぷれあっと",
   "client_uri": "https://nowplayingat.suibari.com",
   "redirect_uris": [
-    "https://nowplayingat.suibari.com/",
-    "https://nowplayingat.suibari.com/oauth/callback"
+    "https://nowplayingat.suibari.com/oauth/callback",
+    "https://develop.bsky-nowplayingat.pages.dev/oauth/callback"
   ],
   "scope": "atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create",
   "grant_types": [
