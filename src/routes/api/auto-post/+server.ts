@@ -25,36 +25,39 @@ export const POST: RequestHandler = async (event) => {
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 
-  // Artwork and track search in parallel
-  const [artwork, tracks] = await Promise.all([
-    fetchArtwork(artist, title).catch(() => undefined),
-    searchTracks(artist, title).catch(() => []),
-  ]);
+  // Discogs で track 取得（artworkUrl + trackUri）
+  const tracks = await searchTracks(artist, title).catch(() => []);
+  const track = tracks[0];
 
-  // Upload artwork
-  let artworkUrl: string | undefined;
+  // fetchArtwork: Discogs artworkUrl を existingUrl として渡す
+  // Step1: Discogs cover_image, Step2 fallback: MusicBrainz+CAA
+  // artwork.streamingUrl: MusicBrainz URL relations から Spotify/Apple Music 等
+  const artwork = await fetchArtwork(artist, title, track?.artworkUrl).catch(() => undefined);
+
+  // サムネイルアップロード
   let thumbBlob: any = undefined;
+  let artworkUrl: string | undefined;
   if (artwork) {
     try {
       const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
       thumbBlob = uploadRes.data.blob;
       artworkUrl = artwork.url;
     } catch (e) {
-      console.warn('[auto-post] blob upload failed (image skipped):', e);
+      console.warn('[auto-post] blob upload failed:', e);
     }
   }
 
-  // Resolve streaming link via Odesli — same flow as feed/post
-  // trackUri can be iTunes (Apple Music) or Discogs; Odesli handles both
-  console.log('[auto-post] searchTracks result:', tracks.length, tracks[0]?.provider, tracks[0]?.trackUri);
-  const track = tracks[0];
+  // ストリーミングリンク解決
+  // 優先: MusicBrainz URL relations の streamingUrl（既に Spotify/Apple Music URL）
+  // 次点: Discogs trackUri → Odesli
+  // Odesli が Discogs URL のまま返した場合 → embed なし
   let targetUrl: string | undefined;
   let serviceName = 'Apple Music';
-
-  if (track?.trackUri) {
-    const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
-    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
-    console.log('[auto-post] targetUrl:', targetUrl, 'serviceName:', serviceName);
+  const resolveSource = artwork?.streamingUrl ?? track?.trackUri;
+  if (resolveSource) {
+    const odesliLinks = await resolveLinks(resolveSource).catch(() => null);
+    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, resolveSource));
+    if (track?.trackUri && targetUrl === track.trackUri) targetUrl = undefined;
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
@@ -87,27 +90,26 @@ export const POST: RequestHandler = async (event) => {
     };
   }
 
-  // [DEBUG] post & history temporarily disabled
-  // await agent.post(postRecord);
+  await agent.post(postRecord);
 
-  // // Also record to PDS history (non-fatal)
-  // try {
-  //   await agent.com.atproto.repo.createRecord({
-  //     repo: did,
-  //     collection: NSID_HISTORY,
-  //     record: {
-  //       $type: NSID_HISTORY,
-  //       provider: 'lastfm',
-  //       track: title,
-  //       artist,
-  //       album: album ?? undefined,
-  //       img: artworkUrl ?? undefined,
-  //       postedAt: new Date().toISOString(),
-  //     },
-  //   });
-  // } catch (e) {
-  //   console.warn('[auto-post] history record failed:', e);
-  // }
+  // Also record to PDS history (non-fatal)
+  try {
+    await agent.com.atproto.repo.createRecord({
+      repo: did,
+      collection: NSID_HISTORY,
+      record: {
+        $type: NSID_HISTORY,
+        provider: 'lastfm',
+        track: title,
+        artist,
+        album: album ?? undefined,
+        img: artworkUrl ?? undefined,
+        postedAt: new Date().toISOString(),
+      },
+    });
+  } catch (e) {
+    console.warn('[auto-post] history record failed:', e);
+  }
 
   return json({ ok: true });
 };
