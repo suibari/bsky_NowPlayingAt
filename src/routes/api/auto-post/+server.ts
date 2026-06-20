@@ -6,6 +6,7 @@ import { createOAuthClient } from '$lib/server/oauth';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
 const LINK_LABEL = '💿なうぷれあっとで見る';
+const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 
 export const POST: RequestHandler = async (event) => {
   // Verify shared secret
@@ -21,14 +22,15 @@ export const POST: RequestHandler = async (event) => {
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 
-  // Get artwork from iTunes Search API
+  // Get artwork from iTunes Search API; keep artworkUrl for history record
+  let artworkUrl: string | undefined;
   let thumbBlob: any = undefined;
   try {
     const searchRes = await fetch(
       `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&limit=1`
     );
     const searchData = await searchRes.json();
-    const artworkUrl = searchData?.results?.[0]?.artworkUrl100?.replace('100x100bb', '600x600bb');
+    artworkUrl = searchData?.results?.[0]?.artworkUrl100?.replace('100x100bb', '600x600bb');
     if (artworkUrl) {
       const imgRes = await fetch(artworkUrl);
       if (imgRes.ok) {
@@ -67,5 +69,25 @@ export const POST: RequestHandler = async (event) => {
   }
 
   await agent.post(postRecord);
+
+  // Also record to PDS history (non-fatal)
+  try {
+    await agent.com.atproto.repo.createRecord({
+      repo: did,
+      collection: NSID_HISTORY,
+      record: {
+        $type: NSID_HISTORY,
+        provider: 'lastfm',
+        track: title,
+        artist,
+        album: album ?? undefined,
+        img: artworkUrl ?? undefined,
+        postedAt: new Date().toISOString(),
+      },
+    });
+  } catch (e) {
+    console.warn('[auto-post] history record failed:', e);
+  }
+
   return json({ ok: true });
 };

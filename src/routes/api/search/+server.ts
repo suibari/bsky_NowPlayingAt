@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { DISCOGS_TOKEN } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
     // 1. Discogs Search
     console.log(`[Search] Discogs query: ${query}`);
-    const discogsUrl = `https://api.discogs.com/database/search?q=${encodedQuery}&type=release&per_page=20&token=${DISCOGS_TOKEN}`;
+    const discogsUrl = `https://api.discogs.com/database/search?q=${encodedQuery}&type=release&per_page=20&token=${env.DISCOGS_TOKEN}`;
     // Mask token for logging if desired, or just log the base URL
     console.log(`[Search] Fetching from Discogs...`);
 
