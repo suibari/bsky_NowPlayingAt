@@ -74,7 +74,9 @@ const runtimeImplementation = {
     return bytes;
   },
   digest: async (bytes: Uint8Array, algorithm: { name: string }): Promise<Uint8Array> => {
-    const ab = await crypto.subtle.digest(algorithm.name, bytes as unknown as BufferSource);
+    // @atproto/oauth-client 0.5.x passes 'sha256'; CF Workers needs 'SHA-256'.
+    const name = algorithm.name.toUpperCase().replace(/^SHA(\d)/, 'SHA-$1');
+    const ab = await crypto.subtle.digest(name, bytes as unknown as BufferSource);
     return new Uint8Array(ab);
   },
 };
