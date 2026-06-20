@@ -87,10 +87,16 @@ const runtimeImplementation = {
   },
 };
 
-// Simple alias — redirect: 'error' is already converted to 'manual' by the
-// globalThis.Request Proxy above, so all requests reaching here are valid.
+// Explicitly construct a Request so the globalThis.Request Proxy above fires,
+// converting redirect:'error' → redirect:'manual' for CF Workers compatibility.
+// Callers like WellKnownHandleResolver pass redirect:'error' in init directly to
+// fetch() (not via new Request()), bypassing the proxy — which causes CF Workers
+// to throw a TypeError and silently swallows the handle resolution result.
 function cfFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  return globalThis.fetch(input as RequestInfo, init);
+  const req = init != null || !(input instanceof Request)
+    ? new Request(input as RequestInfo, init)
+    : input;
+  return globalThis.fetch(req);
 }
 
 // DoH handle resolver — no node:dns dependency.
