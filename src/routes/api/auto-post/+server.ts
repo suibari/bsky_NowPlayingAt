@@ -4,6 +4,7 @@ import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
 import { createOAuthClient } from '$lib/server/oauth';
 import { searchTracks } from '$lib/server/music';
+import { resolveArtworkUrl } from '$lib/server/artwork';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
@@ -45,11 +46,14 @@ export const POST: RequestHandler = async (event) => {
   }
 
   // サムネイルは常にアップロード試みる（リンクカードにもフォールバック画像にも使う）
+  // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA → Discogs（優先順位順）
   let thumbBlob: any = undefined;
-  const artworkUrl: string | undefined = track?.artworkUrl || undefined;
+  const artworkUrl = await resolveArtworkUrl(
+    artist, title, album, track?.artworkUrl || undefined,
+  ).catch(() => undefined);
   if (artworkUrl) {
     try {
-      const res = await fetch(artworkUrl.replace('100x100', '600x600'));
+      const res = await fetch(artworkUrl);
       if (res.ok) {
         const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
