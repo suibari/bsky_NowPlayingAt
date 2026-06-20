@@ -29,12 +29,28 @@
 
   let loadingHot = true;
   let loadingDiscovery = true;
+  let showSettingsBanner = false;
 
   onMount(() => {
     // Start background fetches
     loadHotContent();
     loadDiscoveryContent();
+    checkSettingsBanner();
   });
+
+  async function checkSettingsBanner() {
+    try {
+      const res = await fetch("/api/register");
+      if (res.ok) {
+        const data = await res.json();
+        showSettingsBanner = !data.enabled || !data.lastfm_username;
+      } else {
+        showSettingsBanner = true;
+      }
+    } catch {
+      showSettingsBanner = true;
+    }
+  }
 
   async function loadHotContent() {
     loadingHot = true;
@@ -224,6 +240,23 @@
         </a>
       </div>
     </div>
+
+    <!-- Settings Banner -->
+    {#if showSettingsBanner}
+      <a
+        href="/settings"
+        class="flex items-center justify-between gap-3 mb-6 px-4 py-3 bg-green-500/10 border border-green-500/40 rounded-xl text-sm text-green-300 hover:bg-green-500/20 hover:border-green-400 transition-all group"
+      >
+        <div class="flex items-center gap-3">
+          <Music size={18} class="text-green-400 shrink-0" />
+          <span>
+            <span class="font-bold text-green-400">再生履歴をBlueskyに自動投稿</span>できます！
+            Last.fm と連携してスマホ・PCで再生した曲を自動投稿しましょう。
+          </span>
+        </div>
+        <span class="text-green-400 font-bold whitespace-nowrap group-hover:underline">設定はこちら →</span>
+      </a>
+    {/if}
 
     <!-- TABS -->
     <div class="flex justify-center mb-8">
