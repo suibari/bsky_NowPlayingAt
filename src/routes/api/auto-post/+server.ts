@@ -31,13 +31,17 @@ export const POST: RequestHandler = async (event) => {
   try {
     const artwork = await fetchArtwork(artist, title);
     if (artwork) {
-      const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
-      thumbBlob = uploadRes.data.blob;
-      artworkUrl = artwork.url;
       trackUrl = artwork.trackUrl;
+      try {
+        const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
+        thumbBlob = uploadRes.data.blob;
+        artworkUrl = artwork.url;
+      } catch (e) {
+        console.warn('[auto-post] blob upload failed (image skipped):', e);
+      }
     }
   } catch (e) {
-    console.warn('[auto-post] artwork fetch/upload failed:', e);
+    console.warn('[auto-post] artwork fetch failed:', e);
   }
 
   console.log('[auto-post] artwork result:', { artworkUrl, trackUrl });

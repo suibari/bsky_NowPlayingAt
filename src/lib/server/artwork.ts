@@ -61,7 +61,7 @@ export async function fetchArtwork(
       const mbData = await mbRes.json();
       const mbid = mbData?.recordings?.[0]?.releases?.[0]?.id;
       if (mbid) {
-        const caaUrl = `https://coverartarchive.org/release/${mbid}/front-500`;
+        const caaUrl = `https://coverartarchive.org/release/${mbid}/front`;
         const caaRes = await fetch(caaUrl);
         if (caaRes.ok) {
           const trackUrl = await fetchItunesTrackUrl(artist, title);
