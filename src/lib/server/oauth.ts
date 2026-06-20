@@ -8,6 +8,22 @@ import {
   setOAuthSession, getOAuthSession, delOAuthSession,
 } from './db';
 
+// CF Workers rejects `redirect: 'error'` in the Request constructor even though
+// @atproto-labs/* use it everywhere as SSRF protection. Patch globalThis.Request
+// via Proxy: convert 'error' → 'manual' at construction time. With 'manual',
+// CF Workers returns an opaque redirect on 3xx (status 0, ok: false), which
+// fetchOkProcessor then rejects — same security semantics, no redirects followed.
+// This runs before any request handler fires (module initialisation time).
+{
+  const _R = globalThis.Request;
+  globalThis.Request = new Proxy(_R, {
+    construct(Target, [input, init]: [RequestInfo | URL, RequestInit?]) {
+      if (init?.redirect === 'error') return new Target(input, { ...init, redirect: 'manual' });
+      return new Target(input, init);
+    },
+  }) as unknown as typeof Request;
+}
+
 const PROD_ORIGIN = 'https://nowplayingat.suibari.com';
 const SCOPE = 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create';
 
@@ -63,21 +79,9 @@ const runtimeImplementation = {
   },
 };
 
-// CF Workers doesn't support redirect: 'error' in fetch options.
-// @atproto-labs/did-resolver and @atproto-labs/handle-resolver use it as a
-// security measure to prevent redirect following. Convert to 'manual' and
-// throw manually if a 3xx is returned, preserving the same semantics.
+// Simple alias — redirect: 'error' is already converted to 'manual' by the
+// globalThis.Request Proxy above, so all requests reaching here are valid.
 function cfFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const redirect = input instanceof Request ? input.redirect : init?.redirect;
-  if (redirect === 'error') {
-    const req = new Request(input as RequestInfo, { redirect: 'manual' });
-    return globalThis.fetch(req).then((res) => {
-      if (res.status >= 300 && res.status < 400) {
-        throw new TypeError('redirect is not allowed');
-      }
-      return res;
-    });
-  }
   return globalThis.fetch(input as RequestInfo, init);
 }
 
