@@ -1,27 +1,6 @@
 export interface ArtworkResult {
   blob: Blob;
-  url: string;       // artwork CDN URL, for history img field
-  trackUrl?: string; // Apple Music trackViewUrl, for Odesli link resolution
-}
-
-async function fetchItunesTrackUrl(artist: string, title: string): Promise<string | undefined> {
-  try {
-    const term = `${artist} ${title}`;
-    const res = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=1`,
-    );
-    if (!res.ok) {
-      console.warn('[artwork] iTunes search failed:', res.status, term);
-      return undefined;
-    }
-    const data = await res.json();
-    const trackViewUrl = data?.results?.[0]?.trackViewUrl;
-    console.log('[artwork] iTunes search:', { term, resultCount: data?.resultCount, trackViewUrl });
-    return trackViewUrl;
-  } catch (e) {
-    console.warn('[artwork] iTunes search error:', e);
-    return undefined;
-  }
+  url: string; // artwork CDN URL, for history img field
 }
 
 /**
@@ -63,10 +42,7 @@ export async function fetchArtwork(
       if (mbid) {
         const caaUrl = `https://coverartarchive.org/release/${mbid}/front`;
         const caaRes = await fetch(caaUrl);
-        if (caaRes.ok) {
-          const trackUrl = await fetchItunesTrackUrl(artist, title);
-          return { blob: await caaRes.blob(), url: caaUrl, trackUrl };
-        }
+        if (caaRes.ok) return { blob: await caaRes.blob(), url: caaUrl };
       }
     }
   } catch {
@@ -76,16 +52,15 @@ export async function fetchArtwork(
   // 3. iTunes Search API
   try {
     const searchRes = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&limit=1`,
+      `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&entity=song&limit=1`,
     );
     if (searchRes.ok) {
       const searchData = await searchRes.json();
       const result = searchData?.results?.[0];
       const url: string | undefined = result?.artworkUrl100?.replace('100x100bb', '600x600bb');
-      const trackUrl: string | undefined = result?.trackViewUrl;
       if (url) {
         const imgRes = await fetch(url);
-        if (imgRes.ok) return { blob: await imgRes.blob(), url, trackUrl };
+        if (imgRes.ok) return { blob: await imgRes.blob(), url };
       }
     }
   } catch {

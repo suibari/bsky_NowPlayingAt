@@ -4,6 +4,7 @@ import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
 import { createOAuthClient } from '$lib/server/oauth';
 import { fetchArtwork } from '$lib/server/artwork';
+import { searchTracks } from '$lib/server/music';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
@@ -24,37 +25,39 @@ export const POST: RequestHandler = async (event) => {
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 
-  // Artwork: MusicBrainz+CAA (primary) → iTunes (fallback, also yields trackUrl)
+  // Artwork and track search in parallel
+  const [artwork, tracks] = await Promise.all([
+    fetchArtwork(artist, title).catch(() => undefined),
+    searchTracks(artist, title).catch(() => []),
+  ]);
+
+  // Upload artwork
   let artworkUrl: string | undefined;
   let thumbBlob: any = undefined;
-  let trackUrl: string | undefined;
-  try {
-    const artwork = await fetchArtwork(artist, title);
-    if (artwork) {
-      trackUrl = artwork.trackUrl;
-      try {
-        const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
-        thumbBlob = uploadRes.data.blob;
-        artworkUrl = artwork.url;
-      } catch (e) {
-        console.warn('[auto-post] blob upload failed (image skipped):', e);
-      }
+  if (artwork) {
+    try {
+      const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
+      thumbBlob = uploadRes.data.blob;
+      artworkUrl = artwork.url;
+    } catch (e) {
+      console.warn('[auto-post] blob upload failed (image skipped):', e);
     }
-  } catch (e) {
-    console.warn('[auto-post] artwork fetch failed:', e);
   }
 
-  console.log('[auto-post] artwork result:', { artworkUrl, trackUrl });
-
-  // Resolve streaming links via Odesli (needs a starting Apple Music URL from iTunes)
-  let targetUrl: string | undefined = trackUrl;
+  // Resolve streaming link from search results
+  const track = tracks[0];
+  let targetUrl: string | undefined;
   let serviceName = 'Apple Music';
-  if (trackUrl) {
+
+  if (track?.provider === 'discogs') {
+    targetUrl = track.trackUri;
+    serviceName = 'Discogs';
+  } else if (track?.trackUri) {
     try {
-      const links = await resolveLinks(trackUrl);
-      ({ url: targetUrl, name: serviceName } = pickBestServiceLink(links, trackUrl));
+      const links = await resolveLinks(track.trackUri);
+      ({ url: targetUrl, name: serviceName } = pickBestServiceLink(links, track.trackUri));
     } catch {
-      // keep Apple Music URL as fallback
+      targetUrl = track.trackUri;
     }
   }
 
