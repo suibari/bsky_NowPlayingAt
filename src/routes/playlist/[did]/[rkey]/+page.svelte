@@ -194,7 +194,7 @@
       title: item.track,
       artist: item.artist,
       album: item.album,
-      artworkUrl: item.imgBlob ?? item.img || "",
+      artworkUrl: (item.imgBlob ?? item.img) || "",
       spotifyUrl: item.links?.spotify,
       youtubeMusicUrl: item.links?.youtube,
     };

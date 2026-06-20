@@ -638,7 +638,7 @@
                             artist: item.record.artist || "Unknown Artist",
                             album: item.record.album,
                             artworkUrl:
-                              item.record.imgBlob ?? item.record.img || "/placeholder_art.png",
+                              (item.record.imgBlob ?? item.record.img) || "/placeholder_art.png",
                             spotifyUrl: item.record.links?.spotify,
                             youtubeMusicUrl: item.record.links?.youtube,
                             appleMusicUrl: item.record.links?.appleMusic,
