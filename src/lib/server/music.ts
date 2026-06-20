@@ -14,11 +14,11 @@ export async function searchTracks(artist: string, title: string): Promise<Track
 async function searchITunes(artist: string, title: string): Promise<Track[]> {
   for (const term of [title, `${title} ${artist}`]) {
     try {
-      const res = await fetch(
-        `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=5`,
-      );
-      if (!res.ok) continue;
+      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=5`;
+      const res = await fetch(url);
       const data = await res.json();
+      console.log('[music] iTunes search:', { term, status: res.status, resultCount: data?.resultCount });
+      if (!res.ok) continue;
       const results: Track[] = (data.results ?? [])
         .filter((item: any) => item.trackViewUrl)
         .map((item: any) => ({
@@ -31,7 +31,8 @@ async function searchITunes(artist: string, title: string): Promise<Track[]> {
           trackUri: item.trackViewUrl,
         }));
       if (results.length) return results;
-    } catch {
+    } catch (e) {
+      console.warn('[music] iTunes search error:', e);
       continue;
     }
   }

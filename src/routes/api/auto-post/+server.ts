@@ -87,26 +87,27 @@ export const POST: RequestHandler = async (event) => {
     };
   }
 
-  await agent.post(postRecord);
+  // [DEBUG] post & history temporarily disabled
+  // await agent.post(postRecord);
 
-  // Also record to PDS history (non-fatal)
-  try {
-    await agent.com.atproto.repo.createRecord({
-      repo: did,
-      collection: NSID_HISTORY,
-      record: {
-        $type: NSID_HISTORY,
-        provider: 'lastfm',
-        track: title,
-        artist,
-        album: album ?? undefined,
-        img: artworkUrl ?? undefined,
-        postedAt: new Date().toISOString(),
-      },
-    });
-  } catch (e) {
-    console.warn('[auto-post] history record failed:', e);
-  }
+  // // Also record to PDS history (non-fatal)
+  // try {
+  //   await agent.com.atproto.repo.createRecord({
+  //     repo: did,
+  //     collection: NSID_HISTORY,
+  //     record: {
+  //       $type: NSID_HISTORY,
+  //       provider: 'lastfm',
+  //       track: title,
+  //       artist,
+  //       album: album ?? undefined,
+  //       img: artworkUrl ?? undefined,
+  //       postedAt: new Date().toISOString(),
+  //     },
+  //   });
+  // } catch (e) {
+  //   console.warn('[auto-post] history record failed:', e);
+  // }
 
   return json({ ok: true });
 };
