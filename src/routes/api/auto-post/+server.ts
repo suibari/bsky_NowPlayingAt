@@ -48,6 +48,7 @@ export const POST: RequestHandler = async (event) => {
   // サムネイルは常にアップロード試みる（リンクカードにもフォールバック画像にも使う）
   // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA → Discogs（優先順位順）
   let thumbBlob: any = undefined;
+  let imgBlob: string | undefined = undefined;
   const artworkUrl = await resolveArtworkUrl(
     artist, title, album, track?.artworkUrl || undefined,
   ).catch(() => undefined);
@@ -57,6 +58,7 @@ export const POST: RequestHandler = async (event) => {
       if (res.ok) {
         const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
+        imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.$link}`;
       }
     } catch (e) {
       console.warn('[auto-post] thumbnail upload failed:', e);
@@ -114,6 +116,7 @@ export const POST: RequestHandler = async (event) => {
         artist,
         album: album ?? undefined,
         img: artworkUrl ?? undefined,
+        imgBlob: imgBlob ?? undefined,
         postedAt: new Date().toISOString(),
       },
     });

@@ -10,7 +10,7 @@ export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
   if (!did) throw error(401, 'Unauthorized');
 
-  const track = await event.request.json();
+  const { imgBlob, ...track } = await event.request.json();
 
   const oauthClient = createOAuthClient(event.url.origin);
   const session = await oauthClient.restore(did);
@@ -24,6 +24,7 @@ export const POST: RequestHandler = async (event) => {
     album: track.album,
     trackUri: track.trackUri,
     img: track.artworkUrl,
+    imgBlob: imgBlob ?? undefined,
     links: {
       spotify: track.spotifyUrl ?? undefined,
       youtube: track.youtubeMusicUrl ?? undefined,

@@ -29,12 +29,14 @@ export const POST: RequestHandler = async (event) => {
 
   // Upload thumbnail
   let thumbBlob = undefined;
+  let imgBlob: string | undefined = undefined;
   if (track.artworkUrl) {
     try {
       const res = await fetch(track.artworkUrl.replace('100x100', '600x600'));
       if (res.ok) {
         const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
+        imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.$link}`;
       }
     } catch {
       // ignore
@@ -83,5 +85,5 @@ export const POST: RequestHandler = async (event) => {
     createdAt: new Date().toISOString(),
     langs: ['ja'],
   });
-  return json(res);
+  return json({ ...res, imgBlob });
 };

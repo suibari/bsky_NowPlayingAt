@@ -13,11 +13,11 @@ export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 // --- HISTORY ---
 
-export async function createHistoryRecord(track: MusicTrack) {
+export async function createHistoryRecord(track: MusicTrack, imgBlob?: string) {
   const res = await fetch('/api/history', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(track),
+    body: JSON.stringify({ ...track, imgBlob }),
   });
   if (!res.ok) throw new Error('Failed to create history record');
   return res.json();

@@ -13,6 +13,7 @@ export interface Track {
   album: string;
   trackUri: string;
   img: string;
+  imgBlob?: string;
   links: {
     spotify?: string;
     youtube?: string;

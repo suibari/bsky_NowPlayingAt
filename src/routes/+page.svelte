@@ -136,11 +136,11 @@
       if (postToBsky) {
         if (!confirm(`"${track.title}" をBlueskyに投稿しますか？`)) return;
 
-        // 1. Write to History (PDS)
-        await createHistoryRecord(track);
+        // 1. Post to Feed (blob upload happens here, get imgBlob back)
+        const { imgBlob } = await postToFeed(track);
 
-        // 2. Post to Feed
-        await postToFeed(track);
+        // 2. Write to History (PDS) with imgBlob for permanent image reference
+        await createHistoryRecord(track, imgBlob);
 
         alert("Blueskyに投稿しました！");
       } else {
@@ -436,7 +436,7 @@
                         title: track.track,
                         artist: track.artist,
                         album: track.album,
-                        artworkUrl: track.img,
+                        artworkUrl: track.imgBlob ?? track.img,
                         trackUri: track.trackUri,
                         spotifyUrl: track.links?.spotify,
                         youtubeMusicUrl: track.links?.youtube,
@@ -602,7 +602,7 @@
                           title: item.record.track,
                           artist: item.record.artist,
                           album: item.record.album,
-                          artworkUrl: item.record.img,
+                          artworkUrl: item.record.imgBlob ?? item.record.img,
                           trackUri: item.record.trackUri,
                           spotifyUrl: item.record.links?.spotify,
                           youtubeMusicUrl: item.record.links?.youtube,
@@ -638,7 +638,7 @@
                             artist: item.record.artist || "Unknown Artist",
                             album: item.record.album,
                             artworkUrl:
-                              item.record.img || "/placeholder_art.png",
+                              item.record.imgBlob ?? item.record.img || "/placeholder_art.png",
                             spotifyUrl: item.record.links?.spotify,
                             youtubeMusicUrl: item.record.links?.youtube,
                             appleMusicUrl: item.record.links?.appleMusic,
@@ -742,8 +742,8 @@
       <!-- Artwork Reel Background -->
       {#await getGlobalTimeline() then timeline}
         {@const artworks = timeline
-          .filter((t) => t.type === "history" && t.record.img)
-          .map((t) => t.record.img)
+          .filter((t) => t.type === "history" && (t.record.imgBlob || t.record.img))
+          .map((t) => t.record.imgBlob ?? t.record.img)
           .sort(() => Math.random() - 0.5) // Shuffle
           .slice(0, 30)}
         <!-- Limit to 30 items -->
