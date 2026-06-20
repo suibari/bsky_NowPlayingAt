@@ -5,7 +5,6 @@ import { getDid } from '$lib/server/session';
 import { createOAuthClient } from '$lib/server/oauth';
 import { publicAgent } from '$lib/atproto';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
-import { fetchArtwork } from '$lib/server/artwork';
 
 export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
@@ -28,16 +27,18 @@ export const POST: RequestHandler = async (event) => {
     { spotifyUrl: track.spotifyUrl, youtubeMusicUrl: track.youtubeMusicUrl },
   );
 
-  // Upload thumbnail: existing URL first, then MusicBrainz+CAA, then iTunes
+  // Upload thumbnail
   let thumbBlob = undefined;
-  try {
-    const artwork = await fetchArtwork(track.artist, track.title, track.artworkUrl);
-    if (artwork) {
-      const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
-      thumbBlob = uploadRes.data.blob;
+  if (track.artworkUrl) {
+    try {
+      const res = await fetch(track.artworkUrl.replace('100x100', '600x600'));
+      if (res.ok) {
+        const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
+        thumbBlob = uploadRes.data.blob;
+      }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   const profile = await publicAgent.getProfile({ actor: did });

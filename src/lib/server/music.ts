@@ -4,24 +4,10 @@ import { env } from '$env/dynamic/private';
 const DISCOGS_UA = 'NowPlayingAt/1.0 (https://nowplayingat.suibari.com)';
 
 export async function searchTracks(artist: string, title: string): Promise<Track[]> {
-  return searchDiscogs(artist, title);
+  return searchDiscogsQuery(`${artist} ${title}`);
 }
 
-async function searchDiscogs(artist: string, title: string): Promise<Track[]> {
-  try {
-    const res = await fetch(
-      `https://api.discogs.com/database/search?artist=${encodeURIComponent(artist)}&track=${encodeURIComponent(title)}&type=release&per_page=3&token=${env.DISCOGS_TOKEN}`,
-      { headers: { 'User-Agent': DISCOGS_UA } },
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    return mapDiscogsResults(data.results ?? [], artist);
-  } catch {
-    return [];
-  }
-}
-
-// Used by /api/search for free-form user queries
+// Used by /api/search for free-form user queries, and searchTracks above
 export async function searchDiscogsQuery(query: string): Promise<Track[]> {
   try {
     const res = await fetch(

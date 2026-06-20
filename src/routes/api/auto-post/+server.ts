@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
 import { createOAuthClient } from '$lib/server/oauth';
-import { fetchArtwork } from '$lib/server/artwork';
 import { searchTracks } from '$lib/server/music';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 
@@ -29,35 +28,29 @@ export const POST: RequestHandler = async (event) => {
   const tracks = await searchTracks(artist, title).catch(() => []);
   const track = tracks[0];
 
-  // fetchArtwork: Discogs artworkUrl を existingUrl として渡す
-  // Step1: Discogs cover_image, Step2 fallback: MusicBrainz+CAA
-  // artwork.streamingUrl: MusicBrainz URL relations から Spotify/Apple Music 等
-  const artwork = await fetchArtwork(artist, title, track?.artworkUrl).catch(() => undefined);
-
-  // サムネイルアップロード
+  // サムネイルアップロード（Discogs cover_image を直接フェッチ）
   let thumbBlob: any = undefined;
-  let artworkUrl: string | undefined;
-  if (artwork) {
+  const artworkUrl: string | undefined = track?.artworkUrl || undefined;
+  if (artworkUrl) {
     try {
-      const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
-      thumbBlob = uploadRes.data.blob;
-      artworkUrl = artwork.url;
+      const res = await fetch(artworkUrl.replace('100x100', '600x600'));
+      if (res.ok) {
+        const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
+        thumbBlob = uploadRes.data.blob;
+      }
     } catch (e) {
-      console.warn('[auto-post] blob upload failed:', e);
+      console.warn('[auto-post] thumbnail upload failed:', e);
     }
   }
 
-  // ストリーミングリンク解決
-  // 優先: MusicBrainz URL relations の streamingUrl（既に Spotify/Apple Music URL）
-  // 次点: Discogs trackUri → Odesli
+  // ストリーミングリンク解決: Discogs trackUri → Odesli
   // Odesli が Discogs URL のまま返した場合 → embed なし
   let targetUrl: string | undefined;
   let serviceName = 'Apple Music';
-  const resolveSource = artwork?.streamingUrl ?? track?.trackUri;
-  if (resolveSource) {
-    const odesliLinks = await resolveLinks(resolveSource).catch(() => null);
-    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, resolveSource));
-    if (track?.trackUri && targetUrl === track.trackUri) targetUrl = undefined;
+  if (track?.trackUri) {
+    const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
+    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
+    if (targetUrl === track.trackUri) targetUrl = undefined;
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
