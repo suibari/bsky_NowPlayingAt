@@ -39,8 +39,8 @@ export const POST: RequestHandler = async (event) => {
         thumbBlob = uploadRes.data.blob;
       }
     }
-  } catch {
-    // artwork is optional
+  } catch (e) {
+    console.warn('[auto-post] artwork fetch/upload failed:', e);
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
