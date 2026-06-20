@@ -99,6 +99,7 @@
   let processingTrackId: string | null = null;
 
   async function handleSignIn() {
+    handleInput = handleInput.replace(/^@/, '').trim();
     if (!handleInput.includes(".")) {
       handleInput += ".bsky.social";
     }

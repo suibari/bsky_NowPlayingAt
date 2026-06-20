@@ -15,7 +15,13 @@ export const GET: RequestHandler = async (event) => {
     console.log('[login] authorize URL:', url.toString());
     return json({ url: url.toString() });
   } catch (e: any) {
-    console.error('OAuth login error:', e?.message, 'cause:', e?.cause?.message ?? e?.cause, 'stack:', e?.stack);
+    const serializeCause = (err: any, depth = 0): string => {
+      if (!err || depth > 5) return '';
+      const msg = err?.message ?? String(err);
+      const next = serializeCause(err?.cause, depth + 1);
+      return next ? `${msg} → ${next}` : msg;
+    };
+    console.error('[login] OAuth error for handle:', handle, '| chain:', serializeCause(e), '| stack:', e?.stack);
     throw error(500, 'Failed to start OAuth flow');
   }
 };
