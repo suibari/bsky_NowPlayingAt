@@ -18,8 +18,14 @@ import {
   const _R = globalThis.Request;
   globalThis.Request = new Proxy(_R, {
     construct(Target, [input, init]: [RequestInfo | URL, RequestInit?]) {
-      if (init?.redirect === 'error') return new Target(input, { ...init, redirect: 'manual' });
-      return new Target(input, init);
+      if (!init) return new Target(input);
+      // CF Workers doesn't support `redirect: 'error'` or the `cache` field
+      // (even when set to undefined). Strip both before hitting the constructor.
+      const { redirect, cache: _cache, ...rest } = init as any;
+      return new Target(input, {
+        ...rest,
+        ...(redirect === 'error' ? { redirect: 'manual' } : redirect != null ? { redirect } : {}),
+      });
     },
   }) as unknown as typeof Request;
 }
