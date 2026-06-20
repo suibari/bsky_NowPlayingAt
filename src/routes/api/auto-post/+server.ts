@@ -29,6 +29,10 @@ export const POST: RequestHandler = async (event) => {
     const searchRes = await fetch(
       `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&limit=1`
     );
+    if (!searchRes.ok) {
+      console.warn('[auto-post] iTunes search rate limited or error:', searchRes.status);
+      throw new Error(`iTunes ${searchRes.status}`);
+    }
     const searchData = await searchRes.json();
     artworkUrl = searchData?.results?.[0]?.artworkUrl100?.replace('100x100bb', '600x600bb');
     if (artworkUrl) {
