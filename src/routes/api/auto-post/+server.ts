@@ -80,7 +80,7 @@ export const POST: RequestHandler = async (event) => {
     features: [{ $type: 'app.bsky.richtext.facet#link', uri: profileUrl }],
   });
 
-  const postRecord: any = { text: rt.text, facets: rt.facets, createdAt: new Date().toISOString() };
+  const postRecord: any = { text: rt.text, facets: rt.facets, langs: ['ja'], createdAt: new Date().toISOString() };
   if (targetUrl) {
     // ストリーミングリンクカード（サムネイル付き）
     postRecord.embed = {
