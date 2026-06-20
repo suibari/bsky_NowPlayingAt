@@ -1,7 +1,7 @@
 <script lang="ts">
   import { userProfile, authState, agent } from "$lib/stores";
   import { signOut } from "$lib/atproto";
-  import { LogOut, ArrowLeft, Music } from "lucide-svelte";
+  import { LogOut, ArrowLeft, Music, Loader2 } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
 
@@ -76,7 +76,11 @@
 
   <h1 class="text-3xl font-black text-white mb-8">設定</h1>
 
-  {#if $userProfile}
+  {#if $authState.isLoading}
+    <div class="flex items-center justify-center h-64">
+      <Loader2 class="w-8 h-8 animate-spin text-green-500" />
+    </div>
+  {:else if $userProfile}
     <!-- Profile -->
     <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-6">
       <div class="flex items-center gap-4 mb-6">
