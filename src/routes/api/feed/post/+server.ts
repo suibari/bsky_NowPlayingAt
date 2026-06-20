@@ -5,6 +5,7 @@ import { getDid } from '$lib/server/session';
 import { createOAuthClient } from '$lib/server/oauth';
 import { publicAgent } from '$lib/atproto';
 import { resolveLinks } from '$lib/odesli';
+import { fetchArtwork } from '$lib/server/artwork';
 
 export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
@@ -34,19 +35,16 @@ export const POST: RequestHandler = async (event) => {
   if (track.spotifyUrl) { targetUrl = track.spotifyUrl; serviceName = 'Spotify'; }
   else if (track.youtubeMusicUrl) { targetUrl = track.youtubeMusicUrl; serviceName = 'YouTube Music'; }
 
-  // Upload thumbnail
+  // Upload thumbnail: existing URL first, then MusicBrainz+CAA, then iTunes
   let thumbBlob = undefined;
-  if (track.artworkUrl) {
-    try {
-      const res = await fetch(track.artworkUrl.replace('100x100', '600x600'));
-      if (res.ok) {
-        const blob = await res.blob();
-        const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
-        thumbBlob = uploadRes.data.blob;
-      }
-    } catch {
-      // ignore
+  try {
+    const artwork = await fetchArtwork(track.artist, track.title, track.artworkUrl);
+    if (artwork) {
+      const uploadRes = await agent.uploadBlob(artwork.blob, { encoding: 'image/jpeg' });
+      thumbBlob = uploadRes.data.blob;
     }
+  } catch {
+    // ignore
   }
 
   const profile = await publicAgent.getProfile({ actor: did });
