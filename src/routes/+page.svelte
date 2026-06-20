@@ -30,13 +30,19 @@
   let loadingHot = true;
   let loadingDiscovery = true;
   let showSettingsBanner = false;
+  let bannerChecked = false;
 
   onMount(() => {
     // Start background fetches
     loadHotContent();
     loadDiscoveryContent();
-    checkSettingsBanner();
   });
+
+  // Wait for auth to be confirmed before checking settings
+  $: if ($authState.isAuthenticated && !bannerChecked) {
+    bannerChecked = true;
+    checkSettingsBanner();
+  }
 
   async function checkSettingsBanner() {
     try {
@@ -45,10 +51,10 @@
         const data = await res.json();
         showSettingsBanner = !data.enabled || !data.lastfm_username;
       } else {
-        showSettingsBanner = true;
+        showSettingsBanner = false;
       }
     } catch {
-      showSettingsBanner = true;
+      showSettingsBanner = false;
     }
   }
 
