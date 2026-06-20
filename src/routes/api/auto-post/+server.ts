@@ -46,6 +46,7 @@ export const POST: RequestHandler = async (event) => {
 
   // Resolve streaming link via Odesli — same flow as feed/post
   // trackUri can be iTunes (Apple Music) or Discogs; Odesli handles both
+  console.log('[auto-post] searchTracks result:', tracks.length, tracks[0]?.provider, tracks[0]?.trackUri);
   const track = tracks[0];
   let targetUrl: string | undefined;
   let serviceName = 'Apple Music';
@@ -53,6 +54,7 @@ export const POST: RequestHandler = async (event) => {
   if (track?.trackUri) {
     const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
     ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
+    console.log('[auto-post] targetUrl:', targetUrl, 'serviceName:', serviceName);
   }
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
