@@ -30,8 +30,8 @@ export const GET: RequestHandler = async (event) => {
     }
 
     setDidCookie(event, did);
-  } catch (e) {
-    console.error('OAuth callback error:', e);
+  } catch (e: any) {
+    console.error('OAuth callback error:', e?.message, 'cause:', e?.cause?.message ?? e?.cause, 'cause2:', e?.cause?.cause?.message ?? e?.cause?.cause, 'stack:', e?.stack);
     throw error(500, 'OAuth callback failed');
   }
 
