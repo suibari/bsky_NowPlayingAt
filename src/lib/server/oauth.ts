@@ -2,7 +2,6 @@
 // which are incompatible with Cloudflare Workers.
 import { OAuthClient } from '@atproto/oauth-client';
 import { JoseKey } from '@atproto/jwk-jose';
-import { WebcryptoKey } from '@atproto/jwk-webcrypto';
 import { AtprotoDohHandleResolver } from '@atproto-labs/handle-resolver';
 import {
   setOAuthState, getOAuthState, delOAuthState,
@@ -48,9 +47,11 @@ const sessionStore = toDpopKeyStore({
   del: (sub)      => delOAuthSession(sub),
 });
 
-// WebCrypto runtime — works in both Cloudflare Workers and Node.js 18+
+// JoseKey.generate forces extractable:true so the private key can be serialized
+// to PostgREST across CF Workers requests. WebcryptoKey generates non-extractable
+// keys by default in CF Workers, making them impossible to persist.
 const runtimeImplementation = {
-  createKey: (algs: string[]) => WebcryptoKey.generate(algs),
+  createKey: (algs: string[]) => JoseKey.generate(algs),
   getRandomValues: (n: number): Uint8Array => {
     const bytes = new Uint8Array(n);
     crypto.getRandomValues(bytes);
