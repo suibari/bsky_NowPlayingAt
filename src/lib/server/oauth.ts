@@ -1,4 +1,5 @@
 import { NodeOAuthClient } from '@atproto/oauth-client-node';
+import { AtprotoDohHandleResolver } from '@atproto-labs/handle-resolver';
 import {
   setOAuthState, getOAuthState, delOAuthState,
   setOAuthSession, getOAuthSession, delOAuthSession,
@@ -19,6 +20,21 @@ const sessionStore = {
   async del(sub: string) { await delOAuthSession(sub); },
 };
 
+// Cloudflare Workers / Vite dev compatible options:
+//   - fetch: globalThis.fetch  → bypasses undici (Node.js only)
+//   - handleResolver: DoH      → bypasses node:dns (Node.js only)
+function sharedOptions() {
+  return {
+    fetch: globalThis.fetch,
+    handleResolver: new AtprotoDohHandleResolver({
+      dohEndpoint: 'https://cloudflare-dns.com/dns-query',
+      fetch: globalThis.fetch,
+    }),
+    stateStore,
+    sessionStore,
+  };
+}
+
 export function createOAuthClient(origin: string): NodeOAuthClient {
   const isLocal = origin !== PROD_ORIGIN;
 
@@ -29,6 +45,7 @@ export function createOAuthClient(origin: string): NodeOAuthClient {
     const port = new URL(origin).port || '5173';
     const redirectUri = `http://127.0.0.1:${port}/oauth/callback`;
     return new NodeOAuthClient({
+      ...sharedOptions(),
       clientMetadata: {
         client_id: `http://localhost?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(SCOPE)}`,
         redirect_uris: [redirectUri],
@@ -39,12 +56,11 @@ export function createOAuthClient(origin: string): NodeOAuthClient {
         application_type: 'web',
         dpop_bound_access_tokens: true,
       },
-      stateStore,
-      sessionStore,
     });
   }
 
   return new NodeOAuthClient({
+    ...sharedOptions(),
     clientMetadata: {
       client_id: `${PROD_ORIGIN}/client-metadata.json`,
       client_name: 'なうぷれあっと',
@@ -57,7 +73,5 @@ export function createOAuthClient(origin: string): NodeOAuthClient {
       application_type: 'web',
       dpop_bound_access_tokens: true,
     },
-    stateStore,
-    sessionStore,
   });
 }
