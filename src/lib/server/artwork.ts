@@ -6,13 +6,20 @@ export interface ArtworkResult {
 
 async function fetchItunesTrackUrl(artist: string, title: string): Promise<string | undefined> {
   try {
+    const term = `${artist} ${title}`;
     const res = await fetch(
-      `https://itunes.apple.com/search?term=${encodeURIComponent(`${artist} ${title}`)}&media=music&limit=1`,
+      `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&limit=1`,
     );
-    if (!res.ok) return undefined;
+    if (!res.ok) {
+      console.warn('[artwork] iTunes search failed:', res.status, term);
+      return undefined;
+    }
     const data = await res.json();
-    return data?.results?.[0]?.trackViewUrl;
-  } catch {
+    const trackViewUrl = data?.results?.[0]?.trackViewUrl;
+    console.log('[artwork] iTunes search:', { term, resultCount: data?.resultCount, trackViewUrl });
+    return trackViewUrl;
+  } catch (e) {
+    console.warn('[artwork] iTunes search error:', e);
     return undefined;
   }
 }
@@ -54,7 +61,7 @@ export async function fetchArtwork(
       const mbData = await mbRes.json();
       const mbid = mbData?.recordings?.[0]?.releases?.[0]?.id;
       if (mbid) {
-        const caaUrl = `https://coverartarchive.org/release/${mbid}/front`;
+        const caaUrl = `https://coverartarchive.org/release/${mbid}/front-500`;
         const caaRes = await fetch(caaUrl);
         if (caaRes.ok) {
           const trackUrl = await fetchItunesTrackUrl(artist, title);
