@@ -22,12 +22,8 @@ export const GET: RequestHandler = async (event) => {
       // fallback to DID
     }
 
-    // Persist to nowplayingat_sessions (creates row if not exists, preserves lastfm settings)
-    try {
-      await upsertSession({ did, bsky_handle: handle, lastfm_username: '', enabled: false });
-    } catch {
-      // Row may already exist; ignore
-    }
+    // Insert session row for new users only; ignore if already exists to preserve lastfm settings
+    await upsertSession({ did, bsky_handle: handle, lastfm_username: '', enabled: false }, 'ignore');
 
     setDidCookie(event, did);
   } catch (e: any) {

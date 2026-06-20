@@ -94,10 +94,15 @@ export async function upsertSession(data: {
   bsky_handle: string;
   lastfm_username: string;
   enabled: boolean;
-}): Promise<void> {
+}, onConflict: 'merge' | 'ignore' = 'merge'): Promise<void> {
   await pgFetch(`${env.POSTGREST_URL}/sessions`, {
     method: 'POST',
-    headers: { ...writeHeaders(), 'Prefer': 'resolution=merge-duplicates' },
+    headers: {
+      ...writeHeaders(),
+      'Prefer': onConflict === 'ignore'
+        ? 'resolution=ignore-duplicates'
+        : 'resolution=merge-duplicates',
+    },
     body: JSON.stringify(data),
   });
 }
