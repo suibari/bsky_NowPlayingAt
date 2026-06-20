@@ -40,6 +40,8 @@ export const POST: RequestHandler = async (event) => {
     console.warn('[auto-post] artwork fetch/upload failed:', e);
   }
 
+  console.log('[auto-post] artwork result:', { artworkUrl, trackUrl });
+
   // Resolve streaming links via Odesli (needs a starting Apple Music URL from iTunes)
   let targetUrl: string | undefined = trackUrl;
   let serviceName = 'Apple Music';
