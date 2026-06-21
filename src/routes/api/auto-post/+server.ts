@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
 import { createOAuthClient } from '$lib/server/oauth';
+import { getSession } from '$lib/server/db';
 import { searchTracks } from '$lib/server/music';
 import { resolveArtworkUrl } from '$lib/server/artwork';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
@@ -68,8 +69,12 @@ export const POST: RequestHandler = async (event) => {
     }
   }
 
+  const userSession = await getSession(did);
+  const customText = userSession?.custom_text?.trim() || '';
+  const customLine = customText ? `\n${customText}` : '';
+
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
-  const rawText = `🎵 Now Playing\n${title}\n${artist}${album ? `\n${album}` : ''}\n\n#NowPlaying #なうぷれ\n\n${LINK_LABEL}`;
+  const rawText = `🎵 Now Playing\n${title}\n${artist}${album ? `\n${album}` : ''}${customLine}\n\n#NowPlaying #なうぷれ\n\n${LINK_LABEL}`;
 
   const rt = new RichText({ text: rawText });
   await rt.detectFacets(agent);
