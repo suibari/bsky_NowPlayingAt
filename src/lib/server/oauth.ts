@@ -146,10 +146,12 @@ export async function restoreOAuthSession(client: OAuthClient, sub: string, even
   try {
     return await client.restore(sub);
   } catch (err) {
-    if (err instanceof Error && err.message === SECP256K1_DELETED) {
-      // Session held a secp256k1 key unusable in CF Workers; it was already
-      // deleted from the store. Also clear the browser cookie so the user is
-      // fully signed out and only needs to sign in (not sign out first).
+    if (err instanceof Error && (
+      err.message === SECP256K1_DELETED ||
+      // Session was already deleted from DB (by our handler or externally).
+      // The `did` cookie is stale — clear it so the user only needs to sign in.
+      err.message === 'The session was deleted by another process'
+    )) {
       clearDidCookie(event);
       throw svelteKitError(401, 'Session expired. Please log in again.');
     }
