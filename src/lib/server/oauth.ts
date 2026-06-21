@@ -87,11 +87,9 @@ const sessionStore = toDpopKeyStore({
 const runtimeImplementation = {
   createKey: (algs: string[]) => {
     // CF Workers cannot sign with secp256k1 (ES256K) even though it can generate
-    // the key. Drop ES256K from the candidate list so the client always picks a
-    // curve that CF Workers SubtleCrypto can actually use for signing (e.g. P-256).
-    const isNode = typeof process !== 'undefined' &&
-      typeof (process as any)?.versions?.node === 'string';
-    const safeAlgs = isNode ? algs : algs.filter(a => a !== 'ES256K');
+    // the key. Always drop ES256K so the client picks a curve SubtleCrypto can
+    // actually use for signing (e.g. P-256), in both dev and production.
+    const safeAlgs = algs.filter(a => a !== 'ES256K');
     return JoseKey.generate(safeAlgs.length ? safeAlgs : ['ES256']);
   },
   getRandomValues: (n: number): Uint8Array => {
