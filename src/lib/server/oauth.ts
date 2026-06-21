@@ -34,15 +34,10 @@ import {
 const PROD_ORIGIN = 'https://nowplayingat.suibari.com';
 const SCOPE = 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create';
 
-// @atproto/jwk's jwkAlgorithms only yields 'ES256K' for secp256k1 when IS_NODE_RUNTIME
-// is true. In CF Workers it is always false, so secp256k1 JWKs without an explicit
-// "alg" field report only ECDH-ES algorithms and fail DPoP negotiation. Explicitly
-// set alg:'ES256K' when storing/restoring secp256k1 keys to bypass the guard.
-function normalizeJwkAlg(jwk: Record<string, unknown>): Record<string, unknown> {
-  if (jwk.alg || jwk.kty !== 'EC') return jwk;
-  if (jwk.crv === 'secp256k1') return { ...jwk, alg: 'ES256K' };
-  return jwk;
-}
+// CF Workers can generate secp256k1 keys but cannot import them back for ECDSA
+// signing (SubtleCrypto only supports P-256/P-384/P-521). Sessions that contain
+// a secp256k1 DPoP key are permanently unusable in CF Workers.
+const SECP256K1_DELETED = 'secp256k1-key-unsupported-in-cf-workers';
 
 // DPoP key store: serialise/deserialise the ephemeral DPoP key alongside the session.
 // Mirrors NodeOAuthClient's toDpopKeyStore but uses JoseKey which works in CF Workers.
@@ -55,13 +50,17 @@ function toDpopKeyStore(store: {
     async set(sub: string, { dpopKey, ...data }: any) {
       const dpopJwk = dpopKey.privateJwk;
       if (!dpopJwk) throw new Error('Private DPoP JWK is missing.');
-      await store.set(sub, { ...data, dpopJwk: normalizeJwkAlg(dpopJwk) });
+      await store.set(sub, { ...data, dpopJwk });
     },
     async get(sub: string) {
       const result: any = await store.get(sub);
       if (!result) return undefined;
       const { dpopJwk, ...data } = result;
-      const dpopKey = await JoseKey.fromJWK(normalizeJwkAlg(dpopJwk));
+      if (dpopJwk?.kty === 'EC' && dpopJwk?.crv === 'secp256k1') {
+        await store.del(sub).catch(() => {});
+        throw new Error(SECP256K1_DELETED);
+      }
+      const dpopKey = await JoseKey.fromJWK(dpopJwk);
       return { ...data, dpopKey };
     },
     del: (sub: string) => store.del(sub),
@@ -84,7 +83,15 @@ const sessionStore = toDpopKeyStore({
 // to PostgREST across CF Workers requests. WebcryptoKey generates non-extractable
 // keys by default in CF Workers, making them impossible to persist.
 const runtimeImplementation = {
-  createKey: (algs: string[]) => JoseKey.generate(algs),
+  createKey: (algs: string[]) => {
+    // CF Workers cannot sign with secp256k1 (ES256K) even though it can generate
+    // the key. Drop ES256K from the candidate list so the client always picks a
+    // curve that CF Workers SubtleCrypto can actually use for signing (e.g. P-256).
+    const isNode = typeof process !== 'undefined' &&
+      typeof (process as any)?.versions?.node === 'string';
+    const safeAlgs = isNode ? algs : algs.filter(a => a !== 'ES256K');
+    return JoseKey.generate(safeAlgs.length ? safeAlgs : ['ES256']);
+  },
   getRandomValues: (n: number): Uint8Array => {
     const bytes = new Uint8Array(n);
     crypto.getRandomValues(bytes);
@@ -130,20 +137,22 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
   } as any);
 }
 
-// Wraps restore() to surface the "Key does not match any alg" error clearly.
-// Root cause (secp256k1 keys in CF Workers) is fixed in normalizeJwkAlg above;
-// this catch is a safety net for any remaining edge cases.
+// Wraps restore() to handle session errors that require re-authentication.
 export async function restoreOAuthSession(client: OAuthClient, sub: string) {
   try {
     return await client.restore(sub);
   } catch (err) {
+    if (err instanceof Error && err.message === SECP256K1_DELETED) {
+      // Session held a secp256k1 key unusable in CF Workers; it was already
+      // deleted from the store. Prompt re-authentication.
+      throw svelteKitError(401, 'Session expired. Please log in again.');
+    }
     if (
       err instanceof Error &&
       err.message === 'Key does not match any alg supported by the server'
     ) {
-      // Do NOT delete the session — error may be transient (cached metadata, network blip).
-      // Diagnostics are logged in toDpopKeyStore.get above.
-      console.error('[oauth] DPoP alg mismatch for', sub, '— session preserved for retry');
+      // Transient alg mismatch (e.g. stale metadata cache). Preserve the session.
+      console.error('[oauth] DPoP alg mismatch for', sub, '— may be transient');
       throw svelteKitError(503, 'Authentication temporarily unavailable. Please try again.');
     }
     throw err;
