@@ -11,8 +11,8 @@ export const GET: RequestHandler = async (event) => {
   if (!did) throw error(401, 'Unauthorized');
 
   const session = await getSession(did);
-  if (!session) return json({ lastfm_username: null, enabled: false, custom_text: null });
-  return json({ lastfm_username: session.lastfm_username, enabled: session.enabled, custom_text: session.custom_text ?? null });
+  if (!session) return json({ lastfm_username: null, enabled: false, custom_text: null, attach_image: true });
+  return json({ lastfm_username: session.lastfm_username, enabled: session.enabled, custom_text: session.custom_text ?? null, attach_image: session.attach_image ?? true });
 };
 
 // POST: save Last.fm username + enabled flag
@@ -20,7 +20,7 @@ export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
   if (!did) throw error(401, 'Unauthorized');
 
-  const { lastfm_username, enabled, custom_text } = await event.request.json();
+  const { lastfm_username, enabled, custom_text, attach_image } = await event.request.json();
   if (!lastfm_username?.trim()) throw error(400, 'lastfm_username is required');
 
   // Verify Last.fm user exists
@@ -37,6 +37,6 @@ export const POST: RequestHandler = async (event) => {
     handle = profile.data.handle;
   } catch { /* fallback to DID */ }
 
-  await upsertSession({ did, bsky_handle: handle, lastfm_username: lastfm_username.trim(), enabled: enabled ?? true, custom_text: custom_text?.trim() || null });
+  await upsertSession({ did, bsky_handle: handle, lastfm_username: lastfm_username.trim(), enabled: enabled ?? true, custom_text: custom_text?.trim() || null, attach_image: attach_image ?? true });
   return json({ ok: true });
 };

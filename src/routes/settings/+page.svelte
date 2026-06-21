@@ -10,6 +10,7 @@
 
   let lastfmUsername = "";
   let autoEnabled = false;
+  let attachImage = true;
   let customText = "";
   let savingLastfm = false;
   let lastfmSaved = false;
@@ -23,6 +24,7 @@
         const data = await res.json();
         lastfmUsername = data.lastfm_username ?? "";
         autoEnabled = data.enabled ?? false;
+        attachImage = data.attach_image ?? true;
         customText = data.custom_text ?? "";
       }
     } catch {
@@ -54,6 +56,7 @@
         body: JSON.stringify({
           lastfm_username: lastfmUsername.trim(),
           enabled: autoEnabled,
+          attach_image: attachImage,
           custom_text: customText.trim() || null,
         }),
       });
@@ -149,6 +152,18 @@
             >
               <span
                 class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {autoEnabled ? 'translate-x-6' : 'translate-x-1'}"
+              ></span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-400">{$t('settings.attachimage.toggle')}</span>
+            <button
+              on:click={() => (attachImage = !attachImage)}
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {attachImage ? 'bg-green-500' : 'bg-gray-600'}"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {attachImage ? 'translate-x-6' : 'translate-x-1'}"
               ></span>
             </button>
           </div>

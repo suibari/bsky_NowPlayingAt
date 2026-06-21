@@ -30,6 +30,10 @@ export const POST: RequestHandler = async (event) => {
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
+  const userSession = await getSession(did);
+  const customText = userSession?.custom_text?.trim() || '';
+  const attachImage = userSession?.attach_image ?? true;
+
   // Discogs で track 取得（artworkUrl + trackUri）
   const tracks = await searchTracks(artist, title).catch(() => []);
   const track = tracks[0];
@@ -42,7 +46,7 @@ export const POST: RequestHandler = async (event) => {
   const { artworkUrl, lastFmUrl } = await resolveArtworkUrl(
     artist, title, album, track?.artworkUrl || undefined,
   ).catch(() => ({ artworkUrl: undefined, lastFmUrl: undefined }));
-  if (artworkUrl) {
+  if (attachImage && artworkUrl) {
     try {
       const res = await fetch(artworkUrl);
       if (res.ok) {
@@ -56,9 +60,6 @@ export const POST: RequestHandler = async (event) => {
       console.warn('[auto-post] thumbnail upload failed:', e);
     }
   }
-
-  const userSession = await getSession(did);
-  const customText = userSession?.custom_text?.trim() || '';
   const customLine = customText ? `\n${customText}` : '';
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
