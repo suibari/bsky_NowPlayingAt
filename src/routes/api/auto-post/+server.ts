@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
-import { createOAuthClient } from '$lib/server/oauth';
+import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 import { getSession } from '$lib/server/db';
 import { searchTracks } from '$lib/server/music';
 import { resolveArtworkUrl } from '$lib/server/artwork';
@@ -26,7 +26,7 @@ export const POST: RequestHandler = async (event) => {
 
   try {
   const oauthClient = createOAuthClient(event.url.origin);
-  const session = await oauthClient.restore(did);
+  const session = await restoreOAuthSession(oauthClient, did);
   const agent = new Agent(session);
 
   // Discogs で track 取得（artworkUrl + trackUri）

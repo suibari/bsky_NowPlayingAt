@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { Agent } from '@atproto/api';
 import { getDid } from '$lib/server/session';
-import { createOAuthClient } from '$lib/server/oauth';
+import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 import { getPdsEndpoint } from '$lib/atproto';
 
 const NSID_REACTION = 'com.suibari.nowplayingat.reaction';
@@ -38,7 +38,7 @@ export const POST: RequestHandler = async (event) => {
   if (!opts.subjectUri) throw error(400, 'subjectUri required');
 
   const oauthClient = createOAuthClient(event.url.origin);
-  const session = await oauthClient.restore(did);
+  const session = await restoreOAuthSession(oauthClient, did);
   const agent = new Agent(session);
 
   const record: any = {
@@ -80,7 +80,7 @@ export const DELETE: RequestHandler = async (event) => {
   const { rkey } = await event.request.json();
 
   const oauthClient = createOAuthClient(event.url.origin);
-  const session = await oauthClient.restore(did);
+  const session = await restoreOAuthSession(oauthClient, did);
   const agent = new Agent(session);
 
   await agent.com.atproto.repo.deleteRecord({

@@ -1,6 +1,7 @@
 // Use base OAuthClient instead of NodeOAuthClient to avoid undici / node:dns
 // which are incompatible with Cloudflare Workers.
 import { OAuthClient } from '@atproto/oauth-client';
+import { error as svelteKitError } from '@sveltejs/kit';
 import { JoseKey } from '@atproto/jwk-jose';
 import { AtprotoDohHandleResolver } from '@atproto-labs/handle-resolver';
 import {
@@ -117,6 +118,24 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
     clientMetadata,
     responseMode: 'query',
   } as any);
+}
+
+// Wraps restore() to handle the "Key does not match any alg supported by the
+// server" error: deletes the broken session so the user can re-authenticate,
+// then throws 401 instead of propagating a 500.
+export async function restoreOAuthSession(client: OAuthClient, sub: string) {
+  try {
+    return await client.restore(sub);
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      err.message === 'Key does not match any alg supported by the server'
+    ) {
+      await sessionStore.del(sub).catch(() => {});
+      throw svelteKitError(401, 'Session expired. Please log in again.');
+    }
+    throw err;
+  }
 }
 
 export function createOAuthClient(origin: string): OAuthClient {
