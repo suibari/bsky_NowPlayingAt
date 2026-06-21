@@ -51,7 +51,13 @@ function toDpopKeyStore(store: {
       const result: any = await store.get(sub);
       if (!result) return undefined;
       const { dpopJwk, ...data } = result;
+      // Diagnostic: log JWK shape to diagnose "Key does not match any alg" errors.
+      console.log('[oauth] dpopJwk meta:', JSON.stringify({
+        sub, kty: dpopJwk?.kty, crv: dpopJwk?.crv,
+        alg: dpopJwk?.alg, use: dpopJwk?.use, key_ops: dpopJwk?.key_ops,
+      }));
       const dpopKey = await JoseKey.fromJWK(dpopJwk);
+      console.log('[oauth] dpopKey.algorithms:', JSON.stringify(dpopKey.algorithms));
       return { ...data, dpopKey };
     },
     del: (sub: string) => store.del(sub),
@@ -131,8 +137,10 @@ export async function restoreOAuthSession(client: OAuthClient, sub: string) {
       err instanceof Error &&
       err.message === 'Key does not match any alg supported by the server'
     ) {
-      await sessionStore.del(sub).catch(() => {});
-      throw svelteKitError(401, 'Session expired. Please log in again.');
+      // Do NOT delete the session — error may be transient (cached metadata, network blip).
+      // Diagnostics are logged in toDpopKeyStore.get above.
+      console.error('[oauth] DPoP alg mismatch for', sub, '— session preserved for retry');
+      throw svelteKitError(503, 'Authentication temporarily unavailable. Please try again.');
     }
     throw err;
   }
