@@ -54,9 +54,11 @@ export async function resolveArtworkUrl(
       const mbData = await mbRes.json();
       const mbid: string | undefined = mbData?.recordings?.[0]?.releases?.[0]?.id;
       if (mbid) {
-        const caaRes = await fetch(`https://coverartarchive.org/release/${mbid}/front-500`);
-        if (caaRes.ok && caaRes.headers.get('content-type')?.startsWith('image/')) {
-          return caaRes.url;
+        for (const variant of ['front-500', 'front'] as const) {
+          const caaRes = await fetch(`https://coverartarchive.org/release/${mbid}/${variant}`);
+          if (caaRes.ok && caaRes.headers.get('content-type')?.startsWith('image/')) {
+            return caaRes.url;
+          }
         }
       }
     }
