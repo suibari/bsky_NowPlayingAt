@@ -13,7 +13,7 @@ export const POST: RequestHandler = async (event) => {
   const { imgBlob, ...track } = await event.request.json();
 
   const oauthClient = createOAuthClient(event.url.origin);
-  const session = await restoreOAuthSession(oauthClient, did);
+  const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
   const record = {
@@ -48,7 +48,7 @@ export const DELETE: RequestHandler = async (event) => {
   const { rkey } = await event.request.json();
 
   const oauthClient = createOAuthClient(event.url.origin);
-  const session = await restoreOAuthSession(oauthClient, did);
+  const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
   await agent.com.atproto.repo.deleteRecord({

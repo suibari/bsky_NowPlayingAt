@@ -2,12 +2,14 @@
 // which are incompatible with Cloudflare Workers.
 import { OAuthClient } from '@atproto/oauth-client';
 import { error as svelteKitError } from '@sveltejs/kit';
+import type { RequestEvent } from '@sveltejs/kit';
 import { JoseKey } from '@atproto/jwk-jose';
 import { AtprotoDohHandleResolver } from '@atproto-labs/handle-resolver';
 import {
   setOAuthState, getOAuthState, delOAuthState,
   setOAuthSession, getOAuthSession, delOAuthSession,
 } from './db';
+import { clearDidCookie } from './session';
 
 // CF Workers rejects `redirect: 'error'` in the Request constructor even though
 // @atproto-labs/* use it everywhere as SSRF protection. Patch globalThis.Request
@@ -138,13 +140,17 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
 }
 
 // Wraps restore() to handle session errors that require re-authentication.
-export async function restoreOAuthSession(client: OAuthClient, sub: string) {
+// Pass `event` so that broken sessions also clear the browser `did` cookie,
+// forcing a clean sign-out without the user having to click sign-out manually.
+export async function restoreOAuthSession(client: OAuthClient, sub: string, event: RequestEvent) {
   try {
     return await client.restore(sub);
   } catch (err) {
     if (err instanceof Error && err.message === SECP256K1_DELETED) {
       // Session held a secp256k1 key unusable in CF Workers; it was already
-      // deleted from the store. Prompt re-authentication.
+      // deleted from the store. Also clear the browser cookie so the user is
+      // fully signed out and only needs to sign in (not sign out first).
+      clearDidCookie(event);
       throw svelteKitError(401, 'Session expired. Please log in again.');
     }
     if (

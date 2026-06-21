@@ -26,7 +26,7 @@ export const POST: RequestHandler = async (event) => {
 
   try {
   const oauthClient = createOAuthClient(event.url.origin);
-  const session = await restoreOAuthSession(oauthClient, did);
+  const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
   // Discogs で track 取得（artworkUrl + trackUri）

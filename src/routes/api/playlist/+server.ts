@@ -1,14 +1,14 @@
 import { json, error } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import type { RequestEvent, RequestHandler } from './$types';
 import { Agent } from '@atproto/api';
 import { getDid } from '$lib/server/session';
 import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 
 const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
-async function getAgent(did: string, origin: string) {
-  const oauthClient = createOAuthClient(origin);
-  const session = await restoreOAuthSession(oauthClient, did);
+async function getAgent(did: string, event: RequestEvent) {
+  const oauthClient = createOAuthClient(event.url.origin);
+  const session = await restoreOAuthSession(oauthClient, did, event);
   return new Agent(session);
 }
 
@@ -18,7 +18,7 @@ export const POST: RequestHandler = async (event) => {
   if (!did) throw error(401, 'Unauthorized');
 
   const { name, tracks } = await event.request.json();
-  const agent = await getAgent(did, event.url.origin);
+  const agent = await getAgent(did, event);
 
   const res = await agent.com.atproto.repo.createRecord({
     repo: did,
@@ -39,7 +39,7 @@ export const PUT: RequestHandler = async (event) => {
   if (!did) throw error(401, 'Unauthorized');
 
   const { rkey, record } = await event.request.json();
-  const agent = await getAgent(did, event.url.origin);
+  const agent = await getAgent(did, event);
 
   const res = await agent.com.atproto.repo.putRecord({
     repo: did,
@@ -56,7 +56,7 @@ export const DELETE: RequestHandler = async (event) => {
   if (!did) throw error(401, 'Unauthorized');
 
   const { rkey } = await event.request.json();
-  const agent = await getAgent(did, event.url.origin);
+  const agent = await getAgent(did, event);
 
   await agent.com.atproto.repo.deleteRecord({
     repo: did,
