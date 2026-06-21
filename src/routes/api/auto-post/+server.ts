@@ -6,7 +6,6 @@ import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 import { getSession } from '$lib/server/db';
 import { searchTracks } from '$lib/server/music';
 import { resolveArtworkUrl } from '$lib/server/artwork';
-import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 import { processImage } from '$lib/server/image';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
@@ -34,23 +33,7 @@ export const POST: RequestHandler = async (event) => {
   const tracks = await searchTracks(artist, title).catch(() => []);
   const track = tracks[0];
 
-  // 制約（設計メモ）:
-  //   - iTunes Search API はサーバーサイドで叩くとレートリミットに即ヒットするためクライアント専用
-  //     → auto_post では Apple Music URL を取得できない
-  //   - Discogs URL は Odesli 非対応（HTTP 400）のためストリーミングリンクへの変換不可
-  //     → Discogs しかない auto_post では Odesli によるリンク解決が失敗する場合がある
-  //   フォールバック: ストリーミングリンクが取れない場合はジャケット画像のみ添付
-
-  // ストリーミングリンク解決: Discogs trackUri → Odesli
-  let targetUrl: string | undefined;
-  let serviceName = 'Apple Music';
-  if (track?.trackUri) {
-    const odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
-    ({ url: targetUrl, name: serviceName } = pickBestServiceLink(odesliLinks, track.trackUri));
-    if (targetUrl === track.trackUri) targetUrl = undefined;
-  }
-
-  // サムネイルは常にアップロード試みる（リンクカードにもフォールバック画像にも使う）
+  // auto-post は Odesli を使わずジャケット画像のみ添付する（Odesli レートリミット対策）
   // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA → Discogs（優先順位順）
   let thumbBlob: any = undefined;
   let imgBlob: string | undefined = undefined;
@@ -95,19 +78,7 @@ export const POST: RequestHandler = async (event) => {
   });
 
   const postRecord: any = { text: rt.text, facets: rt.facets, langs: ['ja'], createdAt: new Date().toISOString() };
-  if (targetUrl) {
-    // ストリーミングリンクカード（サムネイル付き）
-    postRecord.embed = {
-      $type: 'app.bsky.embed.external',
-      external: {
-        uri: targetUrl,
-        title: `${title} - ${artist}`,
-        description: `Listen on ${serviceName}`,
-        thumb: thumbBlob,
-      },
-    };
-  } else if (thumbBlob) {
-    // フォールバック: ストリーミングリンクなし → ジャケット画像のみ添付
+  if (thumbBlob) {
     postRecord.embed = {
       $type: 'app.bsky.embed.images',
       images: [{ image: thumbBlob, alt: `${title} - ${artist}`, aspectRatio: thumbAspectRatio }],
