@@ -120,28 +120,42 @@
         </p>
 
         <div class="space-y-4">
-          <div>
-            <label class="block text-sm text-gray-400 mb-1" for="lastfm">{$t('settings.lastfm.label')}</label>
-            <input
-              id="lastfm"
-              type="text"
-              bind:value={lastfmUsername}
-              placeholder="your_lastfm_username"
-              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
-            />
-          </div>
+          <div class="border-l-2 border-gray-700 pl-4 space-y-4 transition-opacity {autoEnabled ? 'opacity-100' : 'opacity-40'} {autoEnabled ? '' : 'pointer-events-none'}">
+            <div>
+              <label class="block text-sm text-gray-400 mb-1" for="lastfm">{$t('settings.lastfm.label')}</label>
+              <input
+                id="lastfm"
+                type="text"
+                bind:value={lastfmUsername}
+                placeholder="your_lastfm_username"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
+              />
+            </div>
 
-          <div>
-            <label class="block text-sm text-gray-400 mb-1" for="customText">{$t('settings.customtext.label')}</label>
-            <input
-              id="customText"
-              type="text"
-              bind:value={customText}
-              placeholder={$t('settings.customtext.placeholder')}
-              maxlength="100"
-              class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
-            />
-            <p class="text-xs text-gray-600 mt-1">{$t('settings.customtext.hint')}</p>
+            <div>
+              <label class="block text-sm text-gray-400 mb-1" for="customText">{$t('settings.customtext.label')}</label>
+              <input
+                id="customText"
+                type="text"
+                bind:value={customText}
+                placeholder={$t('settings.customtext.placeholder')}
+                maxlength="100"
+                class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
+              />
+              <p class="text-xs text-gray-600 mt-1">{$t('settings.customtext.hint')}</p>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-400">{$t('settings.attachimage.toggle')}</span>
+              <button
+                on:click={() => (attachImage = !attachImage)}
+                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {attachImage ? 'bg-green-500' : 'bg-gray-600'}"
+              >
+                <span
+                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {attachImage ? 'translate-x-6' : 'translate-x-1'}"
+                ></span>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between">
@@ -152,18 +166,6 @@
             >
               <span
                 class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {autoEnabled ? 'translate-x-6' : 'translate-x-1'}"
-              ></span>
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-400">{$t('settings.attachimage.toggle')}</span>
-            <button
-              on:click={() => (attachImage = !attachImage)}
-              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {attachImage ? 'bg-green-500' : 'bg-gray-600'}"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {attachImage ? 'translate-x-6' : 'translate-x-1'}"
               ></span>
             </button>
           </div>
