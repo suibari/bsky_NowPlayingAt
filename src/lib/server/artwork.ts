@@ -38,8 +38,8 @@ export async function resolveArtworkUrl(
           }
         }
       }
-    } catch {
-      // fall through
+    } catch (e) {
+      console.warn('[artwork] Last.fm fetch failed:', e);
     }
   }
 
