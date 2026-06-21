@@ -73,8 +73,8 @@ export const POST: RequestHandler = async (event) => {
   const enc = new TextEncoder();
   if (!rt.facets) rt.facets = [];
 
-  // なうぷれあっと → プロフィールリンク
-  const siteIdx = rawText.indexOf(SITE_LABEL);
+  // なうぷれあっと → プロフィールリンク（via 行の最後の出現位置を使う）
+  const siteIdx = rawText.lastIndexOf(SITE_LABEL);
   const siteStartByte = enc.encode(rawText.substring(0, siteIdx)).byteLength;
   const siteEndByte = siteStartByte + enc.encode(SITE_LABEL).byteLength;
   rt.facets.push({
