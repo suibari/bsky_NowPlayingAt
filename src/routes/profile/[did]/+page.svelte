@@ -94,7 +94,7 @@
       title: val.track,
       artist: val.artist,
       album: val.album,
-      artworkUrl: (val.imgBlob ?? val.img) || "", // Fallback handled by Card
+      artworkUrl: (val.imgBlob?.includes('cid=undefined') ? undefined : val.imgBlob) ?? val.img ?? "",
       trackUri: val.trackUri,
       spotifyUrl: val.links?.spotify,
       youtubeMusicUrl: val.links?.youtube,

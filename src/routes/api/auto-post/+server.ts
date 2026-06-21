@@ -62,7 +62,7 @@ export const POST: RequestHandler = async (event) => {
       if (res.ok) {
         const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
-        imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.$link}`;
+        imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.toString()}`;
       }
     } catch (e) {
       console.warn('[auto-post] thumbnail upload failed:', e);
