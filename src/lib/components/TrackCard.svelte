@@ -12,6 +12,7 @@
   } from "lucide-svelte";
   import { resolveLinks } from "$lib/odesli";
   import ReactionBar from "$lib/components/ReactionBar.svelte";
+  import { t } from "$lib/i18n";
 
   export let track: Track;
 
@@ -176,7 +177,7 @@
       <button
         on:click={() => resolveAndOpen("spotify")}
         class="text-gray-400 hover:text-green-500 transition-colors p-1"
-        title="Spotifyで再生"
+        title={$t('track.spotify')}
         disabled={resolvingLink === "spotify"}
       >
         {#if resolvingLink === "spotify"}
@@ -201,7 +202,7 @@
       <button
         on:click={() => resolveAndOpen("ytmusic")}
         class="text-gray-400 hover:text-red-500 transition-colors p-1"
-        title="YouTube Musicで再生"
+        title={$t('track.ytmusic')}
         disabled={resolvingLink === "ytmusic"}
       >
         {#if resolvingLink === "ytmusic"}
@@ -226,7 +227,7 @@
       <button
         on:click={() => resolveAndOpen("appleMusic")}
         class="text-gray-400 hover:text-pink-500 transition-colors p-1"
-        title="Apple Musicで再生"
+        title={$t('track.applemusic')}
         disabled={resolvingLink === "appleMusic"}
       >
         {#if resolvingLink === "appleMusic"}
@@ -253,7 +254,7 @@
         <button
           on:click={handleDelete}
           class="text-gray-600 hover:text-red-500 transition-colors p-1 ml-1"
-          title="削除"
+          title={$t('track.delete')}
         >
           <Trash2 size={20} />
         </button>
@@ -281,7 +282,7 @@
           <input
             type="text"
             bind:value={comment}
-            placeholder="コメントを追加..."
+            placeholder={$t('track.comment.placeholder')}
             class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-green-500 focus:outline-none placeholder-gray-600"
             on:click|stopPropagation
             on:keydown|stopPropagation
@@ -298,18 +299,18 @@
               bind:checked={postToBsky}
               class="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500 bg-gray-700"
             />
-            Blueskyに投稿
+            {$t('track.post.bsky')}
           </label>
 
           <button
             on:click={handleNowPlaying}
             disabled={isProcessing}
             class="bg-green-500 hover:bg-green-400 disabled:bg-green-500/50 disabled:cursor-not-allowed text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95 disabled:active:scale-100"
-            title="再生中にする"
+            title={$t('track.nowplaying.btn')}
           >
             {#if isProcessing}
               <Loader2 size={16} class="animate-spin" />
-              処理中...
+              {$t('track.processing')}
             {:else}
               <Share2 size={16} /> #NowPlaying
             {/if}
@@ -322,7 +323,7 @@
           on:click={handleAddToPlaylist}
           class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
         >
-          <Plus size={16} /> プレイリストに追加
+          <Plus size={16} /> {$t('track.add.playlist')}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
     import { X, Info } from "lucide-svelte";
     import { createEventDispatcher } from "svelte";
+    import { t } from "$lib/i18n";
 
     export let show = false;
 
@@ -34,56 +35,42 @@
                 class="text-xl font-bold text-white mb-4 flex items-center gap-2 flex-shrink-0"
             >
                 <Info size={24} class="text-green-500" />
-                なうぷれあっと について
+                {$t('info.title')}
             </h2>
 
             <div
                 class="space-y-4 text-sm text-gray-300 leading-relaxed overflow-y-auto pr-2 custom-scrollbar"
             >
                 <div>
-                    <p>
-                        なうぷれあっと（以下、本アプリ）は AT protocol
-                        の音楽共有サービスです。
-                    </p>
+                    <p>{$t('info.p1')}</p>
                     <ul class="list-disc pl-5 mt-1">
-                        <li>自分の再生した曲を検索してシェアしよう！</li>
-                        <li>オリジナルのプレイリストを作ってシェアしよう！</li>
-                        <li>
-                            ビビッときた曲、プレイリストには絵文字リアクションを送ろう！
-                        </li>
+                        <li>{$t('info.li1')}</li>
+                        <li>{$t('info.li2')}</li>
+                        <li>{$t('info.li3')}</li>
                     </ul>
                 </div>
 
                 <hr class="border-gray-800" />
 
                 <p>
-                    本アプリは
-                    <a
+                    {$t('info.dev.pre')}<a
                         href="https://bsky.app/profile/suibari.com"
                         target="_blank"
                         class="text-green-500 hover:underline">すいばり</a
-                    >
-                    個人が趣味で開発しています。
+                    >{$t('info.dev.post')}
                 </p>
-                <p>
-                    本アプリは専用のサーバーは持たず、認証情報はユーザーの端末に保存され、データはユーザーのPDSに保存されます。
-                </p>
-                <p>
-                    個人開発のため手厚いサポートはできず、突如サービスを終了する可能性があります。
-                    ただし、データはユーザーのPDSに置くため、サービスが終了してもデータそのものは消えません。
-                </p>
+                <p>{$t('info.storage')}</p>
+                <p>{$t('info.caveat')}</p>
 
                 <hr class="border-gray-800" />
 
                 <div>
-                    <h3 class="font-bold text-white mb-1">その他</h3>
-                    <p>
-                        このページに記載される文章は予告なく変更することがあります。
-                    </p>
+                    <h3 class="font-bold text-white mb-1">{$t('info.other')}</h3>
+                    <p>{$t('info.other.desc')}</p>
                 </div>
 
                 <div>
-                    <h3 class="font-bold text-white mb-1">リンク</h3>
+                    <h3 class="font-bold text-white mb-1">{$t('info.links')}</h3>
                     <ul class="list-disc pl-5 space-y-1">
                         <li>
                             <a

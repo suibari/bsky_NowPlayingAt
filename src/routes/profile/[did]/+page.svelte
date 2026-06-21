@@ -19,6 +19,8 @@
     Track as SchemaTrack,
   } from "$lib/schema";
   import { publicAgent } from "$lib/atproto";
+  import { get } from "svelte/store";
+  import { t } from "$lib/i18n";
 
   // $page.params is reactive but derived, so we react to it.
   $: did = $page.params.did;
@@ -67,16 +69,16 @@
   }
 
   async function handleCreatePlaylist() {
-    const name = prompt("プレイリスト名を入力してください:");
+    const name = prompt(get(t)('profile.playlist.prompt'));
     if (!name) return;
 
     try {
       await createPlaylist(name);
       // Refresh playlists
       playlists = await getPlaylists(did!);
-      alert("プレイリストを作成しました！");
+      alert(get(t)('profile.playlist.created'));
     } catch (e) {
-      alert("作成に失敗しました: " + e);
+      alert(get(t)('profile.playlist.createfailed') + e);
     }
   }
 
@@ -126,15 +128,15 @@
     if (!targetTrackForPlaylist) return;
     try {
       await addToPlaylist(playlist.uri, targetTrackForPlaylist, playlist);
-      alert(`"${playlist.value.name}" に追加しました！`);
+      alert(get(t)('alert.addedto', { name: playlist.value.name }));
       showPlaylistModal = false;
     } catch (e) {
-      alert("追加に失敗しました: " + e);
+      alert(get(t)('alert.addfailed') + e);
     }
   }
 
   async function handleDeleteHistory(idx: number) {
-    if (!confirm("再生履歴から削除しますか？")) return;
+    if (!confirm(get(t)('profile.history.delete.confirm'))) return;
     const item = history[idx];
     if (!item) return;
 
@@ -149,7 +151,7 @@
       }
     } catch (e) {
       console.error(e);
-      alert("再生履歴の削除に失敗しました");
+      alert(get(t)('profile.history.delete.failed'));
       history = oldHistory; // Revert
     }
   }
@@ -175,7 +177,7 @@
           points="12 19 5 12 12 5"
         /></svg
       >
-      ホームに戻る
+      {$t('profile.back')}
     </a>
 
     {#if isOwner}
@@ -221,7 +223,7 @@
           : 'border-transparent text-gray-400 hover:text-gray-200'}"
         on:click={() => (activeTab = "playlists")}
       >
-        プレイリスト
+        {$t('profile.tab.playlists')}
       </button>
       <button
         class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
@@ -230,7 +232,7 @@
           : 'border-transparent text-gray-400 hover:text-gray-200'}"
         on:click={() => (activeTab = "history")}
       >
-        履歴
+        {$t('profile.tab.history')}
       </button>
     </div>
 
@@ -249,7 +251,7 @@
                 size={32}
               />
               <span class="text-gray-500 group-hover:text-white font-medium"
-                >新規プレイリスト作成</span
+                >{$t('profile.playlist.new')}</span
               >
             </button>
           {/if}
@@ -267,17 +269,17 @@
                   <h3 class="font-bold text-lg text-white">{pl.value.name}</h3>
                 </div>
                 <span class="text-xs text-gray-500"
-                  >{pl.value.tracks?.length || 0} 曲</span
+                  >{$t('tracks.count', { count: String(pl.value.tracks?.length || 0) })}</span
                 >
               </div>
               <div class="text-xs text-gray-400 truncate">
-                {pl.value.tracks?.map((t: SchemaTrack) => t.track).join(", ") ||
-                  "空のプレイリスト"}
+                {pl.value.tracks?.map((trk: SchemaTrack) => trk.track).join(", ") ||
+                  $t('profile.playlist.empty')}
               </div>
             </a>
           {/each}
           {#if playlists.length === 0 && !isOwner}
-            <p class="text-gray-500 italic">プレイリストが見つかりません。</p>
+            <p class="text-gray-500 italic">{$t('profile.playlist.notfound')}</p>
           {/if}
         </div>
       {:else}
@@ -293,7 +295,7 @@
             />
           {/each}
           {#if history.length === 0}
-            <p class="text-gray-500 italic">履歴がまだありません。</p>
+            <p class="text-gray-500 italic">{$t('profile.history.empty')}</p>
           {/if}
         </div>
       {/if}
@@ -313,7 +315,7 @@
         class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
       >
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold text-white">プレイリストに追加</h2>
+          <h2 class="text-xl font-bold text-white">{$t('playlist.modal.title')}</h2>
           <button
             on:click={() => (showPlaylistModal = false)}
             class="text-gray-400 hover:text-white"
@@ -330,14 +332,14 @@
               >
                 <span class="font-medium text-white">{pl.value.name}</span>
                 <span class="text-xs text-gray-500"
-                  >{pl.value.tracks?.length || 0} 曲</span
+                  >{$t('tracks.count', { count: String(pl.value.tracks?.length || 0) })}</span
                 >
               </button>
             {/each}
           </div>
         {:else}
           <div class="text-center text-gray-500 py-6">
-            プレイリストが見つかりません。
+            {$t('profile.playlist.modal.empty')}
           </div>
         {/if}
       </div>

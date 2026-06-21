@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { get } from "svelte/store";
   import { authState, userProfile } from "$lib/stores";
   import { signIn } from "$lib/atproto";
   import {
@@ -14,8 +15,10 @@
   import TrackCard from "$lib/components/TrackCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import InfoModal from "$lib/components/InfoModal.svelte";
+  import LangToggle from "$lib/components/LangToggle.svelte";
   import { Loader2, Music, X, Plus, Info } from "lucide-svelte";
   import { swipe } from "$lib/actions/swipe";
+  import { t } from "$lib/i18n";
 
   let handleInput = "";
   let isSigningIn = false;
@@ -109,7 +112,7 @@
     } catch (e) {
       console.error(e);
       isSigningIn = false;
-      alert("サインインに失敗しました: " + e);
+      alert(get(t)('alert.signinfailed') + e);
     }
   }
 
@@ -134,7 +137,7 @@
 
     try {
       if (postToBsky) {
-        if (!confirm(`"${track.title}" をBlueskyに投稿しますか？`)) return;
+        if (!confirm(get(t)('confirm.post', { title: track.title }))) return;
 
         // 1. Post to Feed (blob upload happens here, get imgBlob back)
         const { imgBlob } = await postToFeed(track);
@@ -142,17 +145,17 @@
         // 2. Write to History (PDS) with imgBlob for permanent image reference
         await createHistoryRecord(track, imgBlob);
 
-        alert("Blueskyに投稿しました！");
+        alert(get(t)('alert.posted'));
       } else {
         // No confirmation dialog when just saving to history
         // 1. Write to History (PDS)
         await createHistoryRecord(track);
 
-        alert("再生履歴に登録しました！");
+        alert(get(t)('alert.history'));
       }
     } catch (e) {
       console.error(e);
-      alert("処理に失敗しました: " + e);
+      alert(get(t)('alert.failed') + e);
     } finally {
       processingTrackId = null;
     }
@@ -179,10 +182,10 @@
     if (!targetTrack) return;
     try {
       await addToPlaylist(playlist.uri, targetTrack, playlist);
-      alert(`"${playlist.value.name}" に追加しました！`);
+      alert(get(t)('alert.addedto', { name: playlist.value.name }));
       showPlaylistModal = false;
     } catch (e) {
-      alert("追加に失敗しました: " + e);
+      alert(get(t)('alert.addfailed') + e);
     }
   }
 
@@ -257,11 +260,10 @@
         <div class="flex items-center gap-3">
           <Music size={18} class="text-green-400 shrink-0" />
           <span>
-            <span class="font-bold text-green-400">再生履歴をBlueskyに自動投稿</span>できます！
-            Last.fm と連携してスマホ・PCで再生した曲を自動投稿しましょう。
+            <span class="font-bold text-green-400">{$t('banner.bold')}</span>{$t('banner.desc')}
           </span>
         </div>
-        <span class="text-green-400 font-bold whitespace-nowrap group-hover:underline">設定はこちら →</span>
+        <span class="text-green-400 font-bold whitespace-nowrap group-hover:underline">{$t('banner.cta')}</span>
       </a>
     {/if}
 
@@ -330,7 +332,7 @@
               type="text"
               bind:value={searchQuery}
               on:input={() => performSearch(searchQuery)}
-              placeholder="曲名、アーティスト名、アルバム名を入力"
+              placeholder={$t('search.placeholder')}
               class="w-full bg-gray-900 border border-gray-800 text-white rounded-full py-4 pl-14 pr-6 shadow-lg focus:ring-2 focus:ring-green-500 focus:border-transparent focus:outline-none transition-all placeholder-gray-600 text-lg"
             />
             {#if searchQuery}
@@ -574,16 +576,16 @@
                           {item.author.displayName || item.author.handle}
                         </span>
                         {#if item.type === "history"}
-                          <span class="text-gray-500">が聴いています</span>
+                          <span class="text-gray-500">{$t('discovery.listening')}</span>
                         {:else if item.type === "reaction"}
                           <span class="text-gray-500">
-                            がリアクションしました <span class="text-lg"
+                            {$t('discovery.reacted')} <span class="text-lg"
                               >{item.record.emoji}</span
                             >
                           </span>
                         {:else if item.type === "playlist"}
                           <span class="text-gray-500"
-                            >がプレイリストを作成しました</span
+                            >{$t('discovery.playlist')}</span
                           >
                         {/if}
                       </div>
@@ -667,7 +669,7 @@
             </div>
           {:else}
             <div class="text-center py-20 text-gray-500">
-              <p>まだリアクションがありません。一番乗りしましょう！</p>
+              <p>{$t('discovery.empty')}</p>
             </div>
           {/if}
         </div>
@@ -687,7 +689,7 @@
           class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
         >
           <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-white">プレイリストに追加</h2>
+            <h2 class="text-xl font-bold text-white">{$t('playlist.modal.title')}</h2>
             <button
               on:click={() => (showPlaylistModal = false)}
               class="text-gray-400 hover:text-white"
@@ -709,14 +711,14 @@
                 >
                   <span class="font-medium text-white">{pl.value.name}</span>
                   <span class="text-xs text-gray-500"
-                    >{pl.value.tracks?.length || 0} 曲</span
+                    >{$t('tracks.count', { count: String(pl.value.tracks?.length || 0) })}</span
                   >
                 </button>
               {/each}
             </div>
           {:else}
             <div class="text-center py-8 text-gray-500">
-              プレイリストが見つかりません。プロフィールページから作成してください！
+              {$t('playlist.modal.empty')}
             </div>
           {/if}
         </div>
@@ -824,6 +826,9 @@
           なうぷれ<span class="text-green-500">あっと</span>
         </h1>
         <p class="text-gray-400 text-lg">Share your vibe on AT protocol.</p>
+        <div class="flex justify-center mt-4">
+          <LangToggle />
+        </div>
       </div>
 
       <form on:submit|preventDefault={handleSignIn} class="space-y-6">
@@ -851,9 +856,9 @@
           class="w-full bg-green-500 hover:bg-green-400 text-black font-extrabold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
         >
           {#if isSigningIn}
-            <Loader2 class="animate-spin" size={24} /> リダイレクト中...
+            <Loader2 class="animate-spin" size={24} /> {$t('redirect')}
           {:else}
-            サインイン
+            {$t('signin')}
           {/if}
         </button>
       </form>

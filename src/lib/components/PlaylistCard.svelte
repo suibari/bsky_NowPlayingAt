@@ -1,6 +1,7 @@
 <script lang="ts">
   import { ListMusic, User } from "lucide-svelte";
   import type { PlaylistRecord } from "$lib/schema";
+  import { t } from "$lib/i18n";
 
   export let playlist: PlaylistRecord;
   export let author: {
@@ -57,7 +58,7 @@
     </div>
 
     {#if playlist.tracks}
-      <p class="text-xs text-gray-500 mt-1">{playlist.tracks.length} 曲</p>
+      <p class="text-xs text-gray-500 mt-1">{$t('playlist.tracks', { count: String(playlist.tracks.length) })}</p>
     {/if}
   </div>
 </div>
