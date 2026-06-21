@@ -7,6 +7,7 @@ import { getSession } from '$lib/server/db';
 import { searchTracks } from '$lib/server/music';
 import { resolveArtworkUrl } from '$lib/server/artwork';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
+import { processImage } from '$lib/server/image';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
 const LINK_LABEL = '💿なうぷれあっとで見る';
@@ -53,6 +54,7 @@ export const POST: RequestHandler = async (event) => {
   // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA → Discogs（優先順位順）
   let thumbBlob: any = undefined;
   let imgBlob: string | undefined = undefined;
+  let thumbAspectRatio: { width: number; height: number } | undefined;
   const artworkUrl = await resolveArtworkUrl(
     artist, title, album, track?.artworkUrl || undefined,
   ).catch(() => undefined);
@@ -60,7 +62,9 @@ export const POST: RequestHandler = async (event) => {
     try {
       const res = await fetch(artworkUrl);
       if (res.ok) {
-        const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
+        const { blob, width, height } = await processImage(await res.blob());
+        thumbAspectRatio = { width, height };
+        const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
         imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.toString()}`;
       }
@@ -106,7 +110,7 @@ export const POST: RequestHandler = async (event) => {
     // フォールバック: ストリーミングリンクなし → ジャケット画像のみ添付
     postRecord.embed = {
       $type: 'app.bsky.embed.images',
-      images: [{ image: thumbBlob, alt: `${title} - ${artist}` }],
+      images: [{ image: thumbBlob, alt: `${title} - ${artist}`, aspectRatio: thumbAspectRatio }],
     };
   }
 

@@ -54,7 +54,7 @@ export async function resolveArtworkUrl(
       const mbData = await mbRes.json();
       const mbid: string | undefined = mbData?.recordings?.[0]?.releases?.[0]?.id;
       if (mbid) {
-        const caaRes = await fetch(`https://coverartarchive.org/release/${mbid}/front`);
+        const caaRes = await fetch(`https://coverartarchive.org/release/${mbid}/front-500`);
         if (caaRes.ok && caaRes.headers.get('content-type')?.startsWith('image/')) {
           return caaRes.url;
         }

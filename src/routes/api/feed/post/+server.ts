@@ -5,6 +5,7 @@ import { getDid } from '$lib/server/session';
 import { createOAuthClient } from '$lib/server/oauth';
 import { publicAgent } from '$lib/atproto';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
+import { processImage } from '$lib/server/image';
 
 export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
@@ -34,7 +35,8 @@ export const POST: RequestHandler = async (event) => {
     try {
       const res = await fetch(track.artworkUrl.replace('100x100', '600x600'));
       if (res.ok) {
-        const uploadRes = await agent.uploadBlob(await res.blob(), { encoding: 'image/jpeg' });
+        const { blob } = await processImage(await res.blob());
+        const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
         imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.toString()}`;
       }
