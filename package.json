@@ -30,6 +30,7 @@
 		"@atproto/jwk-jose": "^0.2.1",
 		"@atproto/oauth-client-browser": "^0.3.39",
 		"@atproto/oauth-client-node": "^0.4.2",
+		"@cf-wasm/photon": "^0.3.6",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
 		"lucide-svelte": "^0.562.0",
 		"svelte-dnd-action": "^0.9.69"

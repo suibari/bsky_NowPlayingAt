@@ -1,12 +1,17 @@
+import { PhotonImage, resize, SamplingFilter } from '@cf-wasm/photon';
+
 const BLOB_SIZE_LIMIT = 1_900_000;
 
 export async function processImage(
   blob: Blob,
-): Promise<{ blob: Blob; width: number; height: number }> {
-  const bitmap = await createImageBitmap(blob);
-  const { width: origW, height: origH } = bitmap;
+): Promise<{ blob: Blob; width: number | undefined; height: number | undefined }> {
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const img = PhotonImage.new_from_byteslice(buf);
+  const origW = img.get_width();
+  const origH = img.get_height();
 
   if (blob.size <= BLOB_SIZE_LIMIT) {
+    img.free();
     return { blob, width: origW, height: origH };
   }
 
@@ -14,14 +19,16 @@ export async function processImage(
   const w = Math.max(1, Math.floor(origW * scale));
   const h = Math.max(1, Math.floor(origH * scale));
 
-  const canvas = new OffscreenCanvas(w, h);
-  const ctx = canvas.getContext('2d')!;
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  const resized = resize(img, w, h, SamplingFilter.Lanczos3);
+  img.free();
 
-  let result = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.85 });
-  if (result.size > BLOB_SIZE_LIMIT) {
-    result = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.7 });
+  let outBytes = resized.get_bytes_jpeg(85);
+  if (outBytes.byteLength > BLOB_SIZE_LIMIT) {
+    outBytes = resized.get_bytes_jpeg(70);
   }
+  resized.free();
+
+  const result = new Blob([outBytes.slice()], { type: 'image/jpeg' });
   console.info(`[image] compressed ${blob.size} → ${result.size} bytes (${w}x${h})`);
   return { blob: result, width: w, height: h };
 }

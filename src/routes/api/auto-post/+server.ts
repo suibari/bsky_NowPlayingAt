@@ -63,7 +63,7 @@ export const POST: RequestHandler = async (event) => {
       const res = await fetch(artworkUrl);
       if (res.ok) {
         const { blob, width, height } = await processImage(await res.blob());
-        thumbAspectRatio = { width, height };
+        thumbAspectRatio = width && height ? { width, height } : undefined;
         const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
         imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.toString()}`;
