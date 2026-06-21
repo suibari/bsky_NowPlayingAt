@@ -12,6 +12,7 @@
   let autoEnabled = false;
   let attachImage = true;
   let customText = "";
+  let postProbability = 100;
   let savingLastfm = false;
   let lastfmSaved = false;
   let lastfmError = "";
@@ -26,6 +27,7 @@
         autoEnabled = data.enabled ?? false;
         attachImage = data.attach_image ?? true;
         customText = data.custom_text ?? "";
+        postProbability = data.post_probability ?? 100;
       }
     } catch {
       // not registered yet
@@ -58,6 +60,7 @@
           enabled: autoEnabled,
           attach_image: attachImage,
           custom_text: customText.trim() || null,
+          post_probability: postProbability,
         }),
       });
       if (!res.ok) {
@@ -155,6 +158,27 @@
                   class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {attachImage ? 'translate-x-6' : 'translate-x-1'}"
                 ></span>
               </button>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-sm text-gray-400" for="postProbability">
+                  {$t('settings.probability.label')}
+                </label>
+                <span class="text-sm font-bold text-green-400">
+                  {$t('settings.probability.value', { value: String(postProbability) })}
+                </span>
+              </div>
+              <input
+                id="postProbability"
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                bind:value={postProbability}
+                class="w-full h-2 rounded-lg appearance-none cursor-pointer bg-gray-700 accent-green-500"
+              />
+              <p class="text-xs text-gray-600 mt-1">{$t('settings.probability.hint')}</p>
             </div>
           </div>
 

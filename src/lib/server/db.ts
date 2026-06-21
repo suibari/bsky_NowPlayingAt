@@ -89,6 +89,7 @@ export interface UserSession {
   enabled: boolean;
   custom_text: string | null;
   attach_image: boolean;
+  post_probability: number;
 }
 
 export async function upsertSession(data: {
@@ -98,6 +99,7 @@ export async function upsertSession(data: {
   enabled: boolean;
   custom_text?: string | null;
   attach_image?: boolean;
+  post_probability?: number;
 }, onConflict: 'merge' | 'ignore' = 'merge'): Promise<void> {
   await pgFetch(`${env.POSTGREST_URL}/sessions`, {
     method: 'POST',

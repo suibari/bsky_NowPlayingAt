@@ -11,8 +11,8 @@ export const GET: RequestHandler = async (event) => {
   if (!did) throw error(401, 'Unauthorized');
 
   const session = await getSession(did);
-  if (!session) return json({ lastfm_username: null, enabled: false, custom_text: null, attach_image: true });
-  return json({ lastfm_username: session.lastfm_username, enabled: session.enabled, custom_text: session.custom_text ?? null, attach_image: session.attach_image ?? true });
+  if (!session) return json({ lastfm_username: null, enabled: false, custom_text: null, attach_image: true, post_probability: 100 });
+  return json({ lastfm_username: session.lastfm_username, enabled: session.enabled, custom_text: session.custom_text ?? null, attach_image: session.attach_image ?? true, post_probability: session.post_probability ?? 100 });
 };
 
 // POST: save Last.fm username + enabled flag
@@ -20,8 +20,11 @@ export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
   if (!did) throw error(401, 'Unauthorized');
 
-  const { lastfm_username, enabled, custom_text, attach_image } = await event.request.json();
+  const { lastfm_username, enabled, custom_text, attach_image, post_probability } = await event.request.json();
   if (!lastfm_username?.trim()) throw error(400, 'lastfm_username is required');
+  const probability = typeof post_probability === 'number'
+    ? Math.max(0, Math.min(100, Math.round(post_probability)))
+    : 100;
 
   // Verify Last.fm user exists
   const lfRes = await fetch(
@@ -37,6 +40,6 @@ export const POST: RequestHandler = async (event) => {
     handle = profile.data.handle;
   } catch { /* fallback to DID */ }
 
-  await upsertSession({ did, bsky_handle: handle, lastfm_username: lastfm_username.trim(), enabled: enabled ?? true, custom_text: custom_text?.trim() || null, attach_image: attach_image ?? true });
+  await upsertSession({ did, bsky_handle: handle, lastfm_username: lastfm_username.trim(), enabled: enabled ?? true, custom_text: custom_text?.trim() || null, attach_image: attach_image ?? true, post_probability: probability });
   return json({ ok: true });
 };
