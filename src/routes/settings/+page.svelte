@@ -7,6 +7,7 @@
 
   let lastfmUsername = "";
   let autoEnabled = false;
+  let customText = "";
   let savingLastfm = false;
   let lastfmSaved = false;
   let lastfmError = "";
@@ -19,6 +20,7 @@
         const data = await res.json();
         lastfmUsername = data.lastfm_username ?? "";
         autoEnabled = data.enabled ?? false;
+        customText = data.custom_text ?? "";
       }
     } catch {
       // not registered yet
@@ -49,6 +51,7 @@
         body: JSON.stringify({
           lastfm_username: lastfmUsername.trim(),
           enabled: autoEnabled,
+          custom_text: customText.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -131,6 +134,19 @@
             placeholder="your_lastfm_username"
             class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
           />
+        </div>
+
+        <div>
+          <label class="block text-sm text-gray-400 mb-1" for="customText">カスタムテキスト（任意）</label>
+          <input
+            id="customText"
+            type="text"
+            bind:value={customText}
+            placeholder="例: #聴いてる #music"
+            maxlength="100"
+            class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-green-500 transition-colors"
+          />
+          <p class="text-xs text-gray-600 mt-1">投稿本文に追加される1行テキスト。ハッシュタグも使えます。</p>
         </div>
 
         <div class="flex items-center justify-between">
