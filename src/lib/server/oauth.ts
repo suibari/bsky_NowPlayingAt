@@ -34,6 +34,16 @@ import {
 const PROD_ORIGIN = 'https://nowplayingat.suibari.com';
 const SCOPE = 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create';
 
+// @atproto/jwk's jwkAlgorithms only yields 'ES256K' for secp256k1 when IS_NODE_RUNTIME
+// is true. In CF Workers it is always false, so secp256k1 JWKs without an explicit
+// "alg" field report only ECDH-ES algorithms and fail DPoP negotiation. Explicitly
+// set alg:'ES256K' when storing/restoring secp256k1 keys to bypass the guard.
+function normalizeJwkAlg(jwk: Record<string, unknown>): Record<string, unknown> {
+  if (jwk.alg || jwk.kty !== 'EC') return jwk;
+  if (jwk.crv === 'secp256k1') return { ...jwk, alg: 'ES256K' };
+  return jwk;
+}
+
 // DPoP key store: serialise/deserialise the ephemeral DPoP key alongside the session.
 // Mirrors NodeOAuthClient's toDpopKeyStore but uses JoseKey which works in CF Workers.
 function toDpopKeyStore(store: {
@@ -45,19 +55,13 @@ function toDpopKeyStore(store: {
     async set(sub: string, { dpopKey, ...data }: any) {
       const dpopJwk = dpopKey.privateJwk;
       if (!dpopJwk) throw new Error('Private DPoP JWK is missing.');
-      await store.set(sub, { ...data, dpopJwk });
+      await store.set(sub, { ...data, dpopJwk: normalizeJwkAlg(dpopJwk) });
     },
     async get(sub: string) {
       const result: any = await store.get(sub);
       if (!result) return undefined;
       const { dpopJwk, ...data } = result;
-      // Diagnostic: log JWK shape to diagnose "Key does not match any alg" errors.
-      console.log('[oauth] dpopJwk meta:', JSON.stringify({
-        sub, kty: dpopJwk?.kty, crv: dpopJwk?.crv,
-        alg: dpopJwk?.alg, use: dpopJwk?.use, key_ops: dpopJwk?.key_ops,
-      }));
-      const dpopKey = await JoseKey.fromJWK(dpopJwk);
-      console.log('[oauth] dpopKey.algorithms:', JSON.stringify(dpopKey.algorithms));
+      const dpopKey = await JoseKey.fromJWK(normalizeJwkAlg(dpopJwk));
       return { ...data, dpopKey };
     },
     del: (sub: string) => store.del(sub),
@@ -126,9 +130,9 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
   } as any);
 }
 
-// Wraps restore() to handle the "Key does not match any alg supported by the
-// server" error: deletes the broken session so the user can re-authenticate,
-// then throws 401 instead of propagating a 500.
+// Wraps restore() to surface the "Key does not match any alg" error clearly.
+// Root cause (secp256k1 keys in CF Workers) is fixed in normalizeJwkAlg above;
+// this catch is a safety net for any remaining edge cases.
 export async function restoreOAuthSession(client: OAuthClient, sub: string) {
   try {
     return await client.restore(sub);
