@@ -9,7 +9,8 @@ import { resolveArtworkUrl } from '$lib/server/artwork';
 import { processImage } from '$lib/server/image';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
-const LINK_LABEL = '💿なうぷれあっとで見る';
+const SITE_LABEL = 'なうぷれあっと';
+const LFM_LABEL = 'lastfm';
 const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 
 export const POST: RequestHandler = async (event) => {
@@ -38,9 +39,9 @@ export const POST: RequestHandler = async (event) => {
   let thumbBlob: any = undefined;
   let imgBlob: string | undefined = undefined;
   let thumbAspectRatio: { width: number; height: number } | undefined;
-  const artworkUrl = await resolveArtworkUrl(
+  const { artworkUrl, lastFmUrl } = await resolveArtworkUrl(
     artist, title, album, track?.artworkUrl || undefined,
-  ).catch(() => undefined);
+  ).catch(() => ({ artworkUrl: undefined, lastFmUrl: undefined }));
   if (artworkUrl) {
     try {
       const res = await fetch(artworkUrl);
@@ -61,21 +62,36 @@ export const POST: RequestHandler = async (event) => {
   const customLine = customText ? `\n${customText}` : '';
 
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
-  const rawText = `🎵 Now Playing\n${title}\n${artist}${album ? `\n${album}` : ''}${customLine}\n\n#NowPlaying #なうぷれ\n\n${LINK_LABEL}`;
+  const viaLine = lastFmUrl
+    ? `💿via ${SITE_LABEL} / ${LFM_LABEL}`
+    : `💿via ${SITE_LABEL}`;
+  const rawText = `🎵 Now Playing\n${title}\n${artist}${album ? `\n${album}` : ''}${customLine}\n\n#NowPlaying #なうぷれ #なうぷれあっと\n\n${viaLine}`;
 
   const rt = new RichText({ text: rawText });
   await rt.detectFacets(agent);
 
-  // Attach profile link facet to LINK_LABEL
   const enc = new TextEncoder();
-  const linkStart = rawText.indexOf(LINK_LABEL);
-  const startByte = enc.encode(rawText.substring(0, linkStart)).byteLength;
-  const endByte = startByte + enc.encode(LINK_LABEL).byteLength;
   if (!rt.facets) rt.facets = [];
+
+  // なうぷれあっと → プロフィールリンク
+  const siteIdx = rawText.indexOf(SITE_LABEL);
+  const siteStartByte = enc.encode(rawText.substring(0, siteIdx)).byteLength;
+  const siteEndByte = siteStartByte + enc.encode(SITE_LABEL).byteLength;
   rt.facets.push({
-    index: { byteStart: startByte, byteEnd: endByte },
+    index: { byteStart: siteStartByte, byteEnd: siteEndByte },
     features: [{ $type: 'app.bsky.richtext.facet#link', uri: profileUrl }],
   });
+
+  // lastfm → Last.fm トラックリンク（取得できた場合のみ）
+  if (lastFmUrl) {
+    const lfmIdx = rawText.lastIndexOf(LFM_LABEL);
+    const lfmStartByte = enc.encode(rawText.substring(0, lfmIdx)).byteLength;
+    const lfmEndByte = lfmStartByte + enc.encode(LFM_LABEL).byteLength;
+    rt.facets.push({
+      index: { byteStart: lfmStartByte, byteEnd: lfmEndByte },
+      features: [{ $type: 'app.bsky.richtext.facet#link', uri: lastFmUrl }],
+    });
+  }
 
   const postRecord: any = { text: rt.text, facets: rt.facets, langs: ['ja'], createdAt: new Date().toISOString() };
   if (thumbBlob) {

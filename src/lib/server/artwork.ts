@@ -7,17 +7,23 @@ function isValidDiscogsUrl(url: string | undefined): url is string {
   return !!url && url.length > 0;
 }
 
+export interface ArtworkResult {
+  artworkUrl: string | undefined;
+  lastFmUrl: string | undefined;
+}
+
 /**
  * Resolve jacket image URL using a fallback chain.
  * Priority: Last.fm album.getInfo → MusicBrainz + CAA → Discogs cover_image
  * Discogs is last because its fuzzy q-search often returns mismatched releases.
+ * lastFmUrl is set only when artwork is obtained from Last.fm.
  */
 export async function resolveArtworkUrl(
   artist: string,
   title: string,
   album: string | undefined,
   discogsUrl: string | undefined,
-): Promise<string | undefined> {
+): Promise<ArtworkResult> {
   // 1. Last.fm album.getInfo (structured artist+album query — most accurate when album is known)
   if (album) {
     try {
@@ -34,7 +40,9 @@ export async function resolveArtworkUrl(
         for (const size of ['mega', 'extralarge', 'large']) {
           const img = images.find((i) => i.size === size);
           if (img?.['#text'] && !img['#text'].includes(LFM_PLACEHOLDER)) {
-            return img['#text'];
+            const lastFmUrl =
+              `https://www.last.fm/music/${encodeURIComponent(artist)}/_/${encodeURIComponent(title)}`;
+            return { artworkUrl: img['#text'], lastFmUrl };
           }
         }
       }
@@ -57,7 +65,7 @@ export async function resolveArtworkUrl(
         for (const variant of ['front-500', 'front'] as const) {
           const caaRes = await fetch(`https://coverartarchive.org/release/${release.id}/${variant}`);
           if (caaRes.ok && caaRes.headers.get('content-type')?.startsWith('image/')) {
-            return caaRes.url;
+            return { artworkUrl: caaRes.url, lastFmUrl: undefined };
           }
         }
       }
@@ -68,8 +76,8 @@ export async function resolveArtworkUrl(
 
   // 3. Discogs cover_image (fuzzy fallback — may match a different release)
   if (isValidDiscogsUrl(discogsUrl)) {
-    return discogsUrl.replace('100x100', '600x600');
+    return { artworkUrl: discogsUrl.replace('100x100', '600x600'), lastFmUrl: undefined };
   }
 
-  return undefined;
+  return { artworkUrl: undefined, lastFmUrl: undefined };
 }
