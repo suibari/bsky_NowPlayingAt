@@ -385,10 +385,10 @@
 
     <!-- TABS -->
     <div class="flex justify-center mb-8">
-      <div class="bg-gray-900 p-1 rounded-full flex gap-1">
+      <div class="bg-gray-900 p-1 rounded-full flex gap-1 w-full sm:w-auto">
         <button
           on:click={() => (activeTab = "search")}
-          class="px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'search'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
@@ -397,7 +397,7 @@
         </button>
         <button
           on:click={() => (activeTab = "hot")}
-          class="px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'hot'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
@@ -406,7 +406,7 @@
         </button>
         <button
           on:click={() => (activeTab = "discovery")}
-          class="px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'discovery'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
