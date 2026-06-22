@@ -177,11 +177,25 @@ export async function ensureConfig() {
 const HUB_DID = 'did:plc:uixgxpiqf4i63p6rgpu7ytmx';
 const HUB_REF = `at://${HUB_DID}/app.bsky.actor.profile/self`;
 
-export async function getGlobalTimeline() {
+// Process slow per-user PDS fetches in batches so callers can render progressively.
+const TIMELINE_BATCH_SIZE = 25;
+
+/**
+ * Build the global "Discover" timeline.
+ * If `onProgress` is given, it is called after each user batch resolves with the
+ * sorted items so far (so the UI can render incrementally). The fully-resolved,
+ * sorted array is always returned at the end.
+ */
+export async function getGlobalTimeline(
+  onProgress?: (items: any[], done: boolean) => void
+) {
   const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
   const userDids = Array.from(new Set(backlinks.map(b => b.did)));
 
-  if (userDids.length === 0) return [];
+  if (userDids.length === 0) {
+    onProgress?.([], true);
+    return [];
+  }
 
   const timelineItems: any[] = [];
   let profilesMap = new Map<string, any>();
@@ -197,69 +211,85 @@ export async function getGlobalTimeline() {
     console.error('Failed to fetch timeline profiles', e);
   }
 
-  await Promise.all(userDids.map(async (did) => {
-    const profile = profilesMap.get(did);
-    const pds = await getPdsEndpoint(did);
-    if (!pds) return;
-
-    const pdsAgent = new Agent({ service: pds });
-
-    const fetchCollection = async (collection: string, typeName: string) => {
-      try {
-        const res = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection, limit: 5 });
-        res.data.records.forEach((r: any) => {
-          timelineItems.push({
-            type: typeName,
-            author: profile || { did, handle: 'unknown' },
-            record: r.value,
-            uri: r.uri,
-            cid: r.cid,
-            indexedAt: r.value.postedAt || r.value.createdAt
-          });
-        });
-      } catch (e) { console.warn(`Failed fetch ${collection} for ${did}`, e); }
-    };
-
-    await Promise.all([
-      fetchCollection(NSID_HISTORY, 'history'),
-      fetchCollection(NSID_REACTION, 'reaction'),
-      fetchCollection(NSID_PLAYLIST, 'playlist')
-    ]);
-  }));
-
-  // Hydrate playlist reactions
-  const playlistsToFetch = new Map<string, { did: string, rkey: string }>();
-  timelineItems.forEach(item => {
-    if (item.type === 'reaction' && item.record.kind === 'playlist' && item.record.playlist?.uri) {
-      const uri = item.record.playlist.uri;
-      if (!playlistsToFetch.has(uri)) {
-        try {
-          const parts = uri.split('/');
-          const rkey = parts.pop();
-          parts.pop();
-          const did = parts.pop();
-          if (did && rkey) playlistsToFetch.set(uri, { did, rkey });
-        } catch { /* ignore */ }
-      }
-    }
-  });
-
   const fetchedPlaylists = new Map<string, any>();
-  await Promise.all(Array.from(playlistsToFetch.entries()).map(async ([uri, { did, rkey }]) => {
-    try {
-      const data = await getPlaylist(did, rkey);
-      if (data?.value) fetchedPlaylists.set(uri, data.value);
-    } catch { /* ignore */ }
-  }));
+  const sorted = () =>
+    [...timelineItems].sort((a, b) => new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime());
 
-  timelineItems.forEach(item => {
-    if (item.type === 'reaction' && item.record.kind === 'playlist' && item.record.playlist?.uri) {
-      const fetched = fetchedPlaylists.get(item.record.playlist.uri);
-      if (fetched) item.record.playlist.record = fetched;
-    }
-  });
+  const batches: string[][] = [];
+  for (let i = 0; i < userDids.length; i += TIMELINE_BATCH_SIZE) {
+    batches.push(userDids.slice(i, i + TIMELINE_BATCH_SIZE));
+  }
 
-  return timelineItems.sort((a, b) => new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime());
+  for (let bi = 0; bi < batches.length; bi++) {
+    const batch = batches[bi];
+    const batchItems: any[] = [];
+
+    await Promise.all(batch.map(async (did) => {
+      const profile = profilesMap.get(did);
+      const pds = await getPdsEndpoint(did);
+      if (!pds) return;
+
+      const pdsAgent = new Agent({ service: pds });
+
+      const fetchCollection = async (collection: string, typeName: string) => {
+        try {
+          const res = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection, limit: 5 });
+          res.data.records.forEach((r: any) => {
+            batchItems.push({
+              type: typeName,
+              author: profile || { did, handle: 'unknown' },
+              record: r.value,
+              uri: r.uri,
+              cid: r.cid,
+              indexedAt: r.value.postedAt || r.value.createdAt
+            });
+          });
+        } catch (e) { console.warn(`Failed fetch ${collection} for ${did}`, e); }
+      };
+
+      await Promise.all([
+        fetchCollection(NSID_HISTORY, 'history'),
+        fetchCollection(NSID_REACTION, 'reaction'),
+        fetchCollection(NSID_PLAYLIST, 'playlist')
+      ]);
+    }));
+
+    // Hydrate playlist reactions for this batch
+    const playlistsToFetch = new Map<string, { did: string, rkey: string }>();
+    batchItems.forEach(item => {
+      if (item.type === 'reaction' && item.record.kind === 'playlist' && item.record.playlist?.uri) {
+        const uri = item.record.playlist.uri;
+        if (!fetchedPlaylists.has(uri) && !playlistsToFetch.has(uri)) {
+          try {
+            const parts = uri.split('/');
+            const rkey = parts.pop();
+            parts.pop();
+            const did = parts.pop();
+            if (did && rkey) playlistsToFetch.set(uri, { did, rkey });
+          } catch { /* ignore */ }
+        }
+      }
+    });
+
+    await Promise.all(Array.from(playlistsToFetch.entries()).map(async ([uri, { did, rkey }]) => {
+      try {
+        const data = await getPlaylist(did, rkey);
+        if (data?.value) fetchedPlaylists.set(uri, data.value);
+      } catch { /* ignore */ }
+    }));
+
+    batchItems.forEach(item => {
+      if (item.type === 'reaction' && item.record.kind === 'playlist' && item.record.playlist?.uri) {
+        const fetched = fetchedPlaylists.get(item.record.playlist.uri);
+        if (fetched) item.record.playlist.record = fetched;
+      }
+    });
+
+    timelineItems.push(...batchItems);
+    onProgress?.(sorted(), bi === batches.length - 1);
+  }
+
+  return sorted();
 }
 
 // --- HYDRATION ---
@@ -308,7 +338,24 @@ function songKey(artist?: string, track?: string, fallback?: string): string {
   return fallback || '';
 }
 
-export async function getHotContent() {
+// What's hot ranking windows / thresholds (tweak here to retune).
+// AGGREGATION window: only reactions / history within this window are counted at all.
+const HOT_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const TRENDING_WINDOW_MS = 24 * 60 * 60 * 1000; // "急上昇" window
+const TRENDING_MIN = 3;                          // "急上昇" needs >= this many in the trending window
+const HOT_BATCH_SIZE = 25;
+
+type HotStat = {
+  count: number;
+  record: any;
+  authors: any[];
+  reactions: Record<string, any[]>;
+  recent24: number;     // reactions within TRENDING_WINDOW_MS, for the trending badge
+};
+
+export async function getHotContent(
+  onProgress?: (data: { tracks: any[]; playlists: any[]; users: any[] }, done: boolean) => void
+) {
   const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
   const uniqueDids = new Set(backlinks.map(b => b.did));
 
@@ -316,13 +363,23 @@ export async function getHotContent() {
   if (me) uniqueDids.add(me.did);
 
   const userDids = Array.from(uniqueDids);
-  if (userDids.length === 0) return { tracks: [], playlists: [] };
+  if (userDids.length === 0) {
+    const empty = { tracks: [], playlists: [], users: [] };
+    onProgress?.(empty, true);
+    return empty;
+  }
 
-  const reactions: any[] = [];
   const profilesMap = new Map<string, any>();
   // songKey -> { Bluesky post AT-URIs, representative metadata for display }
   // Includes Last.fm auto-posts (no trackUri) so their likes can surface too.
   const songPosts = new Map<string, { postUris: Set<string>, meta: any }>();
+
+  const trackStats = new Map<string, HotStat>();
+  const playlistStats = new Map<string, HotStat>();
+  // did -> per-user history stats for the Top Users ranking
+  const userStats = new Map<string, { profile: any, count: number, recent24: number }>();
+  // cache hydrated playlist records across batch emits
+  const playlistCache = new Map<string, any>();
 
   try {
     const chunks = [];
@@ -333,46 +390,21 @@ export async function getHotContent() {
     }
   } catch (e) { console.error('Failed to fetch profiles for hot content', e); }
 
-  await Promise.all(userDids.map(async (did) => {
-    const pds = await getPdsEndpoint(did);
-    if (!pds) return;
+  const addReaction = (r: any) => {
+    // Aggregation condition: only reactions within the last week are measured.
+    const ts = new Date(r.createdAt || 0).getTime();
+    if (ts < Date.now() - HOT_WEEK_MS) return;
 
-    const pdsAgent = new Agent({ service: pds });
-    try {
-      const res = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_REACTION, limit: 50 });
-      res.data.records.forEach((r: any) => {
-        reactions.push({ ...r.value, author: profilesMap.get(did) || { did, handle: 'unknown' }, uri: r.uri });
-      });
-    } catch { /* ignore */ }
-
-    // Collect song -> postUris (incl. auto-posts without trackUri) for like aggregation.
-    try {
-      const hRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_HISTORY, limit: 100 });
-      hRes.data.records.forEach((r: any) => {
-        const v = r.value || {};
-        if (!v.postUri) return;
-        const key = songKey(v.artist, v.track, v.trackUri);
-        if (!key) return;
-        if (!songPosts.has(key)) songPosts.set(key, { postUris: new Set(), meta: v });
-        songPosts.get(key)!.postUris.add(v.postUri);
-      });
-    } catch { /* ignore */ }
-  }));
-
-  const trackStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
-  const playlistStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
-
-  reactions.forEach(r => {
-    let stat;
+    let stat: HotStat | undefined;
     if (r.kind === 'playlist' && r.playlist?.uri) {
       const key = r.playlist.uri;
-      if (!playlistStats.has(key)) playlistStats.set(key, { count: 0, record: r, authors: [], reactions: {} });
+      if (!playlistStats.has(key)) playlistStats.set(key, { count: 0, record: r, authors: [], reactions: {}, recent24: 0 });
       stat = playlistStats.get(key)!;
     } else if (r.kind === 'track' || !r.kind) {
       // Reaction records store subjectUri = the track's web URL (trackUri).
       const key = songKey(r.artist, r.track, r.subjectUri);
       if (key) {
-        if (!trackStats.has(key)) trackStats.set(key, { count: 0, record: { ...r, trackUri: r.trackUri ?? r.subjectUri }, authors: [], reactions: {} });
+        if (!trackStats.has(key)) trackStats.set(key, { count: 0, record: { ...r, trackUri: r.trackUri ?? r.subjectUri }, authors: [], reactions: {}, recent24: 0 });
         stat = trackStats.get(key)!;
       }
     }
@@ -382,8 +414,114 @@ export async function getHotContent() {
       const emoji = r.emoji || '👍';
       if (!stat.reactions[emoji]) stat.reactions[emoji] = [];
       stat.reactions[emoji].push({ did: r.author.did, handle: r.author.handle, avatar: r.author.avatar, displayName: r.author.displayName, reactionUri: r.uri });
+      if (ts >= Date.now() - TRENDING_WINDOW_MS) stat.recent24++;
     }
-  });
+  };
+
+  // Build the ranked result. Counts already only include in-window activity,
+  // so items with no recent reactions/history simply never appear here.
+  const buildResult = async () => {
+    const tracks = Array.from(trackStats.values())
+      .filter(s => s.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .map(s => ({
+        ...s.record,
+        reactionCount: s.count,
+        recentReactors: s.authors.slice(0, 5),
+        reactionGroups: Object.entries(s.reactions).map(([emoji, users]) => ({ emoji, users })),
+        trending: s.recent24 >= TRENDING_MIN,
+      }));
+
+    const playlistsRanked = Array.from(playlistStats.values())
+      .filter(s => s.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 20);
+
+    const playlists: any[] = [];
+    for (const item of playlistsRanked) {
+      const uri = item.record.playlist?.uri;
+      if (!uri) continue;
+      let value = playlistCache.get(uri);
+      if (value === undefined) {
+        try {
+          const parts = uri.split('/');
+          const rkey = parts.pop();
+          parts.pop();
+          const did = parts.pop();
+          if (did && rkey) {
+            const data = await getPlaylist(did, rkey);
+            value = data?.value ?? null;
+          } else value = null;
+        } catch { value = null; }
+        playlistCache.set(uri, value);
+      }
+      if (!value) continue;
+      playlists.push({
+        playlist: value,
+        author: item.record.playlist.author,
+        reactionCount: item.count,
+        recentReactors: item.authors.slice(0, 5),
+        uri,
+        reactionGroups: Object.entries(item.reactions).map(([emoji, users]) => ({ emoji, users })),
+        trending: item.recent24 >= TRENDING_MIN,
+      });
+    }
+
+    const users = Array.from(userStats.values())
+      .filter(u => u.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .map(u => ({
+        did: u.profile?.did,
+        handle: u.profile?.handle,
+        displayName: u.profile?.displayName,
+        avatar: u.profile?.avatar,
+        historyCount: u.count,
+        trending: u.recent24 >= TRENDING_MIN,
+      }))
+      .filter(u => u.did);
+
+    return { tracks, playlists, users };
+  };
+
+  const batches: string[][] = [];
+  for (let i = 0; i < userDids.length; i += HOT_BATCH_SIZE) batches.push(userDids.slice(i, i + HOT_BATCH_SIZE));
+
+  for (const batch of batches) {
+    await Promise.all(batch.map(async (did) => {
+      const pds = await getPdsEndpoint(did);
+      if (!pds) return;
+
+      const pdsAgent = new Agent({ service: pds });
+      try {
+        const res = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_REACTION, limit: 50 });
+        res.data.records.forEach((r: any) => {
+          addReaction({ ...r.value, author: profilesMap.get(did) || { did, handle: 'unknown' }, uri: r.uri });
+        });
+      } catch { /* ignore */ }
+
+      // History: collect song -> postUris for like aggregation, and per-user counts for Top Users.
+      // Aggregation condition: only history added within the last week is measured.
+      try {
+        const hRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_HISTORY, limit: 100 });
+        const us = userStats.get(did) || { profile: profilesMap.get(did) || { did, handle: 'unknown' }, count: 0, recent24: 0 };
+        hRes.data.records.forEach((r: any) => {
+          const v = r.value || {};
+          const ts = new Date(v.postedAt || v.createdAt || 0).getTime();
+          if (ts < Date.now() - HOT_WEEK_MS) return; // skip old history
+          us.count++;
+          if (ts >= Date.now() - TRENDING_WINDOW_MS) us.recent24++;
+          if (!v.postUri) return;
+          const key = songKey(v.artist, v.track, v.trackUri);
+          if (!key) return;
+          if (!songPosts.has(key)) songPosts.set(key, { postUris: new Set(), meta: v });
+          songPosts.get(key)!.postUris.add(v.postUri);
+        });
+        if (us.count > 0) userStats.set(did, us);
+      } catch { /* ignore */ }
+    }));
+
+    onProgress?.(await buildResult(), false);
+  }
 
   // --- Aggregate Bluesky post likes (app.bsky.feed.like) per song ---
   // Walk every song that has a Bluesky post (incl. Last.fm auto-posts with no
@@ -458,6 +596,7 @@ export async function getHotContent() {
         },
         authors: [],
         reactions: {},
+        recent24: 0,
       };
       trackStats.set(key, stat);
     }
@@ -472,40 +611,7 @@ export async function getHotContent() {
     });
   });
 
-  const hotTracks = Array.from(trackStats.values())
-    .sort((a, b) => b.count - a.count)
-    .map(s => ({
-      ...s.record,
-      reactionCount: s.count,
-      recentReactors: s.authors.slice(0, 5),
-      reactionGroups: Object.entries(s.reactions).map(([emoji, users]) => ({ emoji, users }))
-    }));
-
-  const hotPlaylistsRaw = Array.from(playlistStats.values()).sort((a, b) => b.count - a.count);
-  const hydratedPlaylists = [];
-  for (const item of hotPlaylistsRaw.slice(0, 20)) {
-    try {
-      const uri = item.record.playlist.uri;
-      if (!uri) continue;
-      const parts = uri.split('/');
-      const rkey = parts.pop();
-      parts.pop();
-      const did = parts.pop();
-      if (did && rkey) {
-        const data = await getPlaylist(did, rkey);
-        if (data?.value) {
-          hydratedPlaylists.push({
-            playlist: data.value,
-            author: item.record.playlist.author,
-            reactionCount: item.count,
-            recentReactors: item.authors.slice(0, 5),
-            uri,
-            reactionGroups: Object.entries(item.reactions).map(([emoji, users]) => ({ emoji, users }))
-          });
-        }
-      }
-    } catch { /* ignore */ }
-  }
-
-  return { tracks: hotTracks, playlists: hydratedPlaylists };
+  const final = await buildResult();
+  onProgress?.(final, true);
+  return final;
 }

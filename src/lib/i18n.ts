@@ -32,6 +32,22 @@ const translations: Record<Locale, Record<string, string>> = {
     // --- Main page: search ---
     'search.placeholder': '曲名、アーティスト名、アルバム名を入力',
 
+    // --- Main page: tabs ---
+    'tab.search': '曲を探す',
+    'tab.hot': 'なうぷれチャート',
+    'tab.discovery': 'みんなのなうぷれ',
+    'hot.toptracks': '曲',
+    'hot.topplaylists': 'プレイリスト',
+    'hot.topusers': 'ユーザー',
+    'hot.trending': '急上昇',
+    'hot.loadmore': 'もっと見る',
+    'hot.loading': 'チャートを集計中...',
+    'hot.empty.tracks': 'まだ急上昇中の曲がありません。',
+    'hot.empty.playlists': 'まだ急上昇中のプレイリストがありません。',
+    'hot.empty.users': 'まだ急上昇中のユーザーがいません。',
+    'hot.users.count': '{{count}} 件の再生履歴',
+    'discovery.loading': 'みんなのなうぷれを読み込み中...',
+
     // --- Main page: discovery ---
     'discovery.listening': 'が聴いています',
     'discovery.reacted': 'がリアクションしました',
@@ -136,6 +152,22 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Main page: search ---
     'search.placeholder': 'Search songs, artists, albums...',
+
+    // --- Main page: tabs ---
+    'tab.search': 'Find Music',
+    'tab.hot': 'Chart',
+    'tab.discovery': "Everyone's",
+    'hot.toptracks': 'Tracks',
+    'hot.topplaylists': 'Playlists',
+    'hot.topusers': 'Users',
+    'hot.trending': 'Trending',
+    'hot.loadmore': 'Load more',
+    'hot.loading': 'Aggregating chart...',
+    'hot.empty.tracks': 'No trending tracks yet.',
+    'hot.empty.playlists': 'No trending playlists yet.',
+    'hot.empty.users': 'No trending users yet.',
+    'hot.users.count': '{{count}} plays',
+    'discovery.loading': "Loading everyone's now playing...",
 
     // --- Main page: discovery ---
     'discovery.listening': 'is listening to',

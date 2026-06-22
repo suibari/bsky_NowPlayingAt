@@ -23,12 +23,18 @@
   let handleInput = "";
   let isSigningIn = false;
   let activeTab: "search" | "hot" | "discovery" = "search";
-  let hotTab: "tracks" | "playlists" = "tracks";
+  let hotTab: "tracks" | "playlists" | "users" = "tracks";
 
   // Data State
   let hotTracks: any[] = [];
   let hotPlaylists: any[] = [];
+  let hotUsers: any[] = [];
   let discoveryTimeline: any[] = [];
+
+  // Display limits ("load more" pagination so we don't render hundreds of nodes)
+  const PAGE_SIZE = 20;
+  let hotLimit = PAGE_SIZE;
+  let discoveryLimit = PAGE_SIZE;
 
   let loadingHot = true;
   let loadingDiscovery = true;
@@ -40,6 +46,16 @@
     loadHotContent();
     loadDiscoveryContent();
   });
+
+  function setHotTab(tab: "tracks" | "playlists" | "users") {
+    hotTab = tab;
+    hotLimit = PAGE_SIZE; // reset pagination when switching sub-tab
+  }
+
+  function goHome() {
+    activeTab = "search";
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   // Wait for auth to be confirmed before checking settings
   $: if ($authState.isAuthenticated && !bannerChecked) {
@@ -64,9 +80,12 @@
   async function loadHotContent() {
     loadingHot = true;
     try {
+      // Show only the final, fully-aggregated ranking (no dynamic reshuffling
+      // while loading). Spinner stays until the whole computation is done.
       const data = await getHotContent();
       hotTracks = data.tracks;
       hotPlaylists = data.playlists;
+      hotUsers = data.users;
     } catch (e) {
       console.error("Failed to load hot content", e);
     } finally {
@@ -77,12 +96,101 @@
   async function loadDiscoveryContent() {
     loadingDiscovery = true;
     try {
-      discoveryTimeline = await getGlobalTimeline();
+      // Show only the final timeline at once (no items popping in while loading).
+      const items = await getGlobalTimeline();
+      discoveryTimeline = mergeTimeline(items);
     } catch (e) {
       console.error("Failed to load discovery content", e);
     } finally {
       loadingDiscovery = false;
     }
+  }
+
+  // Optimistic items (from the current user's just-now post/reaction) that should
+  // stay pinned at the top even as fetched batches stream in.
+  let optimisticItems: any[] = [];
+
+  function mergeTimeline(fetched: any[]): any[] {
+    if (optimisticItems.length === 0) return fetched;
+    const seen = new Set(
+      fetched.map((i) => `${i.type}:${i.uri ?? ""}:${i.record?.subjectUri ?? ""}`),
+    );
+    const stillPending = optimisticItems.filter(
+      (o) => !seen.has(`${o.type}:${o.uri ?? ""}:${o.record?.subjectUri ?? ""}`),
+    );
+    return [...stillPending, ...fetched];
+  }
+
+  function prependDiscovery(item: any) {
+    optimisticItems = [item, ...optimisticItems];
+    discoveryTimeline = [item, ...discoveryTimeline];
+  }
+
+  // Reflect the current user's just-now post/history into Discover (no reload).
+  function reflectHistoryToDiscovery(track: Track, imgBlob?: string, uri?: string) {
+    const me = get(userProfile);
+    if (!me) return;
+    prependDiscovery({
+      type: "history",
+      author: me,
+      record: {
+        track: track.title,
+        artist: track.artist,
+        album: track.album,
+        trackUri: track.trackUri,
+        img: track.artworkUrl,
+        imgBlob,
+        links: {
+          spotify: track.spotifyUrl,
+          youtube: track.youtubeMusicUrl,
+          appleMusic: track.appleMusicUrl,
+        },
+        comment: track.comment,
+        provider: track.provider,
+        postUri: uri,
+      },
+      uri: uri ?? `optimistic:history:${track.trackUri}:${Date.now()}`,
+      indexedAt: new Date().toISOString(),
+    });
+  }
+
+  // Reflect the current user's just-now reaction into Discover (no reload).
+  function handleDiscoveryReaction(e: CustomEvent) {
+    const me = get(userProfile);
+    const track = e.detail?.track;
+    const emoji = e.detail?.emoji;
+    if (!me || !track || !emoji) return;
+    const subjectUri = track.trackUri;
+    if (
+      optimisticItems.some(
+        (o) =>
+          o.type === "reaction" &&
+          o.record?.subjectUri === subjectUri &&
+          o.record?.emoji === emoji,
+      )
+    )
+      return;
+    prependDiscovery({
+      type: "reaction",
+      author: me,
+      record: {
+        emoji,
+        subjectUri,
+        kind: "track",
+        track: track.title,
+        artist: track.artist,
+        album: track.album,
+        img: track.artworkUrl,
+        links: {
+          spotify: track.spotifyUrl,
+          youtube: track.youtubeMusicUrl,
+          appleMusic: track.appleMusicUrl,
+        },
+        provider: track.provider,
+      },
+      uri: `optimistic:reaction:${subjectUri}:${emoji}:${Date.now()}`,
+      indexedAt: new Date().toISOString(),
+    });
   }
 
   // Info Modal
@@ -146,12 +254,14 @@
         //    and postUri so Bluesky likes on the post can be aggregated later.
         await createHistoryRecord(track, imgBlob, uri);
 
+        reflectHistoryToDiscovery(track, imgBlob, uri);
         alert(get(t)('alert.posted'));
       } else {
         // No confirmation dialog when just saving to history
         // 1. Write to History (PDS)
         await createHistoryRecord(track);
 
+        reflectHistoryToDiscovery(track);
         alert(get(t)('alert.history'));
       }
     } catch (e) {
@@ -220,9 +330,13 @@
     <div
       class="flex justify-between items-center mb-6 sticky top-0 bg-black/95 backdrop-blur-md z-20 py-4 border-b border-gray-800/50"
     >
-      <h1 class="text-3xl font-black text-white tracking-tighter">
+      <button
+        on:click={goHome}
+        class="text-3xl font-black text-white tracking-tighter hover:opacity-80 transition-opacity"
+        title="ホーム"
+      >
         なうぷれ<span class="text-green-500">あっと</span>
-      </h1>
+      </button>
       <div class="flex gap-4 items-center">
         <!-- Help / Info -->
         <button
@@ -273,12 +387,12 @@
       <div class="bg-gray-900 p-1 rounded-full flex gap-1">
         <button
           on:click={() => (activeTab = "search")}
-          class="px-6 py-2 rounded-full text-sm font-bold transition-all {activeTab ===
+          class="px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'search'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
         >
-          Search
+          {$t('tab.search')}
         </button>
         <button
           on:click={() => (activeTab = "hot")}
@@ -287,16 +401,16 @@
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
         >
-          What's hot
+          {$t('tab.hot')}
         </button>
         <button
           on:click={() => (activeTab = "discovery")}
-          class="px-6 py-2 rounded-full text-sm font-bold transition-all {activeTab ===
+          class="px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'discovery'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
             : 'text-gray-400 hover:text-white'}"
         >
-          Discovery
+          {$t('tab.discovery')}
         </button>
       </div>
     </div>
@@ -396,22 +510,31 @@
               class="inline-flex bg-black/40 border border-gray-800 rounded-lg p-1"
             >
               <button
-                on:click={() => (hotTab = "tracks")}
+                on:click={() => setHotTab("tracks")}
                 class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
                 'tracks'
                   ? 'bg-gray-700 text-white shadow-sm'
                   : 'text-gray-400 hover:text-gray-200'}"
               >
-                Top Tracks
+                {$t('hot.toptracks')}
               </button>
               <button
-                on:click={() => (hotTab = "playlists")}
+                on:click={() => setHotTab("playlists")}
                 class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
                 'playlists'
                   ? 'bg-gray-700 text-white shadow-sm'
                   : 'text-gray-400 hover:text-gray-200'}"
               >
-                Top Playlists
+                {$t('hot.topplaylists')}
+              </button>
+              <button
+                on:click={() => setHotTab("users")}
+                class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
+                'users'
+                  ? 'bg-gray-700 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-200'}"
+              >
+                {$t('hot.topusers')}
               </button>
             </div>
           </div>
@@ -421,17 +544,20 @@
               <Loader2
                 class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
               />
-              <p>Trending music loading...</p>
+              <p>{$t('hot.loading')}</p>
             </div>
           {:else if hotTab === "tracks"}
             {#if hotTracks.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
-                {#each hotTracks as track}
+                {#each hotTracks.slice(0, hotLimit) as track}
                   <div class="relative group">
-                    <!-- Rank Badge -->
-                    <!-- <div class="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-green-500 text-black font-black flex items-center justify-center z-10 shadow-lg border-2 border-black">
-                             {hotTracks.indexOf(track) + 1}
-                          </div> -->
+                    {#if track.trending}
+                      <div
+                        class="absolute -top-2 -left-2 z-10 px-2 py-0.5 rounded-full bg-orange-500 text-black text-xs font-black shadow-lg border border-black flex items-center gap-1"
+                      >
+                        🔥 {$t('hot.trending')}
+                      </div>
+                    {/if}
 
                     <TrackCard
                       track={{
@@ -451,6 +577,7 @@
                       on:nowPlaying={(e) =>
                         executeNowPlaying(e.detail.track, e.detail.postToBsky)}
                       on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                      on:reaction={handleDiscoveryReaction}
                     />
 
                     <!-- Reaction Count Display -->
@@ -481,17 +608,27 @@
                   </div>
                 {/each}
               </div>
+              {#if hotTracks.length > hotLimit}
+                <div class="flex justify-center mt-8">
+                  <button
+                    on:click={() => (hotLimit += PAGE_SIZE)}
+                    class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
+                  >
+                    {$t('hot.loadmore')}
+                  </button>
+                </div>
+              {/if}
             {:else}
               <div class="text-center py-20 text-gray-500">
                 <Music size={48} class="mx-auto mb-4 opacity-30" />
-                <p>No trending tracks yet.</p>
+                <p>{$t('hot.empty.tracks')}</p>
               </div>
             {/if}
-          {:else}
+          {:else if hotTab === "playlists"}
             <!-- PLAYLISTS -->
             {#if hotPlaylists.length > 0}
               <div class="space-y-4">
-                {#each hotPlaylists as item}
+                {#each hotPlaylists.slice(0, hotLimit) as item}
                   <div
                     class="bg-gray-900/40 p-3 rounded-xl border border-gray-800/50 hover:bg-gray-900/60 transition-colors"
                   >
@@ -509,6 +646,12 @@
                         >
                           {item.reactionCount} reactions
                         </span>
+                        {#if item.trending}
+                          <span
+                            class="px-2 py-0.5 rounded-full bg-orange-500 text-black text-[10px] font-black"
+                            >🔥 {$t('hot.trending')}</span
+                          >
+                        {/if}
                         {#if item.recentReactors && item.recentReactors.length > 0}
                           <div class="flex -space-x-1">
                             {#each item.recentReactors as u}
@@ -531,9 +674,79 @@
                   </div>
                 {/each}
               </div>
+              {#if hotPlaylists.length > hotLimit}
+                <div class="flex justify-center mt-8">
+                  <button
+                    on:click={() => (hotLimit += PAGE_SIZE)}
+                    class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
+                  >
+                    {$t('hot.loadmore')}
+                  </button>
+                </div>
+              {/if}
             {:else}
               <div class="text-center py-20 text-gray-500">
-                <p>No trending playlists yet.</p>
+                <p>{$t('hot.empty.playlists')}</p>
+              </div>
+            {/if}
+          {:else}
+            <!-- USERS -->
+            {#if hotUsers.length > 0}
+              <div class="space-y-2">
+                {#each hotUsers.slice(0, hotLimit) as user, i}
+                  <a
+                    href={`/profile/${user.did}`}
+                    class="flex items-center gap-4 bg-gray-900/40 p-3 rounded-xl border border-gray-800/50 hover:bg-gray-900/60 transition-colors"
+                  >
+                    <span class="w-6 text-center font-black text-gray-500"
+                      >{i + 1}</span
+                    >
+                    {#if user.avatar}
+                      <img
+                        src={user.avatar}
+                        alt={user.handle}
+                        class="w-10 h-10 rounded-full border border-gray-700"
+                      />
+                    {:else}
+                      <div
+                        class="w-10 h-10 rounded-full bg-gray-800 border border-gray-700"
+                      ></div>
+                    {/if}
+                    <div class="grow min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-white truncate"
+                          >{user.displayName || user.handle}</span
+                        >
+                        {#if user.trending}
+                          <span
+                            class="px-2 py-0.5 rounded-full bg-orange-500 text-black text-[10px] font-black shrink-0"
+                            >🔥 {$t('hot.trending')}</span
+                          >
+                        {/if}
+                      </div>
+                      <div class="text-xs text-gray-500 truncate">
+                        @{user.handle}
+                      </div>
+                    </div>
+                    <span class="text-green-500 font-bold text-sm whitespace-nowrap"
+                      >{$t('hot.users.count', { count: String(user.historyCount) })}</span
+                    >
+                  </a>
+                {/each}
+              </div>
+              {#if hotUsers.length > hotLimit}
+                <div class="flex justify-center mt-8">
+                  <button
+                    on:click={() => (hotLimit += PAGE_SIZE)}
+                    class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
+                  >
+                    {$t('hot.loadmore')}
+                  </button>
+                </div>
+              {/if}
+            {:else}
+              <div class="text-center py-20 text-gray-500">
+                <p>{$t('hot.empty.users')}</p>
               </div>
             {/if}
           {/if}
@@ -545,11 +758,11 @@
               <Loader2
                 class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
               />
-              <p>Loading everyone's activity...</p>
+              <p>{$t('discovery.loading')}</p>
             </div>
           {:else if discoveryTimeline.length > 0}
             <div class="space-y-8">
-              {#each discoveryTimeline as item}
+              {#each discoveryTimeline.slice(0, discoveryLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
                 <div
                   class="bg-gray-900/50 rounded-xl p-4 border border-gray-800"
                 >
@@ -622,6 +835,7 @@
                             e.detail.postToBsky,
                           )}
                         on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                        on:reaction={handleDiscoveryReaction}
                       />
                     {:else if item.type === "reaction"}
                       {#if item.record.kind === "playlist" && item.record.playlist}
@@ -656,6 +870,7 @@
                               e.detail.postToBsky,
                             )}
                           on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                          on:reaction={handleDiscoveryReaction}
                         />
                       {/if}
                     {:else if item.type === "playlist"}
@@ -669,6 +884,16 @@
                 </div>
               {/each}
             </div>
+            {#if discoveryTimeline.length > discoveryLimit}
+              <div class="flex justify-center mt-8">
+                <button
+                  on:click={() => (discoveryLimit += PAGE_SIZE)}
+                  class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
+                >
+                  {$t('hot.loadmore')}
+                </button>
+              </div>
+            {/if}
           {:else}
             <div class="text-center py-20 text-gray-500">
               <p>{$t('discovery.empty')}</p>

@@ -177,7 +177,9 @@
           points="12 19 5 12 12 5"
         /></svg
       >
-      {$t('profile.back')}
+      <span class="font-black tracking-tighter"
+        >なうぷれ<span class="text-green-500">あっと</span></span
+      >
     </a>
 
     {#if isOwner}

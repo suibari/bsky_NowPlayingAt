@@ -83,7 +83,9 @@
     class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 mb-8 transition-colors"
   >
     <ArrowLeft size={20} />
-    {$t('settings.back')}
+    <span class="font-black tracking-tighter"
+      >なうぷれ<span class="text-green-500">あっと</span></span
+    >
   </a>
 
   <h1 class="text-3xl font-black text-white mb-8">{$t('settings.title')}</h1>
