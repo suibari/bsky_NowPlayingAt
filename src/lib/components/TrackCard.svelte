@@ -15,6 +15,9 @@
   import { t } from "$lib/i18n";
 
   export let track: Track;
+  // AT-URI of the Bluesky post backing this track (history cards only).
+  // Forwarded to ReactionBar so post likes are merged into reactions.
+  export let postUri: string | undefined = undefined;
 
   export let showDelete: boolean = false;
   export let showDragHandle: boolean = false;
@@ -271,6 +274,7 @@
       <!-- Reactions Showcase -->
       <ReactionBar
         subjectUri={track.trackUri}
+        {postUri}
         {track}
         initialReactions={reactionGroups}
         on:reaction={handleReaction}

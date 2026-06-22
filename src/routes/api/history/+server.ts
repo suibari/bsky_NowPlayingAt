@@ -30,6 +30,7 @@ export const POST: RequestHandler = async (event) => {
       youtube: track.youtubeMusicUrl ?? undefined,
     },
     comment: track.comment ?? undefined,
+    postUri: track.postUri ?? undefined,
     postedAt: new Date().toISOString(),
   };
 

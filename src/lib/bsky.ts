@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { userProfile } from '$lib/stores';
 import { publicAgent, getPdsEndpoint } from '$lib/atproto';
-import { getBacklinks } from '$lib/constellation';
+import { getBacklinks, getPostLikes } from '$lib/constellation';
 import type { Track as MusicTrack } from '$lib/music';
 import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
 import { Agent } from '@atproto/api';
@@ -13,11 +13,11 @@ export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 // --- HISTORY ---
 
-export async function createHistoryRecord(track: MusicTrack, imgBlob?: string) {
+export async function createHistoryRecord(track: MusicTrack, imgBlob?: string, postUri?: string) {
   const res = await fetch('/api/history', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...track, imgBlob }),
+    body: JSON.stringify({ ...track, imgBlob, postUri }),
   });
   if (!res.ok) throw new Error('Failed to create history record');
   return res.json();
@@ -311,6 +311,8 @@ export async function getHotContent() {
 
   const reactions: any[] = [];
   const profilesMap = new Map<string, any>();
+  // trackUri -> set of Bluesky post AT-URIs (one song can be posted by many users)
+  const trackPostUris = new Map<string, Set<string>>();
 
   try {
     const chunks = [];
@@ -332,9 +334,21 @@ export async function getHotContent() {
         reactions.push({ ...r.value, author: profilesMap.get(did) || { did, handle: 'unknown' }, uri: r.uri });
       });
     } catch { /* ignore */ }
+
+    // Collect trackUri -> postUri so Bluesky likes can be aggregated per song.
+    try {
+      const hRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_HISTORY, limit: 100 });
+      hRes.data.records.forEach((r: any) => {
+        const v = r.value || {};
+        if (v.trackUri && v.postUri) {
+          if (!trackPostUris.has(v.trackUri)) trackPostUris.set(v.trackUri, new Set());
+          trackPostUris.get(v.trackUri)!.add(v.postUri);
+        }
+      });
+    } catch { /* ignore */ }
   }));
 
-  const trackStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
+  const trackStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]>, likeCount?: number, likerDids?: string[] }>();
   const playlistStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
 
   reactions.forEach(r => {
@@ -355,6 +369,63 @@ export async function getHotContent() {
       if (!stat.reactions[emoji]) stat.reactions[emoji] = [];
       stat.reactions[emoji].push({ did: r.author.did, handle: r.author.handle, avatar: r.author.avatar, displayName: r.author.displayName, reactionUri: r.uri });
     }
+  });
+
+  // --- Aggregate Bluesky post likes (app.bsky.feed.like) per song ---
+  // For the top tracks (by in-app reactions), sum likes across every post of
+  // that song and merge likers into the ❤️ group + reaction count.
+  const LIKE_TRACK_LIMIT = 30;      // only enrich the top N tracks (cost bound)
+  const MAX_POSTS_PER_TRACK = 10;   // cap posts queried per song
+  const HEART = '❤️';
+
+  const topTrackKeys = Array.from(trackStats.entries())
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, LIKE_TRACK_LIMIT)
+    .map(([key]) => key);
+
+  const likerDidSet = new Set<string>();
+  await Promise.all(topTrackKeys.map(async (key) => {
+    const postUris = Array.from(trackPostUris.get(key) || []).slice(0, MAX_POSTS_PER_TRACK);
+    if (postUris.length === 0) return;
+    const results = await Promise.all(postUris.map((u) => getPostLikes(u)));
+    const dids = new Set<string>();
+    let likeCount = 0;
+    results.forEach((res) => {
+      likeCount += res.count;
+      res.dids.forEach((d) => dids.add(d));
+    });
+    if (likeCount === 0) return;
+    const stat = trackStats.get(key)!;
+    stat.likeCount = likeCount;
+    stat.likerDids = Array.from(dids);
+    stat.likerDids.forEach((d) => likerDidSet.add(d));
+  }));
+
+  // Fetch profiles for likers we don't already know
+  const missingLikerDids = Array.from(likerDidSet).filter((d) => !profilesMap.has(d));
+  if (missingLikerDids.length > 0) {
+    try {
+      for (let i = 0; i < missingLikerDids.length; i += 25) {
+        const chunk = missingLikerDids.slice(i, i + 25);
+        const pRes = await publicAgent.app.bsky.actor.getProfiles({ actors: chunk });
+        pRes.data.profiles.forEach((p: any) => profilesMap.set(p.did, p));
+      }
+    } catch (e) { console.error('Failed to fetch liker profiles', e); }
+  }
+
+  // Merge likes into stats: count + ❤️ group + recentReactors (dedupe by did)
+  topTrackKeys.forEach((key) => {
+    const stat = trackStats.get(key)!;
+    if (!stat.likeCount || !stat.likerDids) return;
+    stat.count += stat.likeCount;
+    if (!stat.reactions[HEART]) stat.reactions[HEART] = [];
+    stat.likerDids.forEach((d) => {
+      const prof = profilesMap.get(d) || { did: d, handle: 'unknown' };
+      if (!stat.reactions[HEART].find((u: any) => u.did === d)) {
+        stat.reactions[HEART].push({ did: d, handle: prof.handle, avatar: prof.avatar, displayName: prof.displayName, reactionUri: undefined });
+      }
+      if (!stat.authors.find((a: any) => a.did === d)) stat.authors.push(prof);
+    });
   });
 
   const hotTracks = Array.from(trackStats.values())

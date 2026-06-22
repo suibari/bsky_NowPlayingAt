@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from "svelte";
   import { Plus, Loader2 } from "lucide-svelte";
-  import { getBacklinks } from "$lib/constellation";
+  import { getBacklinks, getPostLikes } from "$lib/constellation";
   import {
     hydrateReactions,
     createReactionRecord,
@@ -16,6 +16,9 @@
   import { get } from "svelte/store";
 
   export let subjectUri: string;
+  // AT-URI of the Bluesky post backing this track, if any. When set, the post's
+  // app.bsky.feed.like likers are merged into the ❤️ reaction group.
+  export let postUri: string | undefined = undefined;
   // Metadata for creating the reaction record
   export let track: Track | undefined = undefined;
   export let playlist:
@@ -81,10 +84,13 @@
     if (!subjectUri) return;
     loadingReactions = true;
     try {
-      // Parallel fetch: Indexer (Everyone) + PDS (Me)
-      const [res, myReaction] = await Promise.all([
+      // Parallel fetch: Indexer (Everyone) + PDS (Me) + Bluesky post likes
+      const [res, myReaction, likes] = await Promise.all([
         getBacklinks(subjectUri, REACTION_SOURCE),
         getMyRecentReaction(subjectUri),
+        postUri
+          ? getPostLikes(postUri)
+          : Promise.resolve({ count: 0, dids: [] as string[] }),
       ]);
 
       const hydrated = await hydrateReactions(res);
@@ -97,6 +103,17 @@
           groups[record.emoji].push({ did: authorDid, uri });
         }
       });
+
+      // Merge Bluesky post likes (app.bsky.feed.like) into the ❤️ group.
+      // Likes are not our reaction records, so they carry no reactionUri (not toggleable here).
+      if (likes.dids.length > 0) {
+        if (!groups["❤️"]) groups["❤️"] = [];
+        for (const likerDid of likes.dids) {
+          if (!groups["❤️"].find((r) => r.did === likerDid)) {
+            groups["❤️"].push({ did: likerDid, uri: "" });
+          }
+        }
+      }
 
       // Merge My Reaction if missing
       if (myReaction) {

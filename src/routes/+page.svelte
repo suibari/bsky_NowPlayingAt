@@ -139,11 +139,12 @@
       if (postToBsky) {
         if (!confirm(get(t)('confirm.post', { title: track.title }))) return;
 
-        // 1. Post to Feed (blob upload happens here, get imgBlob back)
-        const { imgBlob } = await postToFeed(track);
+        // 1. Post to Feed (blob upload happens here, get imgBlob + post URI back)
+        const { imgBlob, uri } = await postToFeed(track);
 
         // 2. Write to History (PDS) with imgBlob for permanent image reference
-        await createHistoryRecord(track, imgBlob);
+        //    and postUri so Bluesky likes on the post can be aggregated later.
+        await createHistoryRecord(track, imgBlob, uri);
 
         alert(get(t)('alert.posted'));
       } else {

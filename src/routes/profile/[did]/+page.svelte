@@ -288,6 +288,7 @@
           {#each history as item, i}
             <TrackCard
               track={mapHistoryToTrack(item)}
+              postUri={item.value.postUri}
               showDelete={isOwner}
               index={i}
               on:addToPlaylist={(e) => openPlaylistModal(e.detail)}

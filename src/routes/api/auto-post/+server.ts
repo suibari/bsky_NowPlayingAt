@@ -102,7 +102,7 @@ export const POST: RequestHandler = async (event) => {
     };
   }
 
-  await agent.post(postRecord);
+  const postRes = await agent.post(postRecord);
 
   // Also record to PDS history (non-fatal)
   try {
@@ -117,6 +117,7 @@ export const POST: RequestHandler = async (event) => {
         album: album ?? undefined,
         img: artworkUrl ?? undefined,
         imgBlob: imgBlob ?? undefined,
+        postUri: postRes?.uri ?? undefined,
         postedAt: new Date().toISOString(),
       },
     });

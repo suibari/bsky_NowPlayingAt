@@ -5,6 +5,8 @@ export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 // Constellation Source Path
 export const REACTION_SOURCE = `${NSID_REACTION}:subjectUri`;
+// Bluesky likes pointing at a post: app.bsky.feed.like record's `subject.uri` field.
+export const LIKE_SOURCE = 'app.bsky.feed.like:subject.uri';
 
 export interface Track {
   provider?: string;
@@ -24,6 +26,9 @@ export interface HistoryRecord extends Track {
   $type: typeof NSID_HISTORY;
   comment?: string;
   postedAt: string;
+  // AT-URI of the Bluesky post (app.bsky.feed.post) created for this track, if posted.
+  // Used to aggregate app.bsky.feed.like via Constellation backlinks.
+  postUri?: string;
 }
 
 export interface ReactionRecord extends Partial<Track> {
