@@ -553,14 +553,6 @@
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                 {#each hotTracks.slice(0, hotLimit) as track}
                   <div class="relative group">
-                    {#if track.trending}
-                      <div
-                        class="absolute -top-2 -left-2 z-10 px-2 py-0.5 rounded-full bg-orange-500 text-black text-xs font-black shadow-lg border border-black flex items-center gap-1"
-                      >
-                        🔥 {$t('hot.trending')}
-                      </div>
-                    {/if}
-
                     <TrackCard
                       track={{
                         id: track.trackUri, // Use Uri as ID
@@ -589,6 +581,12 @@
                       <span class="text-green-500 font-bold"
                         >{track.reactionCount} reactions</span
                       >
+                      {#if track.trending}
+                        <span
+                          class="px-2 py-0.5 rounded-full bg-orange-500 text-black text-[10px] font-black"
+                          >🔥 {$t('hot.trending')}</span
+                        >
+                      {/if}
                       {#if track.recentReactors && track.recentReactors.length > 0}
                         <div class="flex -space-x-1">
                           {#each track.recentReactors as u}
