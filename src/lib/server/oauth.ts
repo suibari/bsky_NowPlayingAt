@@ -65,6 +65,19 @@ function toDpopKeyStore(store: {
         throw new Error(SECP256K1_DELETED);
       }
       const dpopKey = await JoseKey.fromJWK(dpopJwk);
+      // Sessions whose row was last written by a public-client flow (a localhost
+      // dev login against a shared session store, or a pre-confidential-migration
+      // login) persist authMethod {method:'none'}. The library refreshes using the
+      // STORED authMethod, so under the now-confidential client it sends no
+      // client_assertion and the AS rejects with
+      // `invalid_request: ... required a "client_assertion"`. Replacing 'none' with
+      // the 'legacy' sentinel makes the library re-negotiate against the CURRENT
+      // client metadata (oauth-server-factory.fromIssuer): in production that
+      // resolves to private_key_jwt and the refresh authenticates correctly (then
+      // persists the upgraded authMethod); in local dev it resolves back to 'none'.
+      if ((data as any).authMethod?.method === 'none') {
+        (data as any).authMethod = 'legacy';
+      }
       return { ...data, dpopKey };
     },
     del: (sub: string) => store.del(sub),
@@ -232,6 +245,26 @@ export async function restoreOAuthSession(client: OAuthClient, sub: string, even
       // Transient alg mismatch (e.g. stale metadata cache). Preserve the session.
       console.error('[oauth] DPoP alg mismatch for', sub, '— may be transient');
       throw svelteKitError(503, 'Authentication temporarily unavailable. Please try again.');
+    }
+    // Safety net for the confidential-client auth mismatch: the AS rejects the
+    // refresh with `invalid_request` because the request carried no (or an
+    // unusable) client_assertion. This is an OAuthResponseError, which the library
+    // does NOT treat as invalid_grant, so it neither deletes the session nor retries
+    // — leaving it to recur as HTTP 500 forever. (The primary fix above upgrades
+    // 'none' sessions so this shouldn't trigger; if it still does, the session can't
+    // be refreshed and a clean re-login is the only resolution.) Delete the stale
+    // row ourselves and sign the user out cleanly.
+    const isClientAuthError =
+      !!err && typeof err === 'object' &&
+      (err as any).error === 'invalid_request' &&
+      /client_assertion|private_key_jwt/.test(
+        (err as any).errorDescription ?? (err as any).message ?? '',
+      );
+    if (isClientAuthError) {
+      console.error('[oauth] client auth rejected on refresh for', sub, '— deleting session');
+      await delOAuthSession(sub).catch(() => {});
+      clearDidCookie(event);
+      throw svelteKitError(401, 'Session expired. Please log in again.');
     }
     throw err;
   } finally {
