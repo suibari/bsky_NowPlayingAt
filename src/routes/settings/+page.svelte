@@ -1,7 +1,7 @@
 <script lang="ts">
   import { userProfile, authState, agent } from "$lib/stores";
   import { signOut } from "$lib/atproto";
-  import { LogOut, ArrowLeft, Music, Loader2, Globe } from "lucide-svelte";
+  import { LogOut, Music, Loader2, Globe } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { get } from "svelte/store";
@@ -80,12 +80,9 @@
 <div class="min-h-screen p-6 max-w-2xl mx-auto">
   <a
     href="/"
-    class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 mb-8 transition-colors"
+    class="inline-block text-3xl font-black text-white tracking-tighter hover:opacity-80 transition-opacity mb-8"
   >
-    <ArrowLeft size={20} />
-    <span class="font-black tracking-tighter"
-      >なうぷれ<span class="text-green-500">あっと</span></span
-    >
+    なうぷれ<span class="text-green-500">あっと</span>
   </a>
 
   <h1 class="text-3xl font-black text-white mb-8">{$t('settings.title')}</h1>

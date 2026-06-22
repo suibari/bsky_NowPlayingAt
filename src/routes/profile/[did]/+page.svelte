@@ -161,25 +161,9 @@
   <div class="flex justify-between items-center mb-6">
     <a
       href="/"
-      class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 transition-colors"
+      class="inline-block text-3xl font-black text-white tracking-tighter hover:opacity-80 transition-opacity"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        ><line x1="19" y1="12" x2="5" y2="12" /><polyline
-          points="12 19 5 12 12 5"
-        /></svg
-      >
-      <span class="font-black tracking-tighter"
-        >なうぷれ<span class="text-green-500">あっと</span></span
-      >
+      なうぷれ<span class="text-green-500">あっと</span>
     </a>
 
     {#if isOwner}
