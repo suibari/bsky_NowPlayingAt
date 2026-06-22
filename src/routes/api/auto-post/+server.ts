@@ -10,7 +10,6 @@ import { processImage } from '$lib/server/image';
 
 const SITE_ORIGIN = 'https://nowplayingat.suibari.com';
 const SITE_LABEL = 'なうぷれあっと';
-const LFM_LABEL = 'lastfm';
 const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 
 export const POST: RequestHandler = async (event) => {
@@ -31,7 +30,6 @@ export const POST: RequestHandler = async (event) => {
   const agent = new Agent(session);
 
   const userSession = await getSession(did);
-  const customText = userSession?.custom_text?.trim() || '';
   const attachImage = userSession?.attach_image ?? true;
 
   // Discogs で track 取得（artworkUrl + trackUri）
@@ -42,16 +40,14 @@ export const POST: RequestHandler = async (event) => {
   // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA → Discogs（優先順位順）
   let thumbBlob: any = undefined;
   let imgBlob: string | undefined = undefined;
-  let thumbAspectRatio: { width: number; height: number } | undefined;
-  const { artworkUrl, lastFmUrl } = await resolveArtworkUrl(
+  const { artworkUrl } = await resolveArtworkUrl(
     artist, title, album, track?.artworkUrl || undefined,
   ).catch(() => ({ artworkUrl: undefined, lastFmUrl: undefined }));
   if (attachImage && artworkUrl) {
     try {
       const res = await fetch(artworkUrl);
       if (res.ok) {
-        const { blob, width, height } = await processImage(await res.blob());
-        thumbAspectRatio = width && height ? { width, height } : undefined;
+        const { blob } = await processImage(await res.blob());
         const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
         thumbBlob = uploadRes.data.blob;
         imgBlob = `${session.server.issuer}/xrpc/com.atproto.sync.getBlob?did=${did}&cid=${thumbBlob.ref.toString()}`;
@@ -60,47 +56,22 @@ export const POST: RequestHandler = async (event) => {
       console.warn('[auto-post] thumbnail upload failed:', e);
     }
   }
-  const customLine = customText ? `\n${customText}` : '';
-
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
-  const viaLine = lastFmUrl
-    ? `💿via ${SITE_LABEL} / ${LFM_LABEL}`
-    : `💿via ${SITE_LABEL}`;
-  const rawText = `🎵 Now Playing\n${title}\n${artist}${album ? `\n${album}` : ''}${customLine}\n\n#NowPlaying #なうぷれ #なうぷれあっと\n\n${viaLine}`;
+  const rawText = `💿 ${title} - ${artist}\n#NowPlaying #なうぷれ`;
 
   const rt = new RichText({ text: rawText });
   await rt.detectFacets(agent);
 
-  const enc = new TextEncoder();
-  if (!rt.facets) rt.facets = [];
-
-  // なうぷれあっと → プロフィールリンク（via 行の最後の出現位置を使う）
-  const siteIdx = rawText.lastIndexOf(SITE_LABEL);
-  const siteStartByte = enc.encode(rawText.substring(0, siteIdx)).byteLength;
-  const siteEndByte = siteStartByte + enc.encode(SITE_LABEL).byteLength;
-  rt.facets.push({
-    index: { byteStart: siteStartByte, byteEnd: siteEndByte },
-    features: [{ $type: 'app.bsky.richtext.facet#link', uri: profileUrl }],
-  });
-
-  // lastfm → Last.fm トラックリンク（取得できた場合のみ）
-  if (lastFmUrl) {
-    const lfmIdx = rawText.lastIndexOf(LFM_LABEL);
-    const lfmStartByte = enc.encode(rawText.substring(0, lfmIdx)).byteLength;
-    const lfmEndByte = lfmStartByte + enc.encode(LFM_LABEL).byteLength;
-    rt.facets.push({
-      index: { byteStart: lfmStartByte, byteEnd: lfmEndByte },
-      features: [{ $type: 'app.bsky.richtext.facet#link', uri: lastFmUrl }],
-    });
-  }
-
   const postRecord: any = { text: rt.text, facets: rt.facets, langs: ['ja'], createdAt: new Date().toISOString() };
-  if (thumbBlob) {
-    postRecord.embed = {
-      $type: 'app.bsky.embed.images',
-      images: [{ image: thumbBlob, alt: `${title} - ${artist}`, aspectRatio: thumbAspectRatio }],
-    };
-  }
+  postRecord.embed = {
+    $type: 'app.bsky.embed.external',
+    external: {
+      uri: profileUrl,
+      title: `${title} - ${artist}`,
+      description: SITE_LABEL,
+      thumb: thumbBlob,
+    },
+  };
 
   const postRes = await agent.post(postRecord);
 
