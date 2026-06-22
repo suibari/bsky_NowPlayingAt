@@ -10,6 +10,7 @@
     addToPlaylist,
     getGlobalTimeline,
     getHotContent,
+    songKey,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import TrackCard from "$lib/components/TrackCard.svelte";
@@ -160,7 +161,7 @@
     const track = e.detail?.track;
     const emoji = e.detail?.emoji;
     if (!me || !track || !emoji) return;
-    const subjectUri = track.trackUri;
+    const subjectUri = track.trackUri || songKey(track.artist, track.title);
     if (
       optimisticItems.some(
         (o) =>
@@ -484,6 +485,7 @@
                   on:nowPlaying={(e) =>
                     executeNowPlaying(e.detail.track, e.detail.postToBsky)}
                   on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                  on:reaction={handleDiscoveryReaction}
                 />
               {/each}
             </div>

@@ -331,7 +331,7 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
 
 // Stable per-song key. Auto-posts (Last.fm) have no trackUri, so we key songs by
 // normalized artist::title and fall back to trackUri/subjectUri only if both empty.
-function songKey(artist?: string, track?: string, fallback?: string): string {
+export function songKey(artist?: string, track?: string, fallback?: string): string {
   const a = (artist || '').trim().toLowerCase();
   const t = (track || '').trim().toLowerCase();
   if (a || t) return `song:${a}::${t}`;

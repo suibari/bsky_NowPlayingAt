@@ -11,10 +11,16 @@
     Plus,
   } from "lucide-svelte";
   import { resolveLinks } from "$lib/odesli";
+  import { songKey } from "$lib/bsky";
   import ReactionBar from "$lib/components/ReactionBar.svelte";
   import { t } from "$lib/i18n";
 
   export let track: Track;
+
+  // Some tracks (e.g. Last.fm auto-posts surfaced in What's hot) have no trackUri.
+  // Fall back to a stable song key so reactions still have a valid, aggregatable
+  // subject instead of sending an empty subjectUri (which the API rejects with 400).
+  $: reactionSubjectUri = track.trackUri || songKey(track.artist, track.title);
   // AT-URI of the Bluesky post backing this track (history cards only).
   // Forwarded to ReactionBar so post likes are merged into reactions.
   export let postUri: string | undefined = undefined;
@@ -273,7 +279,7 @@
     >
       <!-- Reactions Showcase -->
       <ReactionBar
-        subjectUri={track.trackUri}
+        subjectUri={reactionSubjectUri}
         {postUri}
         {track}
         initialReactions={reactionGroups}
