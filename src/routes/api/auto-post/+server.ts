@@ -1,4 +1,4 @@
-import { json, error } from '@sveltejs/kit';
+import { json, error, isHttpError } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
@@ -26,7 +26,7 @@ export const POST: RequestHandler = async (event) => {
   const warnings: string[] = [];
 
   try {
-  const oauthClient = createOAuthClient(event.url.origin);
+  const oauthClient = await createOAuthClient(event.url.origin);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
@@ -129,6 +129,13 @@ export const POST: RequestHandler = async (event) => {
   return json({ ok: true, warnings: warnings.length ? warnings : undefined });
 
   } catch (e) {
+    // restoreOAuthSession throws SvelteKit HttpError (401 dead session / 503 transient).
+    // These are not `instanceof Error`, so honor their status instead of always 500ing.
+    if (isHttpError(e)) {
+      const message = typeof e.body === 'object' && e.body ? e.body.message : String(e.body);
+      console.warn(`[auto-post] ${e.status}:`, message);
+      return json({ ok: false, error: message }, { status: e.status });
+    }
     const message = e instanceof Error ? e.message : String(e);
     const stack = e instanceof Error ? e.stack : undefined;
     console.error('[auto-post] error:', e);

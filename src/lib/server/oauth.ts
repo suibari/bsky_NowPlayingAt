@@ -3,6 +3,7 @@
 import { OAuthClient } from '@atproto/oauth-client';
 import { error as svelteKitError } from '@sveltejs/kit';
 import type { RequestEvent } from '@sveltejs/kit';
+import { env } from '$env/dynamic/private';
 import { JoseKey } from '@atproto/jwk-jose';
 import { AtprotoDohHandleResolver } from '@atproto-labs/handle-resolver';
 import {
@@ -125,7 +126,29 @@ const handleResolver = new AtprotoDohHandleResolver({
   fetch: cfFetch,
 });
 
-function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
+// Confidential client signing key (private JWK in env). Used for `private_key_jwt`
+// client authentication at the token endpoint. The matching PUBLIC key is published
+// in static/client-metadata.json under `jwks` (same `kid`). Loaded once and cached.
+// NOTE: $env/dynamic/private must be read inside a request scope on CF Workers, so
+// this is lazily resolved on first createOAuthClient() call rather than at module init.
+let clientKeyPromise: Promise<JoseKey> | undefined;
+function getClientKey(): Promise<JoseKey> {
+  if (!clientKeyPromise) {
+    const raw = env.OAUTH_PRIVATE_KEY_JWK;
+    if (!raw) throw new Error('OAUTH_PRIVATE_KEY_JWK is not set');
+    clientKeyPromise = JoseKey.fromJWK(JSON.parse(raw)).catch((err) => {
+      // Reset so a later request can retry instead of caching a rejected promise.
+      clientKeyPromise = undefined;
+      throw err;
+    });
+  }
+  return clientKeyPromise;
+}
+
+function makeClient(
+  clientMetadata: Record<string, unknown>,
+  keyset?: Iterable<JoseKey>,
+): OAuthClient {
   return new OAuthClient({
     fetch: cfFetch,
     handleResolver,
@@ -133,6 +156,7 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
     stateStore,
     sessionStore,
     clientMetadata,
+    keyset,
     responseMode: 'query',
   } as any);
 }
@@ -141,15 +165,28 @@ function makeClient(clientMetadata: Record<string, unknown>): OAuthClient {
 // Pass `event` so that broken sessions also clear the browser `did` cookie,
 // forcing a clean sign-out without the user having to click sign-out manually.
 export async function restoreOAuthSession(client: OAuthClient, sub: string, event: RequestEvent) {
+  // The library deletes a session (and dispatches a 'deleted' event) when its
+  // refresh token is revoked/expired/invalid — i.e. the session is permanently
+  // dead and the user must re-authenticate. Listen for that, scoped to this sub,
+  // so we can sign the user out cleanly regardless of the underlying error
+  // message (TokenRefreshError messages vary and the classes aren't exported).
+  let sessionDeleted = false;
+  const onDeleted = (e: any) => { if (e?.detail?.sub === sub) sessionDeleted = true; };
+  (client as any).addEventListener?.('deleted', onDeleted);
   try {
     return await client.restore(sub);
   } catch (err) {
-    if (err instanceof Error && (
-      err.message === SECP256K1_DELETED ||
-      // Session was already deleted from DB (by our handler or externally).
-      // The `did` cookie is stale — clear it so the user only needs to sign in.
-      err.message === 'The session was deleted by another process'
-    )) {
+    // Dead session — clear the stale `did` cookie so the user is signed out and
+    // only needs to sign in again. Covers:
+    //   - the 'deleted' event fired during restore (delete succeeded), and
+    //   - AggregateError 'Error while deleting stored value' (refresh failed AND
+    //     the cleanup delete threw, so no 'deleted' event was dispatched), and
+    //   - secp256k1 keys unusable in CF Workers.
+    const isDeadSession =
+      sessionDeleted ||
+      (err instanceof AggregateError && err.message === 'Error while deleting stored value') ||
+      (err instanceof Error && err.message === SECP256K1_DELETED);
+    if (isDeadSession) {
       clearDidCookie(event);
       throw svelteKitError(401, 'Session expired. Please log in again.');
     }
@@ -162,10 +199,12 @@ export async function restoreOAuthSession(client: OAuthClient, sub: string, even
       throw svelteKitError(503, 'Authentication temporarily unavailable. Please try again.');
     }
     throw err;
+  } finally {
+    (client as any).removeEventListener?.('deleted', onDeleted);
   }
 }
 
-export function createOAuthClient(origin: string): OAuthClient {
+export async function createOAuthClient(origin: string): Promise<OAuthClient> {
   // Only http: origins (localhost / 127.0.0.1) are local dev.
   // https: origins — including Cloudflare Pages Preview — use the production client.
   const isLocal = new URL(origin).protocol === 'http:';
@@ -191,6 +230,14 @@ export function createOAuthClient(origin: string): OAuthClient {
   // For production AND Preview (any https: origin), use the production client_id.
   // The redirect_uri uses the actual request origin so Preview callbacks work,
   // but it must also be listed in /client-metadata.json on PROD_ORIGIN.
+  //
+  // Confidential client: authenticate at the token endpoint with `private_key_jwt`
+  // using the signing key from env. This raises the session lifetime from the
+  // public-client cap (2 weeks) to effectively unlimited (refresh tokens up to
+  // 180 days), fixing the ~1-day session death seen in auto-post. The `jwks` is
+  // omitted here — validateClientMetadata derives it from the keyset, and the
+  // public keys are also published in static/client-metadata.json for the PDS.
+  const clientKey = await getClientKey();
   const redirectUri = `${origin}/oauth/callback`;
   return makeClient({
     client_id: `${PROD_ORIGIN}/client-metadata.json`,
@@ -200,8 +247,9 @@ export function createOAuthClient(origin: string): OAuthClient {
     scope: SCOPE,
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
-    token_endpoint_auth_method: 'none',
+    token_endpoint_auth_method: 'private_key_jwt',
+    token_endpoint_auth_signing_alg: 'ES256',
     application_type: 'web',
     dpop_bound_access_tokens: true,
-  });
+  }, [clientKey]);
 }

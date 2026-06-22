@@ -9,7 +9,7 @@ export const GET: RequestHandler = async (event) => {
   const params = event.url.searchParams;
 
   try {
-    const oauthClient = createOAuthClient(event.url.origin);
+    const oauthClient = await createOAuthClient(event.url.origin);
     const { session } = await oauthClient.callback(params);
     const did = session.did;
 

@@ -7,7 +7,7 @@ export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
   if (did) {
     try {
-      const oauthClient = createOAuthClient(event.url.origin);
+      const oauthClient = await createOAuthClient(event.url.origin);
       await oauthClient.revoke(did);
     } catch {
       // ignore revoke failures

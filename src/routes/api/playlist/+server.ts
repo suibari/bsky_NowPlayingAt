@@ -7,7 +7,7 @@ import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 async function getAgent(did: string, event: RequestEvent) {
-  const oauthClient = createOAuthClient(event.url.origin);
+  const oauthClient = await createOAuthClient(event.url.origin);
   const session = await restoreOAuthSession(oauthClient, did, event);
   return new Agent(session);
 }

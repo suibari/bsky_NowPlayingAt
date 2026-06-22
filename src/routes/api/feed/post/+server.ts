@@ -13,7 +13,7 @@ export const POST: RequestHandler = async (event) => {
 
   const { track, text } = await event.request.json();
 
-  const oauthClient = createOAuthClient(event.url.origin);
+  const oauthClient = await createOAuthClient(event.url.origin);
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 

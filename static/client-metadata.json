@@ -14,7 +14,21 @@
   "response_types": [
     "code"
   ],
-  "token_endpoint_auth_method": "none",
+  "token_endpoint_auth_method": "private_key_jwt",
+  "token_endpoint_auth_signing_alg": "ES256",
   "application_type": "web",
-  "dpop_bound_access_tokens": true
+  "dpop_bound_access_tokens": true,
+  "jwks": {
+    "keys": [
+      {
+        "kty": "EC",
+        "kid": "nowplayingat-1782093461078",
+        "crv": "P-256",
+        "x": "7A3EuE6k6KLn5RNbTnGJ_P73I7931lLuA9B6hnBKd2I",
+        "y": "KSC4-3ikIUntnRcetekrFKdhkNhuSsz2e_LPNSyUINQ",
+        "use": "sig",
+        "alg": "ES256"
+      }
+    ]
+  }
 }

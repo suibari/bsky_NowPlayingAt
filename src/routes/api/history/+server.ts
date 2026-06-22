@@ -12,7 +12,7 @@ export const POST: RequestHandler = async (event) => {
 
   const { imgBlob, ...track } = await event.request.json();
 
-  const oauthClient = createOAuthClient(event.url.origin);
+  const oauthClient = await createOAuthClient(event.url.origin);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
@@ -47,7 +47,7 @@ export const DELETE: RequestHandler = async (event) => {
 
   const { rkey } = await event.request.json();
 
-  const oauthClient = createOAuthClient(event.url.origin);
+  const oauthClient = await createOAuthClient(event.url.origin);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
