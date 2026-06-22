@@ -3,7 +3,6 @@ import type { RequestHandler } from './$types';
 import { Agent, RichText } from '@atproto/api';
 import { getDid } from '$lib/server/session';
 import { createOAuthClient } from '$lib/server/oauth';
-import { publicAgent } from '$lib/atproto';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 import { processImage } from '$lib/server/image';
 
@@ -45,32 +44,10 @@ export const POST: RequestHandler = async (event) => {
     }
   }
 
-  const profile = await publicAgent.getProfile({ actor: did });
-  const profileLink = `https://nowplayingat.suibari.com/profile/${did}`;
-  const linkLabel = '💿なうぷれあっとで見る';
-  const comment = text || track.comment;
-
-  const segments = [
-    '#NowPlaying #なうぷれ',
-    comment ? `\n\n${comment}` : '',
-    `\n\n${track.title} - ${track.artist}\n`,
-    linkLabel,
-  ];
-  const finalString = segments.join('');
+  const finalString = `💿 ${track.title} - ${track.artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
 
   const rt = new RichText({ text: finalString });
   await rt.detectFacets(agent);
-
-  const enc = new TextEncoder();
-  const linkStart = finalString.indexOf(linkLabel);
-  const startByte = enc.encode(finalString.substring(0, linkStart)).byteLength;
-  const endByte = startByte + enc.encode(linkLabel).byteLength;
-
-  if (!rt.facets) rt.facets = [];
-  rt.facets.push({
-    index: { byteStart: startByte, byteEnd: endByte },
-    features: [{ $type: 'app.bsky.richtext.facet#link', uri: profileLink }],
-  });
 
   const res = await agent.post({
     text: rt.text,
