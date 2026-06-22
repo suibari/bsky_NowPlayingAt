@@ -299,6 +299,15 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
 
 // --- HOT CONTENT ---
 
+// Stable per-song key. Auto-posts (Last.fm) have no trackUri, so we key songs by
+// normalized artist::title and fall back to trackUri/subjectUri only if both empty.
+function songKey(artist?: string, track?: string, fallback?: string): string {
+  const a = (artist || '').trim().toLowerCase();
+  const t = (track || '').trim().toLowerCase();
+  if (a || t) return `song:${a}::${t}`;
+  return fallback || '';
+}
+
 export async function getHotContent() {
   const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
   const uniqueDids = new Set(backlinks.map(b => b.did));
@@ -311,8 +320,9 @@ export async function getHotContent() {
 
   const reactions: any[] = [];
   const profilesMap = new Map<string, any>();
-  // trackUri -> set of Bluesky post AT-URIs (one song can be posted by many users)
-  const trackPostUris = new Map<string, Set<string>>();
+  // songKey -> { Bluesky post AT-URIs, representative metadata for display }
+  // Includes Last.fm auto-posts (no trackUri) so their likes can surface too.
+  const songPosts = new Map<string, { postUris: Set<string>, meta: any }>();
 
   try {
     const chunks = [];
@@ -335,20 +345,21 @@ export async function getHotContent() {
       });
     } catch { /* ignore */ }
 
-    // Collect trackUri -> postUri so Bluesky likes can be aggregated per song.
+    // Collect song -> postUris (incl. auto-posts without trackUri) for like aggregation.
     try {
       const hRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_HISTORY, limit: 100 });
       hRes.data.records.forEach((r: any) => {
         const v = r.value || {};
-        if (v.trackUri && v.postUri) {
-          if (!trackPostUris.has(v.trackUri)) trackPostUris.set(v.trackUri, new Set());
-          trackPostUris.get(v.trackUri)!.add(v.postUri);
-        }
+        if (!v.postUri) return;
+        const key = songKey(v.artist, v.track, v.trackUri);
+        if (!key) return;
+        if (!songPosts.has(key)) songPosts.set(key, { postUris: new Set(), meta: v });
+        songPosts.get(key)!.postUris.add(v.postUri);
       });
     } catch { /* ignore */ }
   }));
 
-  const trackStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]>, likeCount?: number, likerDids?: string[] }>();
+  const trackStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
   const playlistStats = new Map<string, { count: number, record: any, authors: any[], reactions: Record<string, any[]> }>();
 
   reactions.forEach(r => {
@@ -357,10 +368,13 @@ export async function getHotContent() {
       const key = r.playlist.uri;
       if (!playlistStats.has(key)) playlistStats.set(key, { count: 0, record: r, authors: [], reactions: {} });
       stat = playlistStats.get(key)!;
-    } else if ((r.kind === 'track' || !r.kind) && r.subjectUri) {
-      const key = r.subjectUri;
-      if (!trackStats.has(key)) trackStats.set(key, { count: 0, record: r, authors: [], reactions: {} });
-      stat = trackStats.get(key)!;
+    } else if (r.kind === 'track' || !r.kind) {
+      // Reaction records store subjectUri = the track's web URL (trackUri).
+      const key = songKey(r.artist, r.track, r.subjectUri);
+      if (key) {
+        if (!trackStats.has(key)) trackStats.set(key, { count: 0, record: { ...r, trackUri: r.trackUri ?? r.subjectUri }, authors: [], reactions: {} });
+        stat = trackStats.get(key)!;
+      }
     }
     if (stat) {
       stat.count++;
@@ -372,34 +386,44 @@ export async function getHotContent() {
   });
 
   // --- Aggregate Bluesky post likes (app.bsky.feed.like) per song ---
-  // For the top tracks (by in-app reactions), sum likes across every post of
-  // that song and merge likers into the ❤️ group + reaction count.
-  const LIKE_TRACK_LIMIT = 30;      // only enrich the top N tracks (cost bound)
-  const MAX_POSTS_PER_TRACK = 10;   // cap posts queried per song
+  // Walk every song that has a Bluesky post (incl. Last.fm auto-posts with no
+  // trackUri), sum likes across its posts, and either merge into the matching
+  // reaction entry or create a "like-only" hot entry keyed by artist::title.
+  const MAX_POSTS_PER_SONG = 5;     // cap posts queried per song
+  const LIKE_QUERY_BUDGET = 150;    // overall cap on getPostLikes calls
   const HEART = '❤️';
 
-  const topTrackKeys = Array.from(trackStats.entries())
-    .sort((a, b) => b[1].count - a[1].count)
-    .slice(0, LIKE_TRACK_LIMIT)
-    .map(([key]) => key);
+  // Prioritize already-trending songs (more in-app reactions first).
+  const songEntries = Array.from(songPosts.entries()).sort((a, b) => {
+    const ca = trackStats.get(a[0])?.count ?? 0;
+    const cb = trackStats.get(b[0])?.count ?? 0;
+    return cb - ca;
+  });
 
+  let budget = LIKE_QUERY_BUDGET;
+  const budgetedSongs: [string, string[]][] = [];
+  for (const [key, { postUris }] of songEntries) {
+    if (budget <= 0) break;
+    const uris = Array.from(postUris).slice(0, MAX_POSTS_PER_SONG);
+    if (uris.length === 0) continue;
+    budget -= uris.length;
+    budgetedSongs.push([key, uris]);
+  }
+
+  const likeResults = new Map<string, { likeCount: number, dids: string[] }>();
   const likerDidSet = new Set<string>();
-  await Promise.all(topTrackKeys.map(async (key) => {
-    const postUris = Array.from(trackPostUris.get(key) || []).slice(0, MAX_POSTS_PER_TRACK);
-    if (postUris.length === 0) return;
-    const results = await Promise.all(postUris.map((u) => getPostLikes(u)));
-    const dids = new Set<string>();
-    let likeCount = 0;
-    results.forEach((res) => {
-      likeCount += res.count;
-      res.dids.forEach((d) => dids.add(d));
-    });
-    if (likeCount === 0) return;
-    const stat = trackStats.get(key)!;
-    stat.likeCount = likeCount;
-    stat.likerDids = Array.from(dids);
-    stat.likerDids.forEach((d) => likerDidSet.add(d));
-  }));
+  for (let i = 0; i < budgetedSongs.length; i += 25) {
+    const chunk = budgetedSongs.slice(i, i + 25);
+    await Promise.all(chunk.map(async ([key, uris]) => {
+      const results = await Promise.all(uris.map((u) => getPostLikes(u)));
+      const dids = new Set<string>();
+      let likeCount = 0;
+      results.forEach((res) => { likeCount += res.count; res.dids.forEach((d) => dids.add(d)); });
+      if (likeCount === 0) return;
+      likeResults.set(key, { likeCount, dids: Array.from(dids) });
+      dids.forEach((d) => likerDidSet.add(d));
+    }));
+  }
 
   // Fetch profiles for likers we don't already know
   const missingLikerDids = Array.from(likerDidSet).filter((d) => !profilesMap.has(d));
@@ -413,18 +437,38 @@ export async function getHotContent() {
     } catch (e) { console.error('Failed to fetch liker profiles', e); }
   }
 
-  // Merge likes into stats: count + ❤️ group + recentReactors (dedupe by did)
-  topTrackKeys.forEach((key) => {
-    const stat = trackStats.get(key)!;
-    if (!stat.likeCount || !stat.likerDids) return;
-    stat.count += stat.likeCount;
+  // Merge likes into existing reaction entries, or create like-only entries.
+  likeResults.forEach(({ likeCount, dids }, key) => {
+    let stat = trackStats.get(key);
+    if (!stat) {
+      // Like-only song (e.g. Last.fm auto-post): synthesize a record from history meta.
+      const meta = songPosts.get(key)?.meta || {};
+      stat = {
+        count: 0,
+        record: {
+          track: meta.track,
+          artist: meta.artist,
+          album: meta.album,
+          img: meta.img,
+          imgBlob: meta.imgBlob,
+          trackUri: meta.trackUri,
+          links: meta.links,
+          provider: meta.provider,
+          subjectUri: meta.trackUri,
+        },
+        authors: [],
+        reactions: {},
+      };
+      trackStats.set(key, stat);
+    }
+    stat.count += likeCount;
     if (!stat.reactions[HEART]) stat.reactions[HEART] = [];
-    stat.likerDids.forEach((d) => {
+    dids.forEach((d) => {
       const prof = profilesMap.get(d) || { did: d, handle: 'unknown' };
-      if (!stat.reactions[HEART].find((u: any) => u.did === d)) {
-        stat.reactions[HEART].push({ did: d, handle: prof.handle, avatar: prof.avatar, displayName: prof.displayName, reactionUri: undefined });
+      if (!stat!.reactions[HEART].find((u: any) => u.did === d)) {
+        stat!.reactions[HEART].push({ did: d, handle: prof.handle, avatar: prof.avatar, displayName: prof.displayName, reactionUri: undefined });
       }
-      if (!stat.authors.find((a: any) => a.did === d)) stat.authors.push(prof);
+      if (!stat!.authors.find((a: any) => a.did === d)) stat!.authors.push(prof);
     });
   });
 

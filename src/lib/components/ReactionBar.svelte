@@ -81,13 +81,17 @@
   });
 
   async function loadReactions() {
-    if (!subjectUri) return;
+    // Auto-post (Last.fm) tracks have no trackUri => no subjectUri, but they
+    // still have a postUri whose Bluesky likes we can show.
+    if (!subjectUri && !postUri) return;
     loadingReactions = true;
     try {
       // Parallel fetch: Indexer (Everyone) + PDS (Me) + Bluesky post likes
       const [res, myReaction, likes] = await Promise.all([
-        getBacklinks(subjectUri, REACTION_SOURCE),
-        getMyRecentReaction(subjectUri),
+        subjectUri
+          ? getBacklinks(subjectUri, REACTION_SOURCE)
+          : Promise.resolve([] as Awaited<ReturnType<typeof getBacklinks>>),
+        subjectUri ? getMyRecentReaction(subjectUri) : Promise.resolve(null),
         postUri
           ? getPostLikes(postUri)
           : Promise.resolve({ count: 0, dids: [] as string[] }),

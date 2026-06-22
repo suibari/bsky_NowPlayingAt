@@ -613,6 +613,7 @@
                           comment: item.record.comment,
                           provider: item.record.provider || "itunes",
                         }}
+                        postUri={item.record.postUri}
                         isProcessing={processingTrackId ===
                           item.record.trackUri}
                         on:nowPlaying={(e) =>
