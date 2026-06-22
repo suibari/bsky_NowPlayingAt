@@ -1,7 +1,7 @@
 import { get } from 'svelte/store';
 import { userProfile } from '$lib/stores';
 import { publicAgent, getPdsEndpoint } from '$lib/atproto';
-import { getBacklinks, getPostLikes } from '$lib/constellation';
+import { getBacklinks } from '$lib/constellation';
 import type { Track as MusicTrack } from '$lib/music';
 import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
 import { Agent } from '@atproto/api';
@@ -353,6 +353,30 @@ type HotStat = {
   recent24: number;     // reactions within TRENDING_WINDOW_MS, for the trending badge
 };
 
+// Fetch likes for a Bluesky post via the AppView. Unlike Constellation's count-only
+// backlinks, app.bsky.feed.like records carry a createdAt, so we can count likes
+// within the trending window precisely. Also returns liker profiles (avatar/handle),
+// avoiding a separate profile lookup. One request (first page) to keep it cheap.
+async function getPostLikesDetailed(
+  postUri: string,
+  limit = 100
+): Promise<{ count: number; recent24: number; likers: any[] }> {
+  try {
+    const res = await publicAgent.app.bsky.feed.getLikes({ uri: postUri, limit });
+    const likes = res.data.likes || [];
+    const cutoff = Date.now() - TRENDING_WINDOW_MS;
+    let recent24 = 0;
+    const likers = likes.map((l: any) => {
+      if (new Date(l.createdAt).getTime() >= cutoff) recent24++;
+      return l.actor;
+    });
+    return { count: likes.length, recent24, likers };
+  } catch (e) {
+    console.error('[bsky] getLikes failed for', postUri, e);
+    return { count: 0, recent24: 0, likers: [] };
+  }
+}
+
 export async function getHotContent(
   onProgress?: (data: { tracks: any[]; playlists: any[]; users: any[] }, done: boolean) => void
 ) {
@@ -370,7 +394,7 @@ export async function getHotContent(
   }
 
   const profilesMap = new Map<string, any>();
-  // songKey -> { Bluesky post AT-URIs, representative metadata for display }
+  // songKey -> { Bluesky post AT-URIs, representative metadata for display }.
   // Includes Last.fm auto-posts (no trackUri) so their likes can surface too.
   const songPosts = new Map<string, { postUris: Set<string>, meta: any }>();
 
@@ -548,35 +572,26 @@ export async function getHotContent(
     budgetedSongs.push([key, uris]);
   }
 
-  const likeResults = new Map<string, { likeCount: number, dids: string[] }>();
-  const likerDidSet = new Set<string>();
+  const likeResults = new Map<string, { likeCount: number, recent24: number, likers: any[] }>();
   for (let i = 0; i < budgetedSongs.length; i += 25) {
     const chunk = budgetedSongs.slice(i, i + 25);
     await Promise.all(chunk.map(async ([key, uris]) => {
-      const results = await Promise.all(uris.map((u) => getPostLikes(u)));
-      const dids = new Set<string>();
+      const results = await Promise.all(uris.map((u) => getPostLikesDetailed(u)));
+      const likersByDid = new Map<string, any>();
       let likeCount = 0;
-      results.forEach((res) => { likeCount += res.count; res.dids.forEach((d) => dids.add(d)); });
+      let recent24 = 0; // likes whose createdAt is within the trending window
+      results.forEach((res) => {
+        likeCount += res.count;
+        recent24 += res.recent24;
+        res.likers.forEach((a: any) => { if (a?.did && !likersByDid.has(a.did)) likersByDid.set(a.did, a); });
+      });
       if (likeCount === 0) return;
-      likeResults.set(key, { likeCount, dids: Array.from(dids) });
-      dids.forEach((d) => likerDidSet.add(d));
+      likeResults.set(key, { likeCount, recent24, likers: Array.from(likersByDid.values()) });
     }));
   }
 
-  // Fetch profiles for likers we don't already know
-  const missingLikerDids = Array.from(likerDidSet).filter((d) => !profilesMap.has(d));
-  if (missingLikerDids.length > 0) {
-    try {
-      for (let i = 0; i < missingLikerDids.length; i += 25) {
-        const chunk = missingLikerDids.slice(i, i + 25);
-        const pRes = await publicAgent.app.bsky.actor.getProfiles({ actors: chunk });
-        pRes.data.profiles.forEach((p: any) => profilesMap.set(p.did, p));
-      }
-    } catch (e) { console.error('Failed to fetch liker profiles', e); }
-  }
-
   // Merge likes into existing reaction entries, or create like-only entries.
-  likeResults.forEach(({ likeCount, dids }, key) => {
+  likeResults.forEach(({ likeCount, recent24, likers }, key) => {
     let stat = trackStats.get(key);
     if (!stat) {
       // Like-only song (e.g. Last.fm auto-post): synthesize a record from history meta.
@@ -601,13 +616,13 @@ export async function getHotContent(
       trackStats.set(key, stat);
     }
     stat.count += likeCount;
+    stat.recent24 += recent24; // likes within 24h (by like createdAt) count toward 急上昇
     if (!stat.reactions[HEART]) stat.reactions[HEART] = [];
-    dids.forEach((d) => {
-      const prof = profilesMap.get(d) || { did: d, handle: 'unknown' };
-      if (!stat!.reactions[HEART].find((u: any) => u.did === d)) {
-        stat!.reactions[HEART].push({ did: d, handle: prof.handle, avatar: prof.avatar, displayName: prof.displayName, reactionUri: undefined });
+    likers.forEach((a) => {
+      if (!stat!.reactions[HEART].find((u: any) => u.did === a.did)) {
+        stat!.reactions[HEART].push({ did: a.did, handle: a.handle, avatar: a.avatar, displayName: a.displayName, reactionUri: undefined });
       }
-      if (!stat!.authors.find((a: any) => a.did === d)) stat!.authors.push(prof);
+      if (!stat!.authors.find((x: any) => x.did === a.did)) stat!.authors.push(a);
     });
   });
 
