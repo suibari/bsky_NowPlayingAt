@@ -161,9 +161,9 @@
   <div class="flex justify-between items-center mb-6">
     <a
       href="/"
-      class="inline-block text-3xl font-black text-white tracking-tighter hover:opacity-80 transition-opacity"
+      class="inline-block text-3xl font-black tracking-tighter hover:opacity-80 transition-opacity"
     >
-      なうぷれ<span class="text-green-500">あっと</span>
+      <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
     </a>
 
     {#if isOwner}

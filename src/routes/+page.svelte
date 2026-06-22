@@ -326,7 +326,7 @@
   </div>
 {:else if $authState.isAuthenticated}
   <!-- DASHBOARD VIEW -->
-  <div class="p-6 max-w-5xl mx-auto min-h-screen">
+  <div class="p-6 max-w-4xl mx-auto min-h-screen">
     <!-- Header -->
     <div
       class="flex justify-between items-center mb-6 sticky top-0 bg-black/95 backdrop-blur-md z-20 py-4 border-b border-gray-800/50"
