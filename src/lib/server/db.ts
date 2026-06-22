@@ -79,6 +79,28 @@ export async function delOAuthSession(sub: string): Promise<void> {
   );
 }
 
+// --- distributed lock (oauth_locks) ---
+// Lease-based row lock backing the OAuth client's per-user refresh serialization.
+// See db/oauth_locks.sql for the table + RPC definitions.
+
+export async function tryAcquireLock(name: string, owner: string, ttlMs: number): Promise<boolean> {
+  const res = await pgFetch(`${env.POSTGREST_URL}/rpc/try_acquire_lock`, {
+    method: 'POST',
+    headers: writeHeaders(),
+    body: JSON.stringify({ p_name: name, p_owner: owner, p_ttl_ms: ttlMs }),
+  });
+  // The function returns a scalar boolean; PostgREST serialises it as `true`/`false`.
+  return (await res.json()) === true;
+}
+
+export async function releaseLock(name: string, owner: string): Promise<void> {
+  await pgFetch(`${env.POSTGREST_URL}/rpc/release_lock`, {
+    method: 'POST',
+    headers: writeHeaders(),
+    body: JSON.stringify({ p_name: name, p_owner: owner }),
+  });
+}
+
 // --- sessions (user settings for auto Now Playing) ---
 
 export interface UserSession {

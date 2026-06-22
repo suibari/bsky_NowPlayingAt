@@ -9,6 +9,7 @@ import { AtprotoDohHandleResolver } from '@atproto-labs/handle-resolver';
 import {
   setOAuthState, getOAuthState, delOAuthState,
   setOAuthSession, getOAuthSession, delOAuthSession,
+  tryAcquireLock, releaseLock,
 } from './db';
 import { clearDidCookie } from './session';
 
@@ -103,6 +104,40 @@ const runtimeImplementation = {
     const name = algorithm.name.toUpperCase().replace(/^SHA(\d)/, 'SHA-$1');
     const ab = await crypto.subtle.digest(name, bytes as unknown as BufferSource);
     return new Uint8Array(ab);
+  },
+  // Distributed lock so token refresh is serialised PER USER across Cloudflare
+  // Workers isolates. Without this, runtime.usingLock falls back to an in-isolate
+  // lock that can't see refreshes happening in another isolate, so the poller and
+  // a browser session can refresh the same user concurrently — consuming each
+  // other's single-use refresh token (`invalid_grant`) and killing the session.
+  // Providing requestLock also makes hasImplementationLock=true, which disables
+  // the library's weaker "wait 1s and re-read store" fallback (no longer needed).
+  // The lock is best-effort: if the DB is unreachable we proceed without it rather
+  // than break refresh entirely. The lease TTL covers a crashed/aborted holder.
+  requestLock: async <T>(name: string, fn: () => T | PromiseLike<T>): Promise<T> => {
+    const LOCK_TTL_MS = 30_000;   // lease length; matches the client's 30s refresh timeout
+    const RETRY_MS = 200;
+    const MAX_WAIT_MS = 15_000;   // give up waiting and proceed best-effort after this
+    const owner = crypto.randomUUID();
+    const deadline = Date.now() + MAX_WAIT_MS;
+    let held = false;
+    while (Date.now() < deadline) {
+      try {
+        held = await tryAcquireLock(name, owner, LOCK_TTL_MS);
+      } catch (e) {
+        // Lock infra hiccup must not break authentication.
+        console.warn('[oauth-lock] acquire failed, proceeding without lock:', e);
+        return await fn();
+      }
+      if (held) break;
+      await new Promise((r) => setTimeout(r, RETRY_MS));
+    }
+    if (!held) console.warn('[oauth-lock] timed out acquiring', name, '— proceeding best-effort');
+    try {
+      return await fn();
+    } finally {
+      if (held) await releaseLock(name, owner).catch(() => {});
+    }
   },
 };
 
