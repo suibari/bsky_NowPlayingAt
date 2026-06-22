@@ -57,7 +57,10 @@ export const POST: RequestHandler = async (event) => {
     }
   }
   const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
-  const rawText = `💿 ${title} - ${artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
+  const customText = userSession?.custom_text?.trim();
+  const rawText = customText
+    ? `💿 ${title} - ${artist}\n${customText}\n#NowPlaying #なうぷれ #なうぷれあっと`
+    : `💿 ${title} - ${artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
 
   const rt = new RichText({ text: rawText });
   await rt.detectFacets(agent);
