@@ -31,6 +31,8 @@
   let profile: any = null;
   let history: { uri: string; value: HistoryRecord }[] = [];
   let playlists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
+  let historyCursor: string | undefined = undefined;
+  let loadingMoreHistory = false;
   let loading = true;
   let activeTab = "playlists"; // 'playlists' | 'history'
 
@@ -61,11 +63,25 @@
 
       // 3. Get History
       const hRes = await getHistory(actorDid);
-      history = hRes;
+      history = hRes.records;
+      historyCursor = hRes.cursor;
     } catch (e) {
       console.error("Failed to load profile data", e);
     }
     loading = false;
+  }
+
+  async function loadMoreHistory() {
+    if (!did || !historyCursor || loadingMoreHistory) return;
+    loadingMoreHistory = true;
+    try {
+      const hRes = await getHistory(did, historyCursor);
+      history = [...history, ...hRes.records];
+      historyCursor = hRes.cursor;
+    } catch (e) {
+      console.error("Failed to load more history", e);
+    }
+    loadingMoreHistory = false;
   }
 
   async function handleCreatePlaylist() {
@@ -283,6 +299,23 @@
           {/each}
           {#if history.length === 0}
             <p class="text-gray-500 italic">{$t('profile.history.empty')}</p>
+          {:else if historyCursor}
+            <div class="flex justify-center pt-4">
+              <button
+                on:click={loadMoreHistory}
+                disabled={loadingMoreHistory}
+                class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {#if loadingMoreHistory}
+                  <span class="inline-flex items-center gap-2">
+                    <Loader2 class="w-4 h-4 animate-spin" />
+                    {$t('hot.loading')}
+                  </span>
+                {:else}
+                  {$t('hot.loadmore')}
+                {/if}
+              </button>
+            </div>
           {/if}
         </div>
       {/if}
