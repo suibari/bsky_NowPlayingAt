@@ -23,17 +23,24 @@ export async function createHistoryRecord(track: MusicTrack, imgBlob?: string, p
   return res.json();
 }
 
-export async function getHistory(did: string): Promise<{ uri: string, cid: string, value: HistoryRecord }[]> {
+export async function getHistory(did: string, cursor?: string): Promise<{
+  records: { uri: string, cid: string, value: HistoryRecord }[];
+  cursor?: string;
+}> {
   const pds = await getPdsEndpoint(did);
-  if (!pds) return [];
+  if (!pds) return { records: [] };
 
   const pdsAgent = new Agent({ service: pds });
   const res = await pdsAgent.com.atproto.repo.listRecords({
     repo: did,
     collection: NSID_HISTORY,
-    limit: 50
+    limit: 50,
+    cursor,
   });
-  return res.data.records as unknown as { uri: string, cid: string, value: HistoryRecord }[];
+  return {
+    records: res.data.records as unknown as { uri: string, cid: string, value: HistoryRecord }[],
+    cursor: res.data.cursor,
+  };
 }
 
 export async function deleteHistoryRecord(rkey: string) {
