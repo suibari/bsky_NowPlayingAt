@@ -19,7 +19,7 @@ export const POST: RequestHandler = async (event) => {
     throw error(401, 'Unauthorized');
   }
 
-  const { did, artist, title, album } = await event.request.json();
+  const { did, artist, title, album, skipPost } = await event.request.json();
   if (!did || !artist || !title) throw error(400, 'did, artist, title required');
 
   const warnings: string[] = [];
@@ -56,27 +56,31 @@ export const POST: RequestHandler = async (event) => {
       console.warn('[auto-post] thumbnail upload failed:', e);
     }
   }
-  const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
-  const customText = userSession?.custom_text?.trim();
-  const rawText = customText
-    ? `💿 ${title} - ${artist}\n${customText}\n#NowPlaying #なうぷれ #なうぷれあっと`
-    : `💿 ${title} - ${artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
+  // skipPost: 確率スキップ時は投稿せず history のみ登録する（再生記録だけ残す）
+  let postRes: { uri: string } | undefined;
+  if (!skipPost) {
+    const profileUrl = `${SITE_ORIGIN}/profile/${did}`;
+    const customText = userSession?.custom_text?.trim();
+    const rawText = customText
+      ? `💿 ${title} - ${artist}\n${customText}\n#NowPlaying #なうぷれ #なうぷれあっと`
+      : `💿 ${title} - ${artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
 
-  const rt = new RichText({ text: rawText });
-  await rt.detectFacets(agent);
+    const rt = new RichText({ text: rawText });
+    await rt.detectFacets(agent);
 
-  const postRecord: any = { text: rt.text, facets: rt.facets, langs: ['ja'], createdAt: new Date().toISOString() };
-  postRecord.embed = {
-    $type: 'app.bsky.embed.external',
-    external: {
-      uri: profileUrl,
-      title: `${title} - ${artist}`,
-      description: SITE_LABEL,
-      thumb: thumbBlob,
-    },
-  };
+    const postRecord: any = { text: rt.text, facets: rt.facets, langs: ['ja'], createdAt: new Date().toISOString() };
+    postRecord.embed = {
+      $type: 'app.bsky.embed.external',
+      external: {
+        uri: profileUrl,
+        title: `${title} - ${artist}`,
+        description: SITE_LABEL,
+        thumb: thumbBlob,
+      },
+    };
 
-  const postRes = await agent.post(postRecord);
+    postRes = await agent.post(postRecord);
+  }
 
   // Also record to PDS history (non-fatal)
   try {
