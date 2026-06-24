@@ -174,7 +174,7 @@
 </script>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto">
-  <div class="flex justify-between items-center mb-6">
+  <div class="topbar-layout">
     <a
       href="/"
       class="inline-block text-3xl font-black tracking-tighter hover:opacity-80 transition-opacity"

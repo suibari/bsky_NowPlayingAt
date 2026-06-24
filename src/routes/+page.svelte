@@ -354,7 +354,7 @@
   <div class="p-6 max-w-4xl mx-auto min-h-screen">
     <!-- Header -->
     <div
-      class="flex justify-between items-center mb-6 sticky top-0 bg-black/95 backdrop-blur-md z-20 py-4 border-b border-gray-800/50"
+      class="topbar-layout sticky top-0 bg-black/95 backdrop-blur-md z-20 border-b border-gray-800/50"
     >
       <button
         on:click={goHome}

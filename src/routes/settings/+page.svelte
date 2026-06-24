@@ -78,12 +78,14 @@
 </script>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto">
-  <a
-    href="/"
-    class="inline-block text-3xl font-black tracking-tighter hover:opacity-80 transition-opacity mb-8"
-  >
-    <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
-  </a>
+  <div class="topbar-layout">
+    <a
+      href="/"
+      class="inline-block text-3xl font-black tracking-tighter hover:opacity-80 transition-opacity"
+    >
+      <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
+    </a>
+  </div>
 
   <h1 class="text-3xl font-black text-white mb-8">{$t('settings.title')}</h1>
 
