@@ -358,10 +358,13 @@
     >
       <button
         on:click={goHome}
-        class="text-3xl font-black text-white tracking-tighter hover:opacity-80 transition-opacity"
+        class="flex flex-col items-center hover:opacity-80 transition-opacity"
         title="ホーム"
       >
-        なうぷれ<span class="text-green-500">あっと</span>
+        <div class="text-3xl font-black text-white tracking-tighter leading-none">
+          なうぷれ<span class="text-green-500">あっと</span>
+        </div>
+        <div class="text-[10px] text-gray-400 font-bold tracking-widest mt-1 uppercase">#NowPlaying on ATprotocol</div>
       </button>
       <div class="flex gap-4 items-center">
         <!-- Help / Info -->
@@ -913,11 +916,6 @@
         </div>
       </div>
     {/if}
-    <!-- Info Modal -->
-    <InfoModal
-      bind:show={showInfoModal}
-      on:close={() => (showInfoModal = false)}
-    />
   </div>
 {:else}
   <!-- GUEST / LOGIN VIEW -->
@@ -1010,11 +1008,11 @@
     >
       <div class="text-center mb-10">
         <h1
-          class="text-4xl sm:text-5xl font-black tracking-tighter text-white mb-2 whitespace-nowrap"
+          class="text-4xl sm:text-5xl font-black tracking-tighter text-white leading-none whitespace-nowrap"
         >
           なうぷれ<span class="text-green-500">あっと</span>
         </h1>
-        <p class="text-gray-400 text-lg">Share your vibe on AT protocol.</p>
+        <div class="text-xs sm:text-sm font-bold text-gray-500 tracking-widest uppercase mt-2 mb-2">#NowPlaying on ATprotocol</div>
         <div class="flex justify-center mt-4">
           <LangToggle />
         </div>
@@ -1051,12 +1049,28 @@
           {/if}
         </button>
       </form>
+
+      <div class="mt-6 text-center">
+        <button
+          on:click={() => (showInfoModal = true)}
+          class="text-sm text-green-500 hover:text-green-400 hover:underline font-medium transition-colors"
+        >
+          なうぷれあっとについて
+        </button>
+      </div>
+
       <div class="mt-8 text-center text-xs text-gray-500 font-medium">
         Powered by AT protocol, iTunes and Discogs
       </div>
     </div>
   </div>
 {/if}
+
+<!-- Info Modal -->
+<InfoModal
+  bind:show={showInfoModal}
+  on:close={() => (showInfoModal = false)}
+/>
 
 <style>
   .scrollbar-none {

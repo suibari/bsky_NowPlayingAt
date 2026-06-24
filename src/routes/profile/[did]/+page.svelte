@@ -177,9 +177,12 @@
   <div class="topbar-layout">
     <a
       href="/"
-      class="inline-block text-3xl font-black tracking-tighter hover:opacity-80 transition-opacity"
+      class="flex flex-col items-center hover:opacity-80 transition-opacity"
     >
-      <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
+      <div class="inline-block text-3xl font-black tracking-tighter leading-none">
+        <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
+      </div>
+      <div class="text-[10px] text-gray-400 font-bold tracking-widest mt-1 uppercase">#NowPlaying on ATprotocol</div>
     </a>
 
     {#if isOwner}
