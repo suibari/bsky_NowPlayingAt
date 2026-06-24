@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { agent, userProfile } from "$lib/stores";
+  import { agent, userProfile, authState } from "$lib/stores";
   import {
     getHistory,
     getPlaylists,
@@ -192,6 +192,21 @@
       </a>
     {/if}
   </div>
+
+  {#if !$authState.isAuthenticated}
+    <a
+      href="/"
+      class="flex items-center justify-between gap-3 mb-6 px-4 py-3 bg-green-500/10 border border-green-500/40 rounded-xl text-sm text-green-300 hover:bg-green-500/20 hover:border-green-400 transition-all group"
+    >
+      <div class="flex items-center gap-3">
+        <Music size={18} class="text-green-400 shrink-0" />
+        <span>
+          <span class="font-bold text-green-400">{$t('banner.bold')}</span>{$t('banner.desc')}
+        </span>
+      </div>
+      <span class="text-green-400 font-bold whitespace-nowrap group-hover:underline">{$t('banner.cta')}</span>
+    </a>
+  {/if}
 
   {#if loading}
     <div class="flex justify-center mt-20">
