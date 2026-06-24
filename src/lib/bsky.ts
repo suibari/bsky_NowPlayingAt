@@ -576,29 +576,56 @@ export async function getHotContent(
 
       const pdsAgent = new Agent({ service: pds });
       try {
-        const res = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_REACTION, limit: 50 });
-        res.data.records.forEach((r: any) => {
-          addReaction({ ...r.value, author: profilesMap.get(did) || { did, handle: 'unknown' }, uri: r.uri });
-        });
+        let cursor: string | undefined = undefined;
+        let keepFetching = true;
+        while (keepFetching) {
+          const res = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_REACTION, limit: 100, cursor });
+          if (res.data.records.length === 0) break;
+          for (const r of res.data.records) {
+            const v = (r.value as any) || {};
+            const ts = new Date(v.createdAt || 0).getTime();
+            if (ts < Date.now() - HOT_WEEK_MS) {
+              keepFetching = false;
+              continue;
+            }
+            addReaction({ ...v, author: profilesMap.get(did) || { did, handle: 'unknown' }, uri: r.uri });
+          }
+          cursor = res.data.cursor;
+          if (!cursor) keepFetching = false;
+        }
       } catch { /* ignore */ }
 
       // History: collect song -> postUris for like aggregation, and per-user counts for Top Users.
       // Aggregation condition: only history added within the last week is measured.
       try {
-        const hRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_HISTORY, limit: 100 });
         const us = userStats.get(did) || { profile: profilesMap.get(did) || { did, handle: 'unknown' }, count: 0, recent24: 0 };
-        hRes.data.records.forEach((r: any) => {
-          const v = r.value || {};
-          const ts = new Date(v.postedAt || v.createdAt || 0).getTime();
-          if (ts < Date.now() - HOT_WEEK_MS) return; // skip old history
-          us.count++;
-          if (ts >= Date.now() - TRENDING_WINDOW_MS) us.recent24++;
-          if (!v.postUri) return;
-          const key = songKey(v.artist, v.track, v.trackUri);
-          if (!key) return;
-          if (!songPosts.has(key)) songPosts.set(key, { postUris: new Set(), meta: v });
-          songPosts.get(key)!.postUris.add(v.postUri);
-        });
+        let cursor: string | undefined = undefined;
+        let keepFetching = true;
+        
+        while (keepFetching) {
+          const hRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_HISTORY, limit: 100, cursor });
+          if (hRes.data.records.length === 0) break;
+          
+          for (const r of hRes.data.records) {
+            const v = (r.value as any) || {};
+            const ts = new Date(v.postedAt || v.createdAt || 0).getTime();
+            if (ts < Date.now() - HOT_WEEK_MS) {
+              keepFetching = false;
+              continue;
+            }
+            us.count++;
+            if (ts >= Date.now() - TRENDING_WINDOW_MS) us.recent24++;
+            if (!v.postUri) continue;
+            const key = songKey(v.artist, v.track, v.trackUri);
+            if (!key) continue;
+            if (!songPosts.has(key)) songPosts.set(key, { postUris: new Set(), meta: v });
+            songPosts.get(key)!.postUris.add(v.postUri);
+          }
+          
+          cursor = hRes.data.cursor;
+          if (!cursor) keepFetching = false;
+        }
+        
         if (us.count > 0) userStats.set(did, us);
       } catch { /* ignore */ }
     }));
