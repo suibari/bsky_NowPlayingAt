@@ -1055,7 +1055,7 @@
           on:click={() => (showInfoModal = true)}
           class="text-sm text-green-500 hover:text-green-400 hover:underline font-medium transition-colors"
         >
-          なうぷれあっとについて
+          {$t('info.title')}
         </button>
       </div>
 
