@@ -44,7 +44,10 @@ export const POST: RequestHandler = async (event) => {
     }
   }
 
-  const finalString = `💿 ${track.title} - ${track.artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
+  const customText = text?.trim();
+  const finalString = customText
+    ? `💿 ${track.title} - ${track.artist}\n${customText}\n#NowPlaying #なうぷれ #なうぷれあっと`
+    : `💿 ${track.title} - ${track.artist}\n#NowPlaying #なうぷれ #なうぷれあっと`;
 
   const rt = new RichText({ text: finalString });
   await rt.detectFacets(agent);
