@@ -3,10 +3,6 @@ import { env } from '$env/dynamic/private';
 const MB_UA = 'NowPlayingAt/1.0 (https://nowplayingat.suibari.com)';
 const LFM_PLACEHOLDER = '2a96cbd8b46e442fc41c2b86b821562f';
 
-function isValidDiscogsUrl(url: string | undefined): url is string {
-  return !!url && url.length > 0;
-}
-
 export interface ArtworkResult {
   artworkUrl: string | undefined;
   lastFmUrl: string | undefined;
@@ -14,15 +10,13 @@ export interface ArtworkResult {
 
 /**
  * Resolve jacket image URL using a fallback chain.
- * Priority: Last.fm album.getInfo → MusicBrainz + CAA → Discogs cover_image
- * Discogs is last because its fuzzy q-search often returns mismatched releases.
+ * Priority: Last.fm album.getInfo → MusicBrainz + CAA
  * lastFmUrl is set only when artwork is obtained from Last.fm.
  */
 export async function resolveArtworkUrl(
   artist: string,
   title: string,
   album: string | undefined,
-  discogsUrl: string | undefined,
 ): Promise<ArtworkResult> {
   // 1. Last.fm album.getInfo (structured artist+album query — most accurate when album is known)
   if (album) {
@@ -72,11 +66,6 @@ export async function resolveArtworkUrl(
     }
   } catch {
     // fall through
-  }
-
-  // 3. Discogs cover_image (fuzzy fallback — may match a different release)
-  if (isValidDiscogsUrl(discogsUrl)) {
-    return { artworkUrl: discogsUrl.replace('100x100', '600x600'), lastFmUrl: undefined };
   }
 
   return { artworkUrl: undefined, lastFmUrl: undefined };

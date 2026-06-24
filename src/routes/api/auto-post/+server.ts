@@ -4,7 +4,6 @@ import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
 import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 import { getSession } from '$lib/server/db';
-import { searchTracks } from '$lib/server/music';
 import { resolveArtworkUrl } from '$lib/server/artwork';
 import { processImage } from '$lib/server/image';
 
@@ -32,16 +31,12 @@ export const POST: RequestHandler = async (event) => {
   const userSession = await getSession(did);
   const attachImage = userSession?.attach_image ?? true;
 
-  // Discogs で track 取得（artworkUrl + trackUri）
-  const tracks = await searchTracks(artist, title).catch(() => []);
-  const track = tracks[0];
-
   // auto-post は Odesli を使わずジャケット画像のみ添付する（Odesli レートリミット対策）
-  // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA → Discogs（優先順位順）
+  // ジャケット画像URL解決: Last.fm → MusicBrainz/CAA（優先順位順）
   let thumbBlob: any = undefined;
   let imgBlob: string | undefined = undefined;
   const { artworkUrl } = await resolveArtworkUrl(
-    artist, title, album, track?.artworkUrl || undefined,
+    artist, title, album,
   ).catch(() => ({ artworkUrl: undefined, lastFmUrl: undefined }));
   if (attachImage && artworkUrl) {
     try {
