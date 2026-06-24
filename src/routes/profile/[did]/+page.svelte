@@ -34,7 +34,7 @@
   let historyCursor: string | undefined = undefined;
   let loadingMoreHistory = false;
   let loading = true;
-  let activeTab = "playlists"; // 'playlists' | 'history'
+  let activeTab = "history"; // 'playlists' | 'history'
 
   // Playlist Modal State (For 'Add to Playlist' from History)
   let showPlaylistModal = false;
@@ -238,21 +238,21 @@
     <div class="flex gap-4 border-b border-gray-800 mb-6">
       <button
         class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
-        'playlists'
-          ? 'border-green-500 text-white'
-          : 'border-transparent text-gray-400 hover:text-gray-200'}"
-        on:click={() => (activeTab = "playlists")}
-      >
-        {$t('profile.tab.playlists')}
-      </button>
-      <button
-        class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
         'history'
           ? 'border-green-500 text-white'
           : 'border-transparent text-gray-400 hover:text-gray-200'}"
         on:click={() => (activeTab = "history")}
       >
         {$t('profile.tab.history')}
+      </button>
+      <button
+        class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
+        'playlists'
+          ? 'border-green-500 text-white'
+          : 'border-transparent text-gray-400 hover:text-gray-200'}"
+        on:click={() => (activeTab = "playlists")}
+      >
+        {$t('profile.tab.playlists')}
       </button>
     </div>
 
@@ -304,10 +304,10 @@
         </div>
       {:else}
         <!-- HISTORY LIST -->
-        <div class="space-y-4">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {#each history as item, i}
             <TrackCard
-              variant="bar"
+              variant="square"
               track={mapHistoryToTrack(item)}
               postUri={item.value.postUri}
               showDelete={isOwner}
@@ -317,9 +317,9 @@
             />
           {/each}
           {#if history.length === 0}
-            <p class="text-gray-500 italic">{$t('profile.history.empty')}</p>
+            <p class="text-gray-500 italic col-span-full">{$t('profile.history.empty')}</p>
           {:else if historyCursor}
-            <div class="flex justify-center pt-4">
+            <div class="flex justify-center pt-4 col-span-full">
               <button
                 on:click={loadMoreHistory}
                 disabled={loadingMoreHistory}
