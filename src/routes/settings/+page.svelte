@@ -81,9 +81,12 @@
   <div class="topbar-layout">
     <a
       href="/"
-      class="inline-block text-3xl font-black tracking-tighter hover:opacity-80 transition-opacity"
+      class="flex flex-col items-center hover:opacity-80 transition-opacity group"
     >
-      <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
+      <div class="inline-block text-3xl font-black tracking-tighter leading-none group-hover:underline decoration-green-500 underline-offset-4">
+        <span class="text-white">なうぷれ</span><span class="text-green-500">あっと</span>
+      </div>
+      <div class="text-[10px] text-gray-400 font-bold tracking-widest mt-1 uppercase">#NowPlaying on ATprotocol</div>
     </a>
   </div>
 

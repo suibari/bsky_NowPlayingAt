@@ -358,10 +358,10 @@
     >
       <button
         on:click={goHome}
-        class="flex flex-col items-center hover:opacity-80 transition-opacity"
+        class="flex flex-col items-center hover:opacity-80 transition-opacity group"
         title="ホーム"
       >
-        <div class="text-3xl font-black text-white tracking-tighter leading-none">
+        <div class="text-3xl font-black text-white tracking-tighter leading-none group-hover:underline decoration-green-500 underline-offset-4">
           なうぷれ<span class="text-green-500">あっと</span>
         </div>
         <div class="text-[10px] text-gray-400 font-bold tracking-widest mt-1 uppercase">#NowPlaying on ATprotocol</div>
