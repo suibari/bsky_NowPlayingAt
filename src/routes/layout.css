@@ -36,3 +36,7 @@ a:hover {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-accent); 
 }
+
+.topbar-layout {
+  @apply flex items-center justify-between mb-6 py-4;
+}

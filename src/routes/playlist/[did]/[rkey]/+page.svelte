@@ -233,7 +233,7 @@
 </script>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto relative">
-  <div class="flex justify-between items-center mb-6">
+  <div class="topbar-layout">
     <a
       href="/"
       class="inline-flex items-center gap-2 text-gray-500 hover:text-green-500 transition-colors"
