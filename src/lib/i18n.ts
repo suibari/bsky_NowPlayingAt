@@ -34,8 +34,12 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Main page: tabs ---
     'tab.search': '曲を探す',
+    'tab.recommend': 'おすすめ',
     'tab.hot': 'なうぷれチャート',
     'tab.discovery': 'みんなのなうぷれ',
+    'everyone.realtime': 'リアルタイム',
+    'recommend.loading': 'おすすめを読み込み中...',
+    'recommend.empty': 'フォロー中のユーザーの再生履歴がまだありません。',
     'hot.toptracks': '曲',
     'hot.topplaylists': 'プレイリスト',
     'hot.topusers': 'ユーザー',
@@ -117,6 +121,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.history.delete.failed': '再生履歴の削除に失敗しました',
 
     // --- TrackCard ---
+    'track.play': '再生する',
     'track.spotify': 'Spotifyで再生',
     'track.ytmusic': 'YouTube Musicで再生',
     'track.applemusic': 'Apple Musicで再生',
@@ -155,8 +160,12 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Main page: tabs ---
     'tab.search': 'Find Music',
+    'tab.recommend': 'For You',
     'tab.hot': 'Chart',
     'tab.discovery': "Everyone's",
+    'everyone.realtime': 'Realtime',
+    'recommend.loading': 'Loading recommendations...',
+    'recommend.empty': 'No plays from the people you follow yet.',
     'hot.toptracks': 'Tracks',
     'hot.topplaylists': 'Playlists',
     'hot.topusers': 'Users',
@@ -238,6 +247,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.history.delete.failed': 'Failed to delete',
 
     // --- TrackCard ---
+    'track.play': 'Play',
     'track.spotify': 'Play on Spotify',
     'track.ytmusic': 'Play on YouTube Music',
     'track.applemusic': 'Play on Apple Music',

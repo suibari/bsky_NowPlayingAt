@@ -9,6 +9,7 @@
     GripVertical,
     Trash2,
     Plus,
+    Play,
   } from "lucide-svelte";
   import { resolveLinks } from "$lib/odesli";
   import { songKey } from "$lib/bsky";
@@ -16,6 +17,11 @@
   import { t } from "$lib/i18n";
 
   export let track: Track;
+
+  // Layout variant:
+  //  - "square": Last.fm-style square jacket card (search / chart / feeds)
+  //  - "bar": classic horizontal bar (playlist track list / profile history)
+  export let variant: "square" | "bar" = "square";
 
   // Some tracks (e.g. Last.fm auto-posts surfaced in What's hot) have no trackUri.
   // Fall back to a stable song key so reactions still have a valid, aggregatable
@@ -40,7 +46,7 @@
   let comment = "";
 
   // Link Resolution
-  let resolvingLink: "spotify" | "ytmusic" | "appleMusic" | null = null;
+  let resolving = false;
   let cachedSpotify: string | undefined = track.spotifyUrl;
   let cachedYtMusic: string | undefined = track.youtubeMusicUrl;
   let cachedAppleMusic: string | undefined = track.appleMusicUrl;
@@ -49,59 +55,39 @@
     expanded = !expanded;
   }
 
-  async function resolveAndOpen(
-    platform: "spotify" | "ytmusic" | "appleMusic",
-  ) {
-    let targetUrl: string | undefined;
-
-    if (platform === "spotify") targetUrl = cachedSpotify;
-    else if (platform === "ytmusic") targetUrl = cachedYtMusic;
-    else if (platform === "appleMusic") targetUrl = cachedAppleMusic;
-
-    if (targetUrl) {
-      window.open(targetUrl, "_blank");
+  // Single unified play button: jump to the first available service following a
+  // fixed priority (Spotify → YouTube Music → Apple Music). Resolves missing
+  // links once via Odesli, falling back to a Spotify search.
+  async function resolveAndPlay() {
+    // 1. Use any already-known link in priority order.
+    const cached = cachedSpotify ?? cachedYtMusic ?? cachedAppleMusic;
+    if (cached) {
+      window.open(cached, "_blank");
       return;
     }
 
-    resolvingLink = platform;
+    // 2. Resolve all platform links once, then pick by priority.
+    resolving = true;
     try {
       const res = await resolveLinks(track.trackUri);
       if (res) {
-        if (platform === "spotify") {
-          cachedSpotify = res.linksByPlatform.spotify?.url;
-          targetUrl = cachedSpotify;
-        } else if (platform === "ytmusic") {
-          cachedYtMusic = res.linksByPlatform.youtubeMusic?.url;
-          targetUrl = cachedYtMusic;
-        } else if (platform === "appleMusic") {
-          cachedAppleMusic = res.linksByPlatform.appleMusic?.url;
-          targetUrl = cachedAppleMusic;
-        }
+        cachedSpotify = res.linksByPlatform.spotify?.url;
+        cachedYtMusic = res.linksByPlatform.youtubeMusic?.url;
+        cachedAppleMusic = res.linksByPlatform.appleMusic?.url;
       }
 
+      const targetUrl = cachedSpotify ?? cachedYtMusic ?? cachedAppleMusic;
       if (targetUrl) {
         window.open(targetUrl, "_blank");
       } else {
+        // 3. Fallback: Spotify search.
         const query = encodeURIComponent(`${track.artist} ${track.title}`);
-        if (platform === "spotify") {
-          window.open(`https://open.spotify.com/search/${query}`, "_blank");
-        } else if (platform === "ytmusic") {
-          window.open(`https://music.youtube.com/search?q=${query}`, "_blank");
-        } else if (platform === "appleMusic") {
-          // Apple Music search URL is slightly more complex or just use google search?
-          // Using a generic search or geo specific. iTunes link maker is hard to deep link search.
-          // Fallback to simple google search for "apple music <artist> <track>" might be better or just alert.
-          // But actually, https://music.apple.com/us/search?term= works.
-          window.open(
-            `https://music.apple.com/jp/search?term=${query}`,
-            "_blank",
-          );
-        }
+        window.open(`https://open.spotify.com/search/${query}`, "_blank");
       }
     } catch (e) {
       console.error("Link resolution failed", e);
     }
-    resolvingLink = null;
+    resolving = false;
   }
 
   function handleNowPlaying() {
@@ -125,23 +111,16 @@
 
 <!-- Card Container -->
 <div
-  class="bg-gray-900 border border-gray-800 rounded-xl p-4 transition-all duration-300 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10 group relative"
-  class:ring-2={expanded}
-  class:ring-green-500={expanded}
+  class="group relative"
   class:opacity-50={isDragging}
   role="listitem"
 >
-  <div class="flex gap-4 items-center">
-    <!-- Drag Handle -->
-    {#if showDragHandle}
-      <div class="text-gray-600 cursor-grab active:cursor-grabbing p-1 -ml-2">
-        <GripVertical size={20} />
-      </div>
-    {/if}
-
-    <!-- Artwork -->
+  {#if variant === "square"}
+    <!-- SQUARE VARIANT: Last.fm-style jacket card -->
     <div
-      class="relative w-16 h-16 flex-shrink-0 cursor-pointer"
+      class="relative aspect-square w-full rounded-xl overflow-hidden cursor-pointer bg-gray-800 ring-1 ring-gray-800 transition-all duration-300 hover:ring-green-500/50"
+      class:ring-2={expanded}
+      class:ring-green-500={expanded}
       on:click={toggleExpand}
       on:keypress={(e) => e.key === "Enter" && toggleExpand()}
       role="button"
@@ -150,131 +129,161 @@
       <img
         src={track.artworkUrl || "/placeholder_art.png"}
         alt={track.title}
-        class="w-full h-full object-cover rounded-md shadow-md bg-gray-800"
+        class="absolute inset-0 w-full h-full object-cover"
         on:error={(e) =>
           ((e.currentTarget as HTMLImageElement).src =
-            "https://placehold.co/100x100?text=No+Art")}
+            "https://placehold.co/300x300?text=No+Art")}
       />
+
+      <!-- Hover darken hint -->
       <div
-        class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md"
+        class="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors"
+      ></div>
+
+      <!-- Play button (top-left) -->
+      <button
+        on:click|stopPropagation={resolveAndPlay}
+        class="absolute top-2 left-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors active:scale-95"
+        title={$t('track.play')}
+        disabled={resolving}
       >
-        <ChevronDown class="text-white w-8 h-8" />
+        {#if resolving}
+          <Loader2 size={18} class="animate-spin" />
+        {:else}
+          <Play size={18} class="fill-current" />
+        {/if}
+      </button>
+
+      <!-- Delete / Drag handle (top-right) -->
+      {#if showDelete || showDragHandle}
+        <div class="absolute top-2 right-2 flex items-center gap-1">
+          {#if showDragHandle}
+            <div
+              class="bg-black/50 text-gray-200 rounded-full p-2 cursor-grab active:cursor-grabbing"
+              on:click|stopPropagation={() => {}}
+            >
+              <GripVertical size={18} />
+            </div>
+          {/if}
+          {#if showDelete}
+            <button
+              on:click|stopPropagation={handleDelete}
+              class="bg-black/50 hover:bg-black/70 text-red-500 rounded-full p-2 transition-colors"
+              title={$t('track.delete')}
+            >
+              <Trash2 size={18} />
+            </button>
+          {/if}
+        </div>
+      {/if}
+
+      <!-- Bottom gradient + text -->
+      <div
+        class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-3 pt-8 pointer-events-none"
+      >
+        <h3 class="font-bold text-white truncate leading-tight">
+          {track.title}
+        </h3>
+        <p class="text-gray-200 text-sm truncate">{track.artist}</p>
+        {#if track.album}
+          <p class="text-gray-400 text-xs truncate">{track.album}</p>
+        {/if}
+        {#if track.comment}
+          <p class="text-white/80 text-xs mt-1 italic truncate">
+            "{track.comment}"
+          </p>
+        {/if}
       </div>
     </div>
-
-    <!-- Meta -->
+  {:else}
+    <!-- BAR VARIANT: classic horizontal bar -->
     <div
-      class="flex-grow min-w-0 flex flex-col justify-center min-h-16 cursor-pointer"
-      on:click={toggleExpand}
+      class="bg-gray-900 border border-gray-800 rounded-xl p-4 relative flex gap-4 items-center transition-all duration-300 hover:border-green-500/50 hover:shadow-lg hover:shadow-green-900/10"
+      class:ring-2={expanded}
+      class:ring-green-500={expanded}
     >
-      <h3 class="font-bold text-white truncate text-lg leading-tight">
-        {track.title}
-      </h3>
-      <p class="text-gray-400 text-sm truncate">{track.artist}</p>
-      {#if track.album}
-        <p class="text-gray-500 text-xs truncate">{track.album}</p>
+      <!-- Drag Handle -->
+      {#if showDragHandle}
+        <div class="text-gray-600 cursor-grab active:cursor-grabbing p-1 -ml-2">
+          <GripVertical size={20} />
+        </div>
       {/if}
-      {#if track.comment}
-        <p class="text-white/80 text-sm mt-1 italic break-words line-clamp-2">
-          "{track.comment}"
-        </p>
-      {/if}
-    </div>
 
-    <!-- Quick Actions (Direct Playback) -->
-    <div class="flex gap-2 items-center" on:click|stopPropagation={() => {}}>
-      <button
-        on:click={() => resolveAndOpen("spotify")}
-        class="text-gray-400 hover:text-green-500 transition-colors p-1"
-        title={$t('track.spotify')}
-        disabled={resolvingLink === "spotify"}
+      <!-- Artwork -->
+      <div
+        class="relative w-16 h-16 shrink-0 cursor-pointer"
+        on:click={toggleExpand}
+        on:keypress={(e) => e.key === "Enter" && toggleExpand()}
+        role="button"
+        tabindex="0"
       >
-        {#if resolvingLink === "spotify"}
+        <img
+          src={track.artworkUrl || "/placeholder_art.png"}
+          alt={track.title}
+          class="w-full h-full object-cover rounded-md shadow-md bg-gray-800"
+          on:error={(e) =>
+            ((e.currentTarget as HTMLImageElement).src =
+              "https://placehold.co/100x100?text=No+Art")}
+        />
+        <div
+          class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md"
+        >
+          <ChevronDown class="text-white w-8 h-8" />
+        </div>
+      </div>
+
+      <!-- Meta -->
+      <div
+        class="grow min-w-0 flex flex-col justify-center min-h-16 cursor-pointer pr-10"
+        on:click={toggleExpand}
+      >
+        <h3 class="font-bold text-white truncate text-lg leading-tight">
+          {track.title}
+        </h3>
+        <p class="text-gray-400 text-sm truncate">{track.artist}</p>
+        {#if track.album}
+          <p class="text-gray-500 text-xs truncate">{track.album}</p>
+        {/if}
+        {#if track.comment}
+          <p class="text-white/80 text-sm mt-1 italic wrap-break-word line-clamp-2">
+            "{track.comment}"
+          </p>
+        {/if}
+      </div>
+
+      <!-- Play button (top-right) -->
+      <button
+        on:click|stopPropagation={resolveAndPlay}
+        class="absolute top-2 right-2 text-gray-300 hover:text-green-500 transition-colors p-1.5 rounded-full hover:bg-gray-800 active:scale-95"
+        title={$t('track.play')}
+        disabled={resolving}
+      >
+        {#if resolving}
           <Loader2 size={20} class="animate-spin" />
         {:else}
-          <!-- Spotify Icon -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="transform scale-110"
-          >
-            <path
-              d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.4-1.02 16.141 1.8.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"
-            />
-          </svg>
+          <Play size={20} class="fill-current" />
         {/if}
       </button>
 
-      <button
-        on:click={() => resolveAndOpen("ytmusic")}
-        class="text-gray-400 hover:text-red-500 transition-colors p-1"
-        title={$t('track.ytmusic')}
-        disabled={resolvingLink === "ytmusic"}
-      >
-        {#if resolvingLink === "ytmusic"}
-          <Loader2 size={20} class="animate-spin" />
-        {:else}
-          <!-- YouTube Music Icon -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="transform scale-125"
-          >
-            <path
-              d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 19.2c-3.977 0-7.2-3.223-7.2-7.2s3.223-7.2 7.2-7.2 7.2 3.223 7.2 7.2-3.223 7.2-7.2 7.2zm-2.4-10.8v7.2l6-3.6z"
-            />
-          </svg>
-        {/if}
-      </button>
-
-      <button
-        on:click={() => resolveAndOpen("appleMusic")}
-        class="text-gray-400 hover:text-pink-500 transition-colors p-1"
-        title={$t('track.applemusic')}
-        disabled={resolvingLink === "appleMusic"}
-      >
-        {#if resolvingLink === "appleMusic"}
-          <Loader2 size={20} class="animate-spin" />
-        {:else}
-          <!-- Apple Music Icon -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="transform scale-110"
-          >
-            <path
-              d="M18.7107 19.5002C17.7951 20.8403 16.7891 22.3117 15.1466 22.3117C13.5358 22.3117 13.0457 21.3768 11.2338 21.3768C9.39003 21.3768 8.84759 22.2801 7.30064 22.3117C5.68984 22.3432 4.29344 20.6206 3.16334 18.9663C0.844788 15.5898 2.58554 10.3708 5.43809 10.3393C6.98504 10.3077 8.0924 11.3804 9.03632 11.3804C10.0118 11.3804 10.8928 10.1501 12.6234 10.1185C13.5044 10.1185 15.1781 10.434 16.2165 11.9799C16.1221 12.043 13.913 13.3364 13.9444 16.1439C13.9759 18.51 16.0277 19.3424 16.1221 19.3739C16.0592 19.5316 19.1827 18.8077 18.7107 19.5002ZM12.3087 7.02704C13.0639 6.08064 13.6015 4.75549 13.4442 3.46231C12.3114 3.52541 10.9268 4.25096 10.1397 5.16579C9.38453 6.04909 8.75519 7.374 8.94399 8.66723C10.1397 8.76186 11.5534 8.00499 12.3087 7.02704Z"
-            />
-          </svg>
-        {/if}
-      </button>
-
-      <!-- Delete Button (Owner) -->
+      <!-- Delete Button (bottom-right, red for caution) -->
       {#if showDelete}
         <button
-          on:click={handleDelete}
-          class="text-gray-600 hover:text-red-500 transition-colors p-1 ml-1"
+          on:click|stopPropagation={handleDelete}
+          class="absolute bottom-2 right-2 text-red-500 hover:text-red-400 transition-colors p-1.5 rounded-full hover:bg-gray-800"
           title={$t('track.delete')}
         >
           <Trash2 size={20} />
         </button>
       {/if}
     </div>
-  </div>
+  {/if}
 
   <!-- Expanded Options -->
   {#if expanded}
     <div
-      class="mt-4 pt-4 border-t border-gray-800 flex flex-col gap-3 animate-fade-in"
+      class="flex flex-col gap-3 animate-fade-in {variant === 'square'
+        ? 'mt-2 p-4 bg-gray-900 border border-gray-800 rounded-xl'
+        : 'mt-4 pt-4 border-t border-gray-800'}"
       on:click|stopPropagation={() => {}}
     >
       <!-- Reactions Showcase -->

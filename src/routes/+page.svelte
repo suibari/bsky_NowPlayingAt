@@ -9,11 +9,13 @@
     getPlaylists,
     addToPlaylist,
     getGlobalTimeline,
+    getFolloweesFeed,
     getHotContent,
     songKey,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import TrackCard from "$lib/components/TrackCard.svelte";
+  import ActivityCard from "$lib/components/ActivityCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import InfoModal from "$lib/components/InfoModal.svelte";
   import LangToggle from "$lib/components/LangToggle.svelte";
@@ -23,10 +25,11 @@
 
   let handleInput = "";
   let isSigningIn = false;
-  let activeTab: "search" | "hot" | "discovery" = "search";
-  let hotTab: "tracks" | "playlists" | "users" = "tracks";
+  let activeTab: "recommend" | "everyone" | "search" = "recommend";
+  let everyoneTab: "realtime" | "tracks" | "playlists" | "users" = "realtime";
 
   // Data State
+  let recommendFeed: any[] = [];
   let hotTracks: any[] = [];
   let hotPlaylists: any[] = [];
   let hotUsers: any[] = [];
@@ -34,9 +37,12 @@
 
   // Display limits ("load more" pagination so we don't render hundreds of nodes)
   const PAGE_SIZE = 20;
+  let recommendLimit = PAGE_SIZE;
   let hotLimit = PAGE_SIZE;
   let discoveryLimit = PAGE_SIZE;
 
+  let loadingRecommend = true;
+  let recommendLoaded = false;
   let loadingHot = true;
   let loadingDiscovery = true;
   let showSettingsBanner = false;
@@ -48,13 +54,21 @@
     loadDiscoveryContent();
   });
 
-  function setHotTab(tab: "tracks" | "playlists" | "users") {
-    hotTab = tab;
+  // Recommend feed needs the signed-in user's DID, which may not be ready at
+  // mount time — load it once the profile resolves.
+  $: if ($userProfile?.did && !recommendLoaded) {
+    recommendLoaded = true;
+    loadRecommendFeed($userProfile.did);
+  }
+
+  function setEveryoneTab(tab: "realtime" | "tracks" | "playlists" | "users") {
+    everyoneTab = tab;
     hotLimit = PAGE_SIZE; // reset pagination when switching sub-tab
+    discoveryLimit = PAGE_SIZE;
   }
 
   function goHome() {
-    activeTab = "search";
+    activeTab = "recommend";
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -91,6 +105,17 @@
       console.error("Failed to load hot content", e);
     } finally {
       loadingHot = false;
+    }
+  }
+
+  async function loadRecommendFeed(did: string) {
+    loadingRecommend = true;
+    try {
+      recommendFeed = await getFolloweesFeed(did);
+    } catch (e) {
+      console.error("Failed to load recommend feed", e);
+    } finally {
+      loadingRecommend = false;
     }
   }
 
@@ -304,18 +329,18 @@
   // --- REACTION LOGIC ---
 
   function handleSwipeLeft() {
-    if (activeTab === "search") {
-      activeTab = "hot";
-    } else if (activeTab === "hot") {
-      activeTab = "discovery";
+    if (activeTab === "recommend") {
+      activeTab = "everyone";
+    } else if (activeTab === "everyone") {
+      activeTab = "search";
     }
   }
 
   function handleSwipeRight() {
-    if (activeTab === "discovery") {
-      activeTab = "hot";
-    } else if (activeTab === "hot") {
-      activeTab = "search";
+    if (activeTab === "search") {
+      activeTab = "everyone";
+    } else if (activeTab === "everyone") {
+      activeTab = "recommend";
     }
   }
 </script>
@@ -387,6 +412,24 @@
     <div class="flex justify-center mb-8">
       <div class="bg-gray-900 p-1 rounded-full flex gap-1 w-full sm:w-auto">
         <button
+          on:click={() => (activeTab = "recommend")}
+          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+          'recommend'
+            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+            : 'text-gray-400 hover:text-white'}"
+        >
+          {$t('tab.recommend')}
+        </button>
+        <button
+          on:click={() => (activeTab = "everyone")}
+          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+          'everyone'
+            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+            : 'text-gray-400 hover:text-white'}"
+        >
+          {$t('tab.discovery')}
+        </button>
+        <button
           on:click={() => (activeTab = "search")}
           class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'search'
@@ -394,24 +437,6 @@
             : 'text-gray-400 hover:text-white'}"
         >
           {$t('tab.search')}
-        </button>
-        <button
-          on:click={() => (activeTab = "hot")}
-          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
-          'hot'
-            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
-            : 'text-gray-400 hover:text-white'}"
-        >
-          {$t('tab.hot')}
-        </button>
-        <button
-          on:click={() => (activeTab = "discovery")}
-          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
-          'discovery'
-            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
-            : 'text-gray-400 hover:text-white'}"
-        >
-          {$t('tab.discovery')}
         </button>
       </div>
     </div>
@@ -422,7 +447,47 @@
       on:swipeRight={handleSwipeRight}
       class="min-h-[50vh] touch-pan-y"
     >
-      {#if activeTab === "search"}
+      {#if activeTab === "recommend"}
+        <!-- RECOMMEND SECTION (followees' plays, randomized) -->
+        <div class="max-w-4xl mx-auto animate-fade-in pb-20">
+          {#if loadingRecommend}
+            <div class="text-center py-20 text-gray-500">
+              <Loader2
+                class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
+              />
+              <p>{$t('recommend.loading')}</p>
+            </div>
+          {:else if recommendFeed.length > 0}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              {#each recommendFeed.slice(0, recommendLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
+                <ActivityCard
+                  {item}
+                  {processingTrackId}
+                  on:nowPlaying={(e) =>
+                    executeNowPlaying(e.detail.track, e.detail.postToBsky)}
+                  on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                  on:reaction={handleDiscoveryReaction}
+                />
+              {/each}
+            </div>
+            {#if recommendFeed.length > recommendLimit}
+              <div class="flex justify-center mt-8">
+                <button
+                  on:click={() => (recommendLimit += PAGE_SIZE)}
+                  class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
+                >
+                  {$t('hot.loadmore')}
+                </button>
+              </div>
+            {/if}
+          {:else}
+            <div class="text-center py-20 text-gray-500">
+              <Music size={48} class="mx-auto mb-4 opacity-30" />
+              <p>{$t('recommend.empty')}</p>
+            </div>
+          {/if}
+        </div>
+      {:else if activeTab === "search"}
         <!-- Search Section -->
         <div class="mb-10 max-w-3xl mx-auto animate-fade-in">
           <div class="relative group">
@@ -503,17 +568,26 @@
             </div>
           {/if}
         </div>
-      {:else if activeTab === "hot"}
-        <!-- WHAT'S HOT SECTION -->
+      {:else if activeTab === "everyone"}
+        <!-- EVERYONE'S NOWPLAYING (realtime + chart) -->
         <div class="max-w-4xl mx-auto animate-fade-in pb-20">
           <!-- Sub Tabs -->
-          <div class="flex justify-center mb-8">
+          <div class="flex justify-center mb-8 max-w-full">
             <div
-              class="inline-flex bg-black/40 border border-gray-800 rounded-lg p-1"
+              class="flex flex-nowrap overflow-x-auto justify-start sm:justify-center bg-black/40 border border-gray-800 rounded-lg p-1 max-w-full scrollbar-none"
             >
               <button
-                on:click={() => setHotTab("tracks")}
-                class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
+                on:click={() => setEveryoneTab("realtime")}
+                class="px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap shrink-0 transition-all {everyoneTab ===
+                'realtime'
+                  ? 'bg-gray-700 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-200'}"
+              >
+                {$t('everyone.realtime')}
+              </button>
+              <button
+                on:click={() => setEveryoneTab("tracks")}
+                class="px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap shrink-0 transition-all {everyoneTab ===
                 'tracks'
                   ? 'bg-gray-700 text-white shadow-sm'
                   : 'text-gray-400 hover:text-gray-200'}"
@@ -521,8 +595,8 @@
                 {$t('hot.toptracks')}
               </button>
               <button
-                on:click={() => setHotTab("playlists")}
-                class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
+                on:click={() => setEveryoneTab("playlists")}
+                class="px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap shrink-0 transition-all {everyoneTab ===
                 'playlists'
                   ? 'bg-gray-700 text-white shadow-sm'
                   : 'text-gray-400 hover:text-gray-200'}"
@@ -530,8 +604,8 @@
                 {$t('hot.topplaylists')}
               </button>
               <button
-                on:click={() => setHotTab("users")}
-                class="px-5 py-1.5 rounded-md text-sm font-medium transition-all {hotTab ===
+                on:click={() => setEveryoneTab("users")}
+                class="px-3 sm:px-5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap shrink-0 transition-all {everyoneTab ===
                 'users'
                   ? 'bg-gray-700 text-white shadow-sm'
                   : 'text-gray-400 hover:text-gray-200'}"
@@ -541,14 +615,51 @@
             </div>
           </div>
 
-          {#if loadingHot}
+          {#if everyoneTab === "realtime"}
+            <!-- REALTIME (= former everyone's nowplaying timeline) -->
+            {#if loadingDiscovery}
+              <div class="text-center py-20 text-gray-500">
+                <Loader2
+                  class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
+                />
+                <p>{$t('discovery.loading')}</p>
+              </div>
+            {:else if discoveryTimeline.length > 0}
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                {#each discoveryTimeline.slice(0, discoveryLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
+                  <ActivityCard
+                    {item}
+                    {processingTrackId}
+                    on:nowPlaying={(e) =>
+                      executeNowPlaying(e.detail.track, e.detail.postToBsky)}
+                    on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                    on:reaction={handleDiscoveryReaction}
+                  />
+                {/each}
+              </div>
+              {#if discoveryTimeline.length > discoveryLimit}
+                <div class="flex justify-center mt-8">
+                  <button
+                    on:click={() => (discoveryLimit += PAGE_SIZE)}
+                    class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
+                  >
+                    {$t('hot.loadmore')}
+                  </button>
+                </div>
+              {/if}
+            {:else}
+              <div class="text-center py-20 text-gray-500">
+                <p>{$t('discovery.empty')}</p>
+              </div>
+            {/if}
+          {:else if loadingHot}
             <div class="text-center py-20 text-gray-500">
               <Loader2
                 class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
               />
               <p>{$t('hot.loading')}</p>
             </div>
-          {:else if hotTab === "tracks"}
+          {:else if everyoneTab === "tracks"}
             {#if hotTracks.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
                 {#each hotTracks.slice(0, hotLimit) as track}
@@ -624,7 +735,7 @@
                 <p>{$t('hot.empty.tracks')}</p>
               </div>
             {/if}
-          {:else if hotTab === "playlists"}
+          {:else if everyoneTab === "playlists"}
             <!-- PLAYLISTS -->
             {#if hotPlaylists.length > 0}
               <div class="space-y-4">
@@ -749,155 +860,6 @@
                 <p>{$t('hot.empty.users')}</p>
               </div>
             {/if}
-          {/if}
-        </div>
-      {:else if activeTab === "discovery"}
-        <div class="max-w-2xl mx-auto animate-fade-in pb-20">
-          {#if loadingDiscovery}
-            <div class="text-center py-20 text-gray-500">
-              <Loader2
-                class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
-              />
-              <p>{$t('discovery.loading')}</p>
-            </div>
-          {:else if discoveryTimeline.length > 0}
-            <div class="space-y-8">
-              {#each discoveryTimeline.slice(0, discoveryLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
-                <div
-                  class="bg-gray-900/50 rounded-xl p-4 border border-gray-800"
-                >
-                  <!-- Header: User Action -->
-                  <div class="flex items-center gap-3 mb-3">
-                    <a
-                      href={`/profile/${item.author.did}`}
-                      class="flex-shrink-0"
-                    >
-                      {#if item.author.avatar}
-                        <img
-                          src={item.author.avatar}
-                          alt={item.author.handle}
-                          class="w-10 h-10 rounded-full border border-gray-700"
-                        />
-                      {:else}
-                        <div
-                          class="w-10 h-10 rounded-full bg-gray-800 border border-gray-700"
-                        ></div>
-                      {/if}
-                    </a>
-                    <div>
-                      <div class="text-sm text-gray-300">
-                        <span class="font-bold text-white">
-                          {item.author.displayName || item.author.handle}
-                        </span>
-                        {#if item.type === "history"}
-                          <span class="text-gray-500">{$t('discovery.listening')}</span>
-                        {:else if item.type === "reaction"}
-                          <span class="text-gray-500">
-                            {$t('discovery.reacted')} <span class="text-lg"
-                              >{item.record.emoji}</span
-                            >
-                          </span>
-                        {:else if item.type === "playlist"}
-                          <span class="text-gray-500"
-                            >{$t('discovery.playlist')}</span
-                          >
-                        {/if}
-                      </div>
-                      <div class="text-xs text-gray-600">
-                        {new Date(item.indexedAt).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Content -->
-                  <div class="pl-12">
-                    {#if item.type === "history"}
-                      <TrackCard
-                        track={{
-                          id: item.record.trackUri,
-                          title: item.record.track,
-                          artist: item.record.artist,
-                          album: item.record.album,
-                          artworkUrl: (item.record.imgBlob?.includes('cid=undefined') ? undefined : item.record.imgBlob) ?? item.record.img,
-                          trackUri: item.record.trackUri,
-                          spotifyUrl: item.record.links?.spotify,
-                          youtubeMusicUrl: item.record.links?.youtube,
-                          appleMusicUrl: item.record.links?.appleMusic,
-                          comment: item.record.comment,
-                          provider: item.record.provider || "itunes",
-                        }}
-                        postUri={item.record.postUri}
-                        isProcessing={processingTrackId ===
-                          item.record.trackUri}
-                        on:nowPlaying={(e) =>
-                          executeNowPlaying(
-                            e.detail.track,
-                            e.detail.postToBsky,
-                          )}
-                        on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                        on:reaction={handleDiscoveryReaction}
-                      />
-                    {:else if item.type === "reaction"}
-                      {#if item.record.kind === "playlist" && item.record.playlist}
-                        <PlaylistCard
-                          playlist={item.record.playlist.record || {
-                            name: item.record.playlist.title,
-                            tracks: [],
-                          }}
-                          author={item.record.playlist.author}
-                          rkey={item.record.playlist.uri.split("/").pop()}
-                        />
-                      {:else}
-                        <TrackCard
-                          track={{
-                            id: item.record.subjectUri,
-                            trackUri: item.record.subjectUri,
-                            title: item.record.track || "Unknown Track",
-                            artist: item.record.artist || "Unknown Artist",
-                            album: item.record.album,
-                            artworkUrl:
-                              (item.record.imgBlob?.includes('cid=undefined') ? undefined : item.record.imgBlob) ?? item.record.img ?? "/placeholder_art.png",
-                            spotifyUrl: item.record.links?.spotify,
-                            youtubeMusicUrl: item.record.links?.youtube,
-                            appleMusicUrl: item.record.links?.appleMusic,
-                            provider: item.record.provider || "itunes",
-                          }}
-                          isProcessing={processingTrackId ===
-                            item.record.subjectUri}
-                          on:nowPlaying={(e) =>
-                            executeNowPlaying(
-                              e.detail.track,
-                              e.detail.postToBsky,
-                            )}
-                          on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                          on:reaction={handleDiscoveryReaction}
-                        />
-                      {/if}
-                    {:else if item.type === "playlist"}
-                      <PlaylistCard
-                        playlist={item.record}
-                        author={item.author}
-                        rkey={item.uri.split("/").pop()}
-                      />
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-            {#if discoveryTimeline.length > discoveryLimit}
-              <div class="flex justify-center mt-8">
-                <button
-                  on:click={() => (discoveryLimit += PAGE_SIZE)}
-                  class="px-6 py-2 rounded-full bg-gray-800 text-gray-300 text-sm font-bold hover:bg-gray-700 transition-colors"
-                >
-                  {$t('hot.loadmore')}
-                </button>
-              </div>
-            {/if}
-          {:else}
-            <div class="text-center py-20 text-gray-500">
-              <p>{$t('discovery.empty')}</p>
-            </div>
           {/if}
         </div>
       {/if}
@@ -1097,6 +1059,14 @@
 {/if}
 
 <style>
+  .scrollbar-none {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+
   .animate-blob {
     animation: blob 10s infinite;
   }

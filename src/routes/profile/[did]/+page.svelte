@@ -289,6 +289,7 @@
         <div class="space-y-4">
           {#each history as item, i}
             <TrackCard
+              variant="bar"
               track={mapHistoryToTrack(item)}
               postUri={item.value.postUri}
               showDelete={isOwner}

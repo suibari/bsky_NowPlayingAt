@@ -299,6 +299,58 @@ export async function getGlobalTimeline(
   return sorted();
 }
 
+// --- FOLLOWEES FEED (おすすめ) ---
+
+/**
+ * Build the "Recommend" feed: history records played by the people the given
+ * user follows, returned in random order. Item shape matches the discovery
+ * timeline `history` items so they can be rendered with ActivityCard.
+ */
+export async function getFolloweesFeed(did: string) {
+  // 1. Collect followees (with their profiles) up to a reasonable cap.
+  const follows: any[] = [];
+  let cursor: string | undefined = undefined;
+  for (let page = 0; page < 3; page++) {
+    const res = await publicAgent.app.bsky.graph.getFollows({ actor: did, limit: 100, cursor });
+    follows.push(...res.data.follows);
+    cursor = res.data.cursor;
+    if (!cursor) break;
+  }
+
+  if (follows.length === 0) return [];
+
+  const profilesByDid = new Map<string, any>();
+  follows.forEach((f) => profilesByDid.set(f.did, f));
+  const followeeDids = Array.from(profilesByDid.keys());
+
+  // 2. Fetch each followee's recent history in batches.
+  const items: any[] = [];
+  for (let i = 0; i < followeeDids.length; i += TIMELINE_BATCH_SIZE) {
+    const batch = followeeDids.slice(i, i + TIMELINE_BATCH_SIZE);
+    await Promise.all(batch.map(async (followeeDid) => {
+      try {
+        const { records } = await getHistory(followeeDid);
+        const author = profilesByDid.get(followeeDid) || { did: followeeDid, handle: 'unknown' };
+        records.forEach((r) => {
+          items.push({
+            type: 'history',
+            author,
+            record: r.value,
+            uri: r.uri,
+            cid: r.cid,
+            indexedAt: (r.value as any).postedAt || (r.value as any).createdAt,
+          });
+        });
+      } catch (e) {
+        console.warn(`Failed to fetch history for ${followeeDid}`, e);
+      }
+    }));
+  }
+
+  // 3. Random order.
+  return items.sort(() => Math.random() - 0.5);
+}
+
 // --- HYDRATION ---
 
 export async function hydrateReactions(records: ConstellationRecord[]): Promise<{ record: ReactionRecord, authorDid: string, uri: string }[]> {

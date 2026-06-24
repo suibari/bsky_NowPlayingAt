@@ -330,6 +330,7 @@
       {#each tracks as track, index (track.id)}
         <div animate:flip={{ duration: flipDurationMs }}>
           <TrackCard
+            variant="bar"
             track={mapToTrack(track)}
             showDelete={isOwner}
             showDragHandle={isOwner}
