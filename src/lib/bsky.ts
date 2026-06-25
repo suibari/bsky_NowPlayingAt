@@ -323,7 +323,27 @@ export async function getFolloweesFeed(did: string) {
   follows.forEach((f) => profilesByDid.set(f.did, f));
   const followeeDids = Array.from(profilesByDid.keys());
 
-  // 2. Fetch each followee's recent history in batches.
+  const followeeDidsSet = new Set(followeeDids);
+
+  // 2. Try to use the cached global timeline to filter followee records.
+  try {
+    const cacheRes = await fetch('/api/timeline');
+    if (cacheRes.ok) {
+      const { data } = await cacheRes.json();
+      if (data && Array.isArray(data) && data.length > 0) {
+        const cachedItems = data.filter((item: any) => 
+          item.author && item.author.did && followeeDidsSet.has(item.author.did) && item.type === 'history'
+        );
+        if (cachedItems.length > 0) {
+          return cachedItems.sort(() => Math.random() - 0.5);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load timeline cache for followees feed", e);
+  }
+
+  // 3. Fallback: Fetch each followee's recent history in batches.
   const items: any[] = [];
   for (let i = 0; i < followeeDids.length; i += TIMELINE_BATCH_SIZE) {
     const batch = followeeDids.slice(i, i + TIMELINE_BATCH_SIZE);
@@ -347,7 +367,7 @@ export async function getFolloweesFeed(did: string) {
     }));
   }
 
-  // 3. Random order.
+  // 4. Random order.
   return items.sort(() => Math.random() - 0.5);
 }
 

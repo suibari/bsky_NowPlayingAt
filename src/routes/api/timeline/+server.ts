@@ -7,6 +7,7 @@ export async function GET(event) {
 
     try {
         const { value, metadata } = await event.platform.env.CACHE.getWithMetadata('timeline', 'json');
+
         if (value) {
             return json(
                 { data: value, updatedAt: metadata?.updatedAt, stale: false },
