@@ -301,7 +301,7 @@
         if (!confirm(get(t)('confirm.post', { title: track.title }))) return;
 
         // 1. Post to Feed (blob upload happens here, get imgBlob + post URI back)
-        const { imgBlob, uri } = await postToFeed(track);
+        const { imgBlob, uri } = await postToFeed(track, track.comment);
 
         // 2. Write to History (PDS) with imgBlob for permanent image reference
         //    and postUri so Bluesky likes on the post can be aggregated later.
