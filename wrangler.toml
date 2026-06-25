@@ -5,5 +5,5 @@ pages_build_output_dir = ".svelte-kit/cloudflare"
 
 [[kv_namespaces]]
 binding = "CACHE"
-id = "nowplayingat-cache"
+id = "2988ebc3e8eb4be1b87ec5a0aa616dc5"
 
