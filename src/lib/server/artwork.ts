@@ -19,12 +19,20 @@ export async function resolveArtworkUrl(
   title: string,
   album: string | undefined,
 ): Promise<ArtworkResult> {
-  const getLfmImage = (images: Array<any> | undefined) => {
+  const getLfmImage = async (images: Array<any> | undefined) => {
     if (!images) return undefined;
     for (const size of ['mega', 'extralarge', 'large']) {
       const img = images.find((i: any) => i.size === size);
       if (img?.['#text'] && !img['#text'].includes(LFM_PLACEHOLDER)) {
-        return img['#text'];
+        const url = img['#text'];
+        try {
+          const res = await fetch(url, { method: 'HEAD' });
+          if (res.ok) {
+            return url;
+          }
+        } catch (e) {
+          // ignore network errors
+        }
       }
     }
     return undefined;
@@ -46,7 +54,7 @@ export async function resolveArtworkUrl(
       const res = await fetch(albumUrl);
       if (res.ok) {
         const data = await res.json();
-        imgUrl = getLfmImage(data?.album?.image);
+        imgUrl = await getLfmImage(data?.album?.image);
       }
     }
 
@@ -60,7 +68,7 @@ export async function resolveArtworkUrl(
       const res = await fetch(trackUrl);
       if (res.ok) {
         const data = await res.json();
-        imgUrl = getLfmImage(data?.track?.album?.image);
+        imgUrl = await getLfmImage(data?.track?.album?.image);
       }
     }
 
