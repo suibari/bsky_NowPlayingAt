@@ -17,6 +17,18 @@
   import { t } from "$lib/i18n";
 
   export let track: Track;
+  export let fallbackArtworkUrl: string | undefined = undefined;
+
+  let imgErrorCount = 0;
+  function handleImgError(e: Event) {
+    const img = e.currentTarget as HTMLImageElement;
+    if (imgErrorCount === 0 && fallbackArtworkUrl) {
+      imgErrorCount++;
+      img.src = fallbackArtworkUrl;
+    } else {
+      img.src = "https://placehold.co/300x300?text=No+Art";
+    }
+  }
 
   // Layout variant:
   //  - "square": Last.fm-style square jacket card (search / chart / feeds)
@@ -126,14 +138,12 @@
       role="button"
       tabindex="0"
     >
-      <img
-        src={track.artworkUrl || "/placeholder_art.png"}
-        alt={track.title}
-        class="absolute inset-0 w-full h-full object-cover"
-        on:error={(e) =>
-          ((e.currentTarget as HTMLImageElement).src =
-            "https://placehold.co/300x300?text=No+Art")}
-      />
+        <img
+          src={track.artworkUrl || "/placeholder_art.png"}
+          alt={track.title}
+          class="absolute inset-0 w-full h-full object-cover"
+          on:error={handleImgError}
+        />
 
       <!-- Hover darken hint -->
       <div
@@ -221,9 +231,7 @@
           src={track.artworkUrl || "/placeholder_art.png"}
           alt={track.title}
           class="w-full h-full object-cover rounded-md shadow-md bg-gray-800"
-          on:error={(e) =>
-            ((e.currentTarget as HTMLImageElement).src =
-              "https://placehold.co/100x100?text=No+Art")}
+          on:error={handleImgError}
         />
         <div
           class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-md"

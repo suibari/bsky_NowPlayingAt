@@ -1,3 +1,5 @@
+import type { BlobRef } from '@atproto/api';
+
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
 export const NSID_REACTION = 'com.suibari.nowplayingat.reaction';
@@ -15,7 +17,7 @@ export interface Track {
   album: string;
   trackUri: string;
   img: string;
-  imgBlob?: string;
+  imgBlob?: string | BlobRef;
   links: {
     spotify?: string;
     youtube?: string;

@@ -300,14 +300,14 @@
       if (postToBsky) {
         if (!confirm(get(t)('confirm.post', { title: track.title }))) return;
 
-        // 1. Post to Feed (blob upload happens here, get imgBlob + post URI back)
-        const { imgBlob, uri } = await postToFeed(track, track.comment);
+        // 1. Post to Feed (blob upload happens here, get post URI and thumbBlob back)
+        const { uri, thumbBlob } = await postToFeed(track, track.comment);
 
-        // 2. Write to History (PDS) with imgBlob for permanent image reference
+        // 2. Write to History (PDS) with jacketBlob for permanent image reference
         //    and postUri so Bluesky likes on the post can be aggregated later.
-        await createHistoryRecord(track, imgBlob, uri);
+        await createHistoryRecord(track, undefined, uri, thumbBlob);
 
-        reflectHistoryToDiscovery(track, imgBlob, uri);
+        reflectHistoryToDiscovery(track, undefined, uri);
         alert(get(t)('alert.posted'));
       } else {
         // No confirmation dialog when just saving to history

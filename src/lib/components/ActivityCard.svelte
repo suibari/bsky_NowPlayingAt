@@ -63,10 +63,19 @@
           title: item.record.track,
           artist: item.record.artist,
           album: item.record.album,
-          artworkUrl:
-            (item.record.imgBlob?.includes("cid=undefined")
-              ? undefined
-              : item.record.imgBlob) ?? item.record.img,
+          artworkUrl: (() => {
+            if (item.record.imgBlob?.ref) {
+              const cid = item.record.imgBlob.ref.$link || item.record.imgBlob.ref.toString();
+              return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
+            }
+            if (typeof item.record.imgBlob === "string" && item.record.imgBlob.includes("cid=") && !item.record.imgBlob.includes("cid=undefined")) {
+              try {
+                const cid = new URL(item.record.imgBlob).searchParams.get("cid");
+                if (cid) return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
+              } catch { /* ignore */ }
+            }
+            return item.record.img;
+          })(),
           trackUri: item.record.trackUri,
           spotifyUrl: item.record.links?.spotify,
           youtubeMusicUrl: item.record.links?.youtube,
@@ -74,6 +83,7 @@
           comment: item.record.comment,
           provider: item.record.provider || "itunes",
         }}
+        fallbackArtworkUrl={item.record.img}
         postUri={item.record.postUri}
         isProcessing={processingTrackId === item.record.trackUri}
         on:nowPlaying={forward("nowPlaying")}
@@ -98,15 +108,25 @@
             title: item.record.track || "Unknown Track",
             artist: item.record.artist || "Unknown Artist",
             album: item.record.album,
-            artworkUrl:
-              (item.record.imgBlob?.includes("cid=undefined")
-                ? undefined
-                : item.record.imgBlob) ?? item.record.img ?? "/placeholder_art.png",
+            artworkUrl: (() => {
+              if (item.record.imgBlob?.ref) {
+                const cid = item.record.imgBlob.ref.$link || item.record.imgBlob.ref.toString();
+                return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
+              }
+              if (typeof item.record.imgBlob === "string" && item.record.imgBlob.includes("cid=") && !item.record.imgBlob.includes("cid=undefined")) {
+                try {
+                  const cid = new URL(item.record.imgBlob).searchParams.get("cid");
+                  if (cid) return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
+                } catch { /* ignore */ }
+              }
+              return item.record.img ?? "/placeholder_art.png";
+            })(),
             spotifyUrl: item.record.links?.spotify,
             youtubeMusicUrl: item.record.links?.youtube,
             appleMusicUrl: item.record.links?.appleMusic,
             provider: item.record.provider || "itunes",
           }}
+          fallbackArtworkUrl={item.record.img}
           isProcessing={processingTrackId === item.record.subjectUri}
           on:nowPlaying={forward("nowPlaying")}
           on:addToPlaylist={forward("addToPlaylist")}
