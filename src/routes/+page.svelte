@@ -95,8 +95,19 @@
   async function loadHotContent() {
     loadingHot = true;
     try {
-      // Show only the final, fully-aggregated ranking (no dynamic reshuffling
-      // while loading). Spinner stays until the whole computation is done.
+      // 1. Try to load from KV cache first for immediate display
+      const cacheRes = await fetch("/api/hot").catch(() => null);
+      if (cacheRes && cacheRes.ok) {
+        const { data, stale } = await cacheRes.json();
+        if (data && !stale) {
+          hotTracks = data.tracks;
+          hotPlaylists = data.playlists;
+          hotUsers = data.users;
+          loadingHot = false; // Show cached UI immediately
+        }
+      }
+      
+      // 2. Fetch fresh data in the background (or foreground if no cache)
       const data = await getHotContent();
       hotTracks = data.tracks;
       hotPlaylists = data.playlists;
@@ -122,7 +133,17 @@
   async function loadDiscoveryContent() {
     loadingDiscovery = true;
     try {
-      // Show only the final timeline at once (no items popping in while loading).
+      // 1. Try to load from KV cache first for immediate display
+      const cacheRes = await fetch("/api/timeline").catch(() => null);
+      if (cacheRes && cacheRes.ok) {
+        const { data, stale } = await cacheRes.json();
+        if (data && !stale) {
+          discoveryTimeline = mergeTimeline(data);
+          loadingDiscovery = false; // Show cached UI immediately
+        }
+      }
+
+      // 2. Fetch fresh data in the background (or foreground if no cache)
       const items = await getGlobalTimeline();
       discoveryTimeline = mergeTimeline(items);
     } catch (e) {
