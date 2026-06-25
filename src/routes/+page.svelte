@@ -106,17 +106,20 @@
           loadingHot = false; // Show cached UI immediately
         }
       }
-      
-      // 2. Fetch fresh data in the background (or foreground if no cache)
-      const data = await getHotContent();
+    } catch (e) {
+      console.error("Failed to load hot cache", e);
+    }
+
+    // 2. Fetch fresh data in the background (fire and forget)
+    getHotContent().then((data) => {
       hotTracks = data.tracks;
       hotPlaylists = data.playlists;
       hotUsers = data.users;
-    } catch (e) {
-      console.error("Failed to load hot content", e);
-    } finally {
+      loadingHot = false; // Turn off spinner if cache wasn't available
+    }).catch(e => {
+      console.error("Failed to load fresh hot content", e);
       loadingHot = false;
-    }
+    });
   }
 
   async function loadRecommendFeed(did: string) {
@@ -142,15 +145,18 @@
           loadingDiscovery = false; // Show cached UI immediately
         }
       }
-
-      // 2. Fetch fresh data in the background (or foreground if no cache)
-      const items = await getGlobalTimeline();
-      discoveryTimeline = mergeTimeline(items);
     } catch (e) {
-      console.error("Failed to load discovery content", e);
-    } finally {
-      loadingDiscovery = false;
+      console.error("Failed to load discovery cache", e);
     }
+
+    // 2. Fetch fresh data in the background
+    getGlobalTimeline().then((items) => {
+      discoveryTimeline = mergeTimeline(items);
+      loadingDiscovery = false;
+    }).catch(e => {
+      console.error("Failed to load fresh discovery content", e);
+      loadingDiscovery = false;
+    });
   }
 
   // Optimistic items (from the current user's just-now post/reaction) that should
