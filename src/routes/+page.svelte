@@ -700,7 +700,7 @@
                         title: track.track,
                         artist: track.artist,
                         album: track.album,
-                        artworkUrl: (track.imgBlob?.includes('cid=undefined') ? undefined : track.imgBlob) ?? track.img,
+                        artworkUrl: (typeof track.imgBlob === 'string' && !track.imgBlob.includes('cid=undefined') ? track.imgBlob : undefined) ?? track.img,
                         trackUri: track.trackUri,
                         spotifyUrl: track.links?.spotify,
                         youtubeMusicUrl: track.links?.youtube,

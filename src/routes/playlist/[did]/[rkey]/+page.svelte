@@ -194,7 +194,16 @@
       title: item.track,
       artist: item.artist,
       album: item.album,
-      artworkUrl: (item.imgBlob?.includes('cid=undefined') ? undefined : item.imgBlob) ?? item.img ?? "",
+      artworkUrl: (() => {
+        if (item.imgBlob?.ref) {
+          const cid = item.imgBlob.ref.$link || item.imgBlob.ref.toString();
+          return `https://cdn.bsky.app/img/feed_thumbnail/plain/${did}/${cid}@jpeg`;
+        }
+        if (typeof item.imgBlob === 'string' && !item.imgBlob.includes('cid=undefined')) {
+          return item.imgBlob;
+        }
+        return item.img ?? "";
+      })(),
       spotifyUrl: item.links?.spotify,
       youtubeMusicUrl: item.links?.youtube,
     };
