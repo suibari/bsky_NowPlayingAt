@@ -102,6 +102,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'settings.saved': '保存しました',
     'settings.error.network': 'ネットワークエラーが発生しました',
     'settings.error.save': '保存に失敗しました',
+    'settings.error.LASTFM_USER_NOT_FOUND': 'Last.fmユーザーが見つかりませんでした。ユーザー名が正しいか確認してください',
+    'settings.error.LASTFM_USERNAME_REQUIRED': 'Last.fmユーザー名を入力してください',
+    'settings.error.DB_SAVE_FAILED': 'データ保存に失敗しました。しばらく経ってから再試行してください',
     'settings.noauth': 'サインインしていません。',
     'settings.gotologin': 'ログイン画面へ',
 
@@ -134,6 +137,21 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- PlaylistCard ---
     'playlist.tracks': '{{count}} 曲',
+
+    // --- SetupHelpModal ---
+    'setup.modal.title': '自動投稿のセットアップ',
+    'setup.modal.step1.title': '1. Last.fmに登録する',
+    'setup.modal.step1.desc': 'Last.fmは再生履歴を記録するサービスです。まだ登録していない方はこちらから登録してください。',
+    'setup.modal.step1.link': 'Last.fmに登録する →',
+    'setup.modal.step1.skip': '設定済みの場合は 2. へ',
+    'setup.modal.step2.title': '2. 音楽サービスをLast.fmに連携する',
+    'setup.modal.step2.desc': '音楽サービスをLast.fmに連携することで、再生した曲がlast.fmに自動的に記録されます。SpotifyはSpotifyアプリの設定から連携できます。',
+    'setup.modal.step2.link': 'Last.fm アプリ連携設定 →',
+    'setup.modal.step2.skip': '設定済みの場合は 3. へ',
+    'setup.modal.step3.title': '3. なうぷれあっとにユーザー名を登録する',
+    'setup.modal.step3.desc': 'このページの「Last.fm ユーザー名」欄にLast.fmのユーザー名を入力して「保存する」をクリックすれば、last.fmの再生履歴をなうぷれあっとが自動で読み込みます！',
+    'setup.modal.btn.close': '閉じる',
+    'setup.help.btn': 'セットアップ方法',
 
     // --- InfoModal ---
     'info.title': 'なうぷれあっと について',
@@ -228,6 +246,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'settings.saved': 'Saved',
     'settings.error.network': 'Network error occurred',
     'settings.error.save': 'Failed to save',
+    'settings.error.LASTFM_USER_NOT_FOUND': 'Last.fm user not found. Please check your username.',
+    'settings.error.LASTFM_USERNAME_REQUIRED': 'Please enter your Last.fm username.',
+    'settings.error.DB_SAVE_FAILED': 'Failed to save data. Please try again later.',
     'settings.noauth': 'Not signed in.',
     'settings.gotologin': 'Go to Login',
 
@@ -260,6 +281,21 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- PlaylistCard ---
     'playlist.tracks': '{{count}} tracks',
+
+    // --- SetupHelpModal ---
+    'setup.modal.title': 'Auto-post Setup',
+    'setup.modal.step1.title': '1. Create a Last.fm account',
+    'setup.modal.step1.desc': 'Last.fm is a service that tracks your listening history. If you don\'t have an account yet, sign up here.',
+    'setup.modal.step1.link': 'Sign up for Last.fm →',
+    'setup.modal.step1.skip': 'Already have an account? Skip to 2.',
+    'setup.modal.step2.title': '2. Connect your music service to Last.fm',
+    'setup.modal.step2.desc': 'Connect your music app to Last.fm so your plays are automatically recorded on Last.fm. Spotify can be connected from within the Spotify app settings.',
+    'setup.modal.step2.link': 'Last.fm connected apps →',
+    'setup.modal.step2.skip': 'Already connected? Skip to 3.',
+    'setup.modal.step3.title': '3. Enter your username in なうぷれあっと',
+    'setup.modal.step3.desc': 'Enter your Last.fm username in the "Last.fm Username" field on this page and click "Save" — なうぷれあっと will then automatically pull your Last.fm listening history!',
+    'setup.modal.btn.close': 'Close',
+    'setup.help.btn': 'Setup Guide',
 
     // --- InfoModal ---
     'info.title': 'About なうぷれあっと',

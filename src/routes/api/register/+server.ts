@@ -21,7 +21,7 @@ export const POST: RequestHandler = async (event) => {
   if (!did) throw error(401, 'Unauthorized');
 
   const { lastfm_username, enabled, custom_text, attach_image, post_probability } = await event.request.json();
-  if (!lastfm_username?.trim()) throw error(400, 'lastfm_username is required');
+  if (!lastfm_username?.trim()) return json({ error: 'LASTFM_USERNAME_REQUIRED' }, { status: 400 });
   const probability = typeof post_probability === 'number'
     ? Math.max(0, Math.min(100, Math.round(post_probability)))
     : 100;
@@ -31,7 +31,7 @@ export const POST: RequestHandler = async (event) => {
     `https://ws.audioscrobbler.com/2.0/?method=user.getInfo&user=${encodeURIComponent(lastfm_username)}&api_key=${env.LASTFM_API_KEY}&format=json`
   );
   const lfData = await lfRes.json();
-  if (lfData.error) throw error(400, 'Last.fm user not found');
+  if (lfData.error) return json({ error: 'LASTFM_USER_NOT_FOUND' }, { status: 400 });
 
   // Get handle for session record
   let handle = did;
@@ -40,6 +40,10 @@ export const POST: RequestHandler = async (event) => {
     handle = profile.data.handle;
   } catch { /* fallback to DID */ }
 
-  await upsertSession({ did, bsky_handle: handle, lastfm_username: lastfm_username.trim(), enabled: enabled ?? true, custom_text: custom_text?.trim() || null, attach_image: attach_image ?? true, post_probability: probability });
+  try {
+    await upsertSession({ did, bsky_handle: handle, lastfm_username: lastfm_username.trim(), enabled: enabled ?? true, custom_text: custom_text?.trim() || null, attach_image: attach_image ?? true, post_probability: probability });
+  } catch {
+    return json({ error: 'DB_SAVE_FAILED' }, { status: 500 });
+  }
   return json({ ok: true });
 };

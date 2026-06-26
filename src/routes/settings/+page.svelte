@@ -1,12 +1,13 @@
 <script lang="ts">
   import { userProfile, authState, agent } from "$lib/stores";
   import { signOut } from "$lib/atproto";
-  import { LogOut, Music, Loader2, Globe } from "lucide-svelte";
+  import { LogOut, Music, Loader2, Globe, HelpCircle } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { get } from "svelte/store";
   import { t } from "$lib/i18n";
   import LangToggle from "$lib/components/LangToggle.svelte";
+  import SetupHelpModal from "$lib/components/SetupHelpModal.svelte";
 
   let lastfmUsername = "";
   let autoEnabled = false;
@@ -16,6 +17,7 @@
   let savingLastfm = false;
   let lastfmSaved = false;
   let lastfmError = "";
+  let showSetupModal = false;
 
   onMount(async () => {
     // Load existing Last.fm registration
@@ -65,7 +67,11 @@
       });
       if (!res.ok) {
         const err = await res.json();
-        lastfmError = err.error ?? get(t)('settings.error.save');
+        const code = err.error;
+        const knownCodes = ['LASTFM_USER_NOT_FOUND', 'LASTFM_USERNAME_REQUIRED', 'DB_SAVE_FAILED'];
+        lastfmError = knownCodes.includes(code)
+          ? get(t)(`settings.error.${code}`)
+          : get(t)('settings.error.save');
       } else {
         lastfmSaved = true;
       }
@@ -120,6 +126,13 @@
         <div class="flex items-center gap-3 mb-4">
           <Music size={22} class="text-green-400" />
           <h2 class="text-xl font-bold text-white">{$t('settings.autopost.title')}</h2>
+          <button
+            on:click={() => (showSetupModal = true)}
+            class="ml-auto flex items-center gap-1 text-xs text-green-400 hover:text-green-300 hover:underline"
+          >
+            <HelpCircle size={14} />
+            {$t('setup.help.btn')}
+          </button>
         </div>
         <p class="text-gray-400 text-sm mb-6">
           {$t('settings.autopost.desc1')}<br />
@@ -245,3 +258,5 @@
     </div>
   {/if}
 </div>
+
+<SetupHelpModal bind:show={showSetupModal} on:close={() => (showSetupModal = false)} />
