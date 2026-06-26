@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { get } from "svelte/store";
   import { authState, userProfile } from "$lib/stores";
-  import { signIn } from "$lib/atproto";
   import {
     createHistoryRecord,
     postToFeed,
@@ -20,13 +19,18 @@
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import InfoModal from "$lib/components/InfoModal.svelte";
   import LangToggle from "$lib/components/LangToggle.svelte";
-  import { Loader2, Music, X, Plus, Info } from "lucide-svelte";
+  import GlobalStats from "$lib/components/GlobalStats.svelte";
+  import SignInForm from "$lib/components/SignInForm.svelte";
+  import SignInModal from "$lib/components/SignInModal.svelte";
+  import { Loader2, Music, X, Plus, Info, LogIn } from "lucide-svelte";
   import { swipe } from "$lib/actions/swipe";
   import { t } from "$lib/i18n";
 
-  let handleInput = "";
-  let isSigningIn = false;
-  let activeTab: "recommend" | "everyone" | "search" = "recommend";
+  // Default to the "everyone" tab so guests (no DID) see content immediately.
+  // Once auth resolves, switch to "recommend" unless the user already picked a tab.
+  let activeTab: "recommend" | "everyone" | "search" = "everyone";
+  let tabManuallySet = false;
+  let showSignInModal = false;
   let everyoneTab: "realtime" | "tracks" | "playlists" | "users" = "realtime";
 
   // Data State
@@ -62,6 +66,17 @@
     loadRecommendFeed($userProfile.did);
   }
 
+  // Once auth confirms a signed-in user, default them to the recommend tab
+  // (unless they already switched tabs themselves).
+  $: if ($authState.isAuthenticated && !tabManuallySet) {
+    activeTab = "recommend";
+  }
+
+  function selectTab(tab: "recommend" | "everyone" | "search") {
+    tabManuallySet = true;
+    activeTab = tab;
+  }
+
   function setEveryoneTab(tab: "realtime" | "tracks" | "playlists" | "users") {
     everyoneTab = tab;
     hotLimit = PAGE_SIZE; // reset pagination when switching sub-tab
@@ -69,7 +84,7 @@
   }
 
   function goHome() {
-    activeTab = "recommend";
+    activeTab = $authState.isAuthenticated ? "recommend" : "everyone";
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -263,21 +278,6 @@
   let loadingPlaylists = false;
   let processingTrackId: string | null = null;
 
-  async function handleSignIn() {
-    handleInput = handleInput.replace(/^@/, '').trim();
-    if (!handleInput.includes(".")) {
-      handleInput += ".bsky.social";
-    }
-    isSigningIn = true;
-    try {
-      await signIn(handleInput);
-    } catch (e) {
-      console.error(e);
-      isSigningIn = false;
-      alert(get(t)('alert.signinfailed') + e);
-    }
-  }
-
   function performSearch(query: string) {
     if (searchTimeout) clearTimeout(searchTimeout);
 
@@ -358,17 +358,18 @@
 
   function handleSwipeLeft() {
     if (activeTab === "recommend") {
-      activeTab = "everyone";
+      selectTab("everyone");
     } else if (activeTab === "everyone") {
-      activeTab = "search";
+      selectTab("search");
     }
   }
 
   function handleSwipeRight() {
     if (activeTab === "search") {
-      activeTab = "everyone";
-    } else if (activeTab === "everyone") {
-      activeTab = "recommend";
+      selectTab("everyone");
+    } else if (activeTab === "everyone" && $authState.isAuthenticated) {
+      // Guests have no recommend tab — keep them on "everyone".
+      selectTab("recommend");
     }
   }
 </script>
@@ -377,10 +378,10 @@
   <div class="flex items-center justify-center h-screen bg-black text-white">
     <Loader2 class="w-8 h-8 animate-spin text-green-500" />
   </div>
-{:else if $authState.isAuthenticated}
-  <!-- DASHBOARD VIEW -->
-  <div class="p-6 max-w-4xl mx-auto min-h-screen">
-    <!-- Header -->
+{:else}
+  <!-- UNIFIED VIEW (auth + guest share the same layout) -->
+  <div class="max-w-6xl mx-auto p-6 min-h-screen">
+    <!-- Header (full width, above both columns) -->
     <div
       class="topbar-layout sticky top-0 bg-black/95 backdrop-blur-md z-20 border-b border-gray-800/50"
     >
@@ -404,24 +405,44 @@
           <Info size={20} />
         </button>
 
-        <!-- User Info (Linked to Profile) -->
-        <a
-          href={`/profile/${$userProfile?.did}`}
-          class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors group"
-        >
-          {#if $userProfile?.avatar}
-            <img
-              src={$userProfile.avatar}
-              alt="avatar"
-              class="w-8 h-8 rounded-full border border-gray-700 group-hover:border-green-500 transition-colors"
-            />
-          {/if}
-          <span class="hidden sm:inline font-medium group-hover:underline"
-            >{$userProfile?.displayName || $userProfile?.handle}</span
+        {#if $authState.isAuthenticated}
+          <!-- User Info (Linked to Profile) -->
+          <a
+            href={`/profile/${$userProfile?.did}`}
+            class="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors group"
           >
-        </a>
+            {#if $userProfile?.avatar}
+              <img
+                src={$userProfile.avatar}
+                alt="avatar"
+                class="w-8 h-8 rounded-full border border-gray-700 group-hover:border-green-500 transition-colors"
+              />
+            {/if}
+            <span class="hidden sm:inline font-medium group-hover:underline"
+              >{$userProfile?.displayName || $userProfile?.handle}</span
+            >
+          </a>
+        {:else}
+          <!-- Sign-in button (opens modal; the PC right pane has the inline form) -->
+          <button
+            on:click={() => (showSignInModal = true)}
+            class="lg:hidden flex items-center gap-1.5 bg-green-500 hover:bg-green-400 text-black font-bold text-sm px-4 py-2 rounded-full transition-colors"
+          >
+            <LogIn size={18} />
+            <span class="hidden sm:inline">{$t('signin')}</span>
+          </button>
+        {/if}
+
+        <!-- Language switcher (top-right; hidden on mobile) -->
+        <div class="hidden lg:block">
+          <LangToggle />
+        </div>
       </div>
     </div>
+
+    <!-- Below topbar: central pane + right pane -->
+    <div class="flex gap-8 mt-2">
+    <main class="flex-1 min-w-0">
 
     <!-- Settings Banner -->
     {#if showSettingsBanner}
@@ -442,17 +463,19 @@
     <!-- TABS -->
     <div class="flex justify-center mb-8">
       <div class="bg-gray-900 p-1 rounded-full flex gap-1 w-full sm:w-auto">
+        {#if $authState.isAuthenticated}
+          <button
+            on:click={() => selectTab("recommend")}
+            class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
+            'recommend'
+              ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+              : 'text-gray-400 hover:text-white'}"
+          >
+            {$t('tab.recommend')}
+          </button>
+        {/if}
         <button
-          on:click={() => (activeTab = "recommend")}
-          class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
-          'recommend'
-            ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
-            : 'text-gray-400 hover:text-white'}"
-        >
-          {$t('tab.recommend')}
-        </button>
-        <button
-          on:click={() => (activeTab = "everyone")}
+          on:click={() => selectTab("everyone")}
           class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'everyone'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
@@ -461,7 +484,7 @@
           {$t('tab.discovery')}
         </button>
         <button
-          on:click={() => (activeTab = "search")}
+          on:click={() => selectTab("search")}
           class="flex-1 sm:flex-none px-2 sm:px-6 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all {activeTab ===
           'search'
             ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
@@ -944,153 +967,23 @@
         </div>
       </div>
     {/if}
-  </div>
-{:else}
-  <!-- GUEST / LOGIN VIEW -->
-  <div
-    class="relative h-screen w-full overflow-hidden flex items-center justify-center bg-black"
-  >
-    <!-- Background video/reel placeholder -->
-    <div class="absolute inset-0 z-0 overflow-hidden">
-      <div
-        class="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent z-10"
-      ></div>
+    </main>
 
-      <!-- Artwork Reel Background -->
-      {#await getGlobalTimeline() then timeline}
-        {@const artworks = timeline
-          .filter((t) => t.type === "history")
-          .map((t) => resolveArtworkUrl(t.record.imgBlob, t.record.img, t.author?.did))
-          .filter((url) => !!url)
-          .sort(() => Math.random() - 0.5) // Shuffle
-          .slice(0, 30)}
-        <!-- Limit to 30 items -->
-
-        {#if artworks.length > 0}
-          <div
-            class="absolute inset-0 flex flex-col justify-center opacity-30 select-none pointer-events-none"
-          >
-            <!-- Row 1: Left to Right -->
-            <div class="flex gap-4 animate-marquee whitespace-nowrap mb-6">
-              {#each [...artworks, ...artworks] as art}
-                <img
-                  src={art.replace("100x100", "600x600")}
-                  alt="bg"
-                  class="w-48 h-48 object-cover rounded-xl shadow-2xl grayscale hover:grayscale-0 transition-all duration-700"
-                />
-              {/each}
-            </div>
-            <!-- Row 2: Right to Left -->
-            <div
-              class="flex gap-4 animate-marquee-reverse whitespace-nowrap mb-6"
-            >
-              {#each [...artworks, ...artworks].reverse() as art}
-                <img
-                  src={art.replace("100x100", "600x600")}
-                  alt="bg"
-                  class="w-48 h-48 object-cover rounded-xl shadow-2xl grayscale hover:grayscale-0 transition-all duration-700"
-                />
-              {/each}
-            </div>
-            <!-- Row 3: Left to Right (slower) -->
-            <div class="flex gap-4 animate-marquee-slow whitespace-nowrap">
-              {#each [...artworks, ...artworks].sort(() => Math.random() - 0.5) as art}
-                <img
-                  src={art.replace("100x100", "600x600")}
-                  alt="bg"
-                  class="w-48 h-48 object-cover rounded-xl shadow-2xl grayscale hover:grayscale-0 transition-all duration-700"
-                />
-              {/each}
-            </div>
-          </div>
-        {:else}
-          <!-- Fallback animated blobs if no data -->
-          <div
-            class="w-full h-full flex flex-wrap opacity-20 transform scale-110 blur-sm"
-          >
-            <div
-              class="w-1/2 h-1/2 bg-green-900 rounded-full mix-blend-screen filter blur-3xl animate-blob"
-            ></div>
-            <div
-              class="w-1/2 h-1/2 bg-blue-900 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000"
-            ></div>
+    <!-- Right pane (PC only) -->
+    <aside class="hidden lg:block w-80 shrink-0">
+      <div class="sticky top-6 space-y-6">
+        {#if !$authState.isAuthenticated}
+          <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <LogIn size={20} class="text-green-500" />
+              {$t('signin.modal.title')}
+            </h2>
+            <SignInForm />
           </div>
         {/if}
-      {:catch}
-        <!-- Fallback on error -->
-        <div
-          class="w-full h-full flex flex-wrap opacity-20 transform scale-110 blur-sm"
-        >
-          <div
-            class="w-1/2 h-1/2 bg-green-900 rounded-full mix-blend-screen filter blur-3xl animate-blob"
-          ></div>
-          <div
-            class="w-1/2 h-1/2 bg-blue-900 rounded-full mix-blend-screen filter blur-3xl animate-blob animation-delay-2000"
-          ></div>
-        </div>
-      {/await}
-    </div>
-
-    <!-- Login Card -->
-    <div
-      class="relative z-20 bg-black/60 backdrop-blur-xl p-10 rounded-3xl border border-gray-800 w-full max-w-md shadow-2xl"
-    >
-      <div class="text-center mb-10">
-        <h1
-          class="text-4xl sm:text-5xl font-black tracking-tighter text-white leading-none whitespace-nowrap"
-        >
-          なうぷれ<span class="text-green-500">あっと</span>
-        </h1>
-        <div class="text-xs sm:text-sm font-bold text-gray-500 tracking-widest uppercase mt-2 mb-2">#NowPlaying on ATprotocol</div>
-        <div class="flex justify-center mt-4">
-          <LangToggle />
-        </div>
+        <GlobalStats />
       </div>
-
-      <form on:submit|preventDefault={handleSignIn} class="space-y-6">
-        <div>
-          <label
-            for="handle"
-            class="block text-sm font-medium text-gray-400 mb-2 ml-1"
-            >Bluesky Handle</label
-          >
-          <div class="relative">
-            <span class="absolute left-4 top-3.5 text-gray-500">@</span>
-            <input
-              type="text"
-              id="handle"
-              bind:value={handleInput}
-              placeholder="username.bsky.social"
-              class="w-full bg-gray-900 border border-gray-700 rounded-xl pl-8 pr-4 py-3 text-white focus:ring-2 focus:ring-green-500 focus:outline-none transition-all placeholder-gray-600 shadow-inner"
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isSigningIn}
-          class="w-full bg-green-500 hover:bg-green-400 text-black font-extrabold text-lg py-4 rounded-xl transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98]"
-        >
-          {#if isSigningIn}
-            <Loader2 class="animate-spin" size={24} /> {$t('redirect')}
-          {:else}
-            {$t('signin')}
-          {/if}
-        </button>
-      </form>
-
-      <div class="mt-6 text-center">
-        <button
-          on:click={() => (showInfoModal = true)}
-          class="text-sm text-green-500 hover:text-green-400 hover:underline font-medium transition-colors"
-        >
-          {$t('info.title')}
-        </button>
-      </div>
-
-      <div class="mt-8 text-center text-xs text-gray-500 font-medium">
-        Powered by AT protocol, iTunes and Discogs
-      </div>
+    </aside>
     </div>
   </div>
 {/if}
@@ -1099,6 +992,12 @@
 <InfoModal
   bind:show={showInfoModal}
   on:close={() => (showInfoModal = false)}
+/>
+
+<!-- Sign-in Modal (mobile guests) -->
+<SignInModal
+  bind:show={showSignInModal}
+  on:close={() => (showSignInModal = false)}
 />
 
 <style>

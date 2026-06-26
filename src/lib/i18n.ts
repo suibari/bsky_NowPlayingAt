@@ -52,6 +52,15 @@ const translations: Record<Locale, Record<string, string>> = {
     'hot.users.count': '{{count}} 件の再生履歴',
     'discovery.loading': 'みんなのなうぷれを読み込み中...',
 
+    // --- Main page: global stats (right pane) ---
+    'stats.title': 'みんなのなうぷれ',
+    'stats.total': '総再生回数',
+    'stats.daily': '日ごとの再生回数',
+    'stats.tooltip.plays': '{{count}} 回再生',
+
+    // --- Main page: sign-in modal ---
+    'signin.modal.title': 'サインイン',
+
     // --- Main page: discovery ---
     'discovery.listening': 'が聴いています',
     'discovery.reacted': 'がリアクションしました',
@@ -203,6 +212,15 @@ const translations: Record<Locale, Record<string, string>> = {
     'hot.empty.users': 'No trending users yet.',
     'hot.users.count': '{{count}} plays',
     'discovery.loading': "Loading everyone's now playing...",
+
+    // --- Main page: global stats (right pane) ---
+    'stats.title': "Everyone's Now Playing",
+    'stats.total': 'Total Plays',
+    'stats.daily': 'Plays per Day',
+    'stats.tooltip.plays': '{{count}} plays',
+
+    // --- Main page: sign-in modal ---
+    'signin.modal.title': 'Sign In',
 
     // --- Main page: discovery ---
     'discovery.listening': 'is listening to',
