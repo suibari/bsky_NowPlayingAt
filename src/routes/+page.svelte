@@ -433,10 +433,12 @@
           </button>
         {/if}
 
-        <!-- Language switcher (top-right; hidden on mobile) -->
-        <div class="hidden lg:block">
-          <LangToggle />
-        </div>
+        <!-- Language switcher (guests only, top-right; hidden on mobile) -->
+        {#if !$authState.isAuthenticated}
+          <div class="hidden lg:block">
+            <LangToggle />
+          </div>
+        {/if}
       </div>
     </div>
 
