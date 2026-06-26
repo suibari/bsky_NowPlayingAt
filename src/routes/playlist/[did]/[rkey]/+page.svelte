@@ -12,6 +12,7 @@
   import { flip } from "svelte/animate";
   import { generatePlaylistThumbnail } from "$lib/thumbnail";
   import type { Track } from "$lib/music";
+  import { resolveArtworkUrl } from "$lib/artwork";
 
   const flipDurationMs = 300;
 
@@ -194,16 +195,7 @@
       title: item.track,
       artist: item.artist,
       album: item.album,
-      artworkUrl: (() => {
-        if (item.imgBlob?.ref) {
-          const cid = item.imgBlob.ref.$link || item.imgBlob.ref.toString();
-          return `https://cdn.bsky.app/img/feed_thumbnail/plain/${did}/${cid}@jpeg`;
-        }
-        if (typeof item.imgBlob === 'string' && !item.imgBlob.includes('cid=undefined')) {
-          return item.imgBlob;
-        }
-        return item.img ?? "";
-      })(),
+      artworkUrl: resolveArtworkUrl(item.imgBlob, item.img, did),
       spotifyUrl: item.links?.spotify,
       youtubeMusicUrl: item.links?.youtube,
     };

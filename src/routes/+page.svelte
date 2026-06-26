@@ -14,6 +14,7 @@
     songKey,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
+  import { resolveArtworkUrl } from "$lib/artwork";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ActivityCard from "$lib/components/ActivityCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
@@ -700,7 +701,7 @@
                         title: track.track,
                         artist: track.artist,
                         album: track.album,
-                        artworkUrl: (typeof track.imgBlob === 'string' && !track.imgBlob.includes('cid=undefined') ? track.imgBlob : undefined) ?? track.img,
+                        artworkUrl: resolveArtworkUrl(track.imgBlob, track.img),
                         trackUri: track.trackUri,
                         spotifyUrl: track.links?.spotify,
                         youtubeMusicUrl: track.links?.youtube,
@@ -958,8 +959,9 @@
       <!-- Artwork Reel Background -->
       {#await getGlobalTimeline() then timeline}
         {@const artworks = timeline
-          .filter((t) => t.type === "history" && (t.record.imgBlob || t.record.img))
-          .map((t) => t.record.imgBlob ?? t.record.img)
+          .filter((t) => t.type === "history")
+          .map((t) => resolveArtworkUrl(t.record.imgBlob, t.record.img, t.author?.did))
+          .filter((url) => !!url)
           .sort(() => Math.random() - 0.5) // Shuffle
           .slice(0, 30)}
         <!-- Limit to 30 items -->

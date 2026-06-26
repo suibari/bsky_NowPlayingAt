@@ -5,7 +5,8 @@
   import { get } from "svelte/store";
   import { Loader2, Music } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
-  import { getHistory } from "$lib/bsky";
+  import { getHistory, songKey } from "$lib/bsky";
+  import { resolveArtworkUrl } from "$lib/artwork";
   import type { HistoryRecord } from "$lib/schema";
   import type { Track } from "$lib/music";
   import { t } from "$lib/i18n";
@@ -36,17 +37,7 @@
 
   // Resolve artwork URL the same way profile/[did]/+page.svelte's mapHistoryToTrack does.
   function recordToTrack(val: HistoryRecord): Track {
-    const artworkUrl = (() => {
-      const blob: any = val.imgBlob;
-      if (blob?.ref) {
-        const cid = blob.ref.$link || blob.ref.toString();
-        return `https://cdn.bsky.app/img/feed_thumbnail/plain/${did}/${cid}@jpeg`;
-      }
-      if (typeof blob === "string" && !blob.includes("cid=undefined")) {
-        return blob;
-      }
-      return val.img ?? "";
-    })();
+    const artworkUrl = resolveArtworkUrl(val.imgBlob, val.img, did);
     return {
       id: val.trackUri,
       // @ts-ignore – provider is a loose string on history records
@@ -66,7 +57,10 @@
     const counts = new Map<string, { track: Track; count: number }>();
     const hours = new Array(24).fill(0);
     for (const val of records) {
-      const key = val.trackUri || `${val.artist}::${val.track}`;
+      // Group by artist + title (normalized). trackUri is unreliable here — some
+      // records share the same trackUri across different songs, which would
+      // wrongly collapse distinct tracks into one bucket.
+      const key = songKey(val.artist, val.track, val.trackUri);
       const existing = counts.get(key);
       if (existing) existing.count++;
       else counts.set(key, { track: recordToTrack(val), count: 1 });
@@ -231,7 +225,7 @@
         {$t("profile.report.toptracks")}
       </h2>
       <div class="grid grid-cols-2 md:grid-cols-4 md:grid-rows-2 gap-3 mb-8">
-        {#each top5 as item, i (item.track.trackUri || i)}
+        {#each top5 as item, i (songKey(item.track.artist, item.track.title, item.track.trackUri))}
           <div class="relative {PLACEMENT[i]}">
             <div
               class="absolute top-2 right-2 z-10 pointer-events-none w-7 h-7 rounded-full bg-black/70 text-green-400 text-sm font-black flex items-center justify-center shadow"

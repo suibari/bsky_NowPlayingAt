@@ -13,6 +13,7 @@
   import { Loader2, Music, Disc, Plus, X, Settings, BarChart3 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReportTab from "$lib/components/ReportTab.svelte";
+  import { resolveArtworkUrl } from "$lib/artwork";
   import type { Track } from "$lib/music";
   import type {
     HistoryRecord,
@@ -113,16 +114,7 @@
       title: val.track,
       artist: val.artist,
       album: val.album,
-      artworkUrl: (() => {
-        if (val.imgBlob?.ref) {
-          const cid = val.imgBlob.ref.$link || val.imgBlob.ref.toString();
-          return `https://cdn.bsky.app/img/feed_thumbnail/plain/${did}/${cid}@jpeg`;
-        }
-        if (typeof val.imgBlob === 'string' && !val.imgBlob.includes('cid=undefined')) {
-          return val.imgBlob;
-        }
-        return val.img ?? "";
-      })(),
+      artworkUrl: resolveArtworkUrl(val.imgBlob, val.img, did),
       trackUri: val.trackUri,
       spotifyUrl: val.links?.spotify,
       youtubeMusicUrl: val.links?.youtube,

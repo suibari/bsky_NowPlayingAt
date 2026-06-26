@@ -3,6 +3,7 @@
   import TrackCard from "$lib/components/TrackCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import { t } from "$lib/i18n";
+  import { resolveArtworkUrl } from "$lib/artwork";
 
   // A single activity (history / reaction / playlist) shown in the
   // recommendation and realtime feeds.
@@ -63,19 +64,7 @@
           title: item.record.track,
           artist: item.record.artist,
           album: item.record.album,
-          artworkUrl: (() => {
-            if (item.record.imgBlob?.ref) {
-              const cid = item.record.imgBlob.ref.$link || item.record.imgBlob.ref.toString();
-              return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
-            }
-            if (typeof item.record.imgBlob === "string" && item.record.imgBlob.includes("cid=") && !item.record.imgBlob.includes("cid=undefined")) {
-              try {
-                const cid = new URL(item.record.imgBlob).searchParams.get("cid");
-                if (cid) return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
-              } catch { /* ignore */ }
-            }
-            return item.record.img;
-          })(),
+          artworkUrl: resolveArtworkUrl(item.record.imgBlob, item.record.img, item.author.did),
           trackUri: item.record.trackUri,
           spotifyUrl: item.record.links?.spotify,
           youtubeMusicUrl: item.record.links?.youtube,
@@ -108,19 +97,7 @@
             title: item.record.track || "Unknown Track",
             artist: item.record.artist || "Unknown Artist",
             album: item.record.album,
-            artworkUrl: (() => {
-              if (item.record.imgBlob?.ref) {
-                const cid = item.record.imgBlob.ref.$link || item.record.imgBlob.ref.toString();
-                return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
-              }
-              if (typeof item.record.imgBlob === "string" && item.record.imgBlob.includes("cid=") && !item.record.imgBlob.includes("cid=undefined")) {
-                try {
-                  const cid = new URL(item.record.imgBlob).searchParams.get("cid");
-                  if (cid) return `https://cdn.bsky.app/img/feed_thumbnail/plain/${item.author.did}/${cid}@jpeg`;
-                } catch { /* ignore */ }
-              }
-              return item.record.img ?? "/placeholder_art.png";
-            })(),
+            artworkUrl: resolveArtworkUrl(item.record.imgBlob, item.record.img, item.author.did) || "/placeholder_art.png",
             spotifyUrl: item.record.links?.spotify,
             youtubeMusicUrl: item.record.links?.youtube,
             appleMusicUrl: item.record.links?.appleMusic,
