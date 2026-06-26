@@ -110,8 +110,16 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Profile page ---
     'profile.back': 'ホームに戻る',
+    'profile.tab.report': 'レポート',
     'profile.tab.playlists': 'プレイリスト',
     'profile.tab.history': '履歴',
+    'profile.report.totalplays': '総再生回数',
+    'profile.report.toptracks': '再生回数トップ5',
+    'profile.report.timeline': '時間帯別の再生',
+    'profile.report.updating': '更新中…',
+    'profile.report.empty': 'まだデータがありません',
+    'profile.report.tooltip.hour': '{{hour}}時',
+    'profile.report.tooltip.plays': '{{count}}回',
     'profile.playlist.new': '新規プレイリスト作成',
     'profile.playlist.prompt': 'プレイリスト名を入力してください:',
     'profile.playlist.created': 'プレイリストを作成しました！',
@@ -254,8 +262,16 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Profile page ---
     'profile.back': 'Back to Home',
+    'profile.tab.report': 'Report',
     'profile.tab.playlists': 'Playlists',
     'profile.tab.history': 'History',
+    'profile.report.totalplays': 'Total Plays',
+    'profile.report.toptracks': 'Top 5 Tracks',
+    'profile.report.timeline': 'Plays by Hour',
+    'profile.report.updating': 'Updating…',
+    'profile.report.empty': 'No data yet',
+    'profile.report.tooltip.hour': '{{hour}}:00',
+    'profile.report.tooltip.plays': '{{count}} plays',
     'profile.playlist.new': 'New Playlist',
     'profile.playlist.prompt': 'Enter playlist name:',
     'profile.playlist.created': 'Playlist created!',

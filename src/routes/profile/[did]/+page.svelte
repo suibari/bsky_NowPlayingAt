@@ -10,8 +10,9 @@
     addToPlaylist,
     deleteHistoryRecord,
   } from "$lib/bsky";
-  import { Loader2, Music, Disc, Plus, X, Settings } from "lucide-svelte";
+  import { Loader2, Music, Disc, Plus, X, Settings, BarChart3 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
+  import ReportTab from "$lib/components/ReportTab.svelte";
   import type { Track } from "$lib/music";
   import type {
     HistoryRecord,
@@ -34,7 +35,7 @@
   let historyCursor: string | undefined = undefined;
   let loadingMoreHistory = false;
   let loading = true;
-  let activeTab = "history"; // 'playlists' | 'history'
+  let activeTab = "report"; // 'report' | 'history' | 'playlists'
 
   // Playlist Modal State (For 'Add to Playlist' from History)
   let showPlaylistModal = false;
@@ -247,6 +248,15 @@
     <div class="flex gap-4 border-b border-gray-800 mb-6">
       <button
         class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
+        'report'
+          ? 'border-green-500 text-white'
+          : 'border-transparent text-gray-400 hover:text-gray-200'}"
+        on:click={() => (activeTab = "report")}
+      >
+        {$t('profile.tab.report')}
+      </button>
+      <button
+        class="px-4 py-2 pb-3 font-medium transition-colors border-b-2 {activeTab ===
         'history'
           ? 'border-green-500 text-white'
           : 'border-transparent text-gray-400 hover:text-gray-200'}"
@@ -267,7 +277,9 @@
 
     <!-- Content -->
     <div>
-      {#if activeTab === "playlists"}
+      {#if activeTab === "report"}
+        <ReportTab {did} />
+      {:else if activeTab === "playlists"}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Create New Card (Owner Only) -->
           {#if isOwner}

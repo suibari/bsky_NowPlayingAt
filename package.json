@@ -32,6 +32,7 @@
 		"@atproto/oauth-client-node": "^0.4.2",
 		"@cf-wasm/photon": "^0.3.6",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
+		"chart.js": "^4.5.1",
 		"lucide-svelte": "^0.562.0",
 		"svelte-dnd-action": "^0.9.69"
 	}
