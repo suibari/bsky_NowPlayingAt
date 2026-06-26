@@ -35,9 +35,9 @@
     </a>
     <div>
       <div class="text-sm text-gray-300">
-        <span class="font-bold text-white">
+        <a href={`/profile/${item.author.did}`} class="font-bold text-white hover:underline">
           {item.author.displayName || item.author.handle}
-        </span>
+        </a>
         {#if item.type === "history"}
           <span class="text-gray-500">{$t('discovery.listening')}</span>
         {:else if item.type === "reaction"}
