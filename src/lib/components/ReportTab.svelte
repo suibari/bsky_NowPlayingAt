@@ -15,7 +15,10 @@
 
   let loading = true;
   let totalPlays = 0;
-  let top5: { track: Track; count: number }[] = [];
+  // Each TOP5 entry carries the representative record's track + postUri. The
+  // representative is always the LATEST play of that song (see aggregate()), so
+  // a card consistently shows the most recent record's data.
+  let top5: { track: Track; count: number; postUri?: string }[] = [];
   let hourly: number[] = new Array(24).fill(0);
 
   // Count-up animation for the total play number.
@@ -35,7 +38,8 @@
     "md:col-start-4 md:row-start-2",
   ];
 
-  // Resolve artwork URL the same way profile/[did]/+page.svelte's mapHistoryToTrack does.
+  // Map a history record to a TrackCard track. Artwork is resolved via the
+  // shared resolveArtworkUrl helper (legacy getBlob URLs fall back to img).
   function recordToTrack(val: HistoryRecord): Track {
     const artworkUrl = resolveArtworkUrl(val.imgBlob, val.img, did);
     return {
@@ -54,7 +58,14 @@
   }
 
   function aggregate(records: HistoryRecord[]) {
-    const counts = new Map<string, { track: Track; count: number }>();
+    // Unified philosophy: the record shown for a TOP5 song is always the LATEST
+    // play of that song. The representative track (artwork) and its postUri are
+    // both taken from the most recent record — so the card's jacket and the
+    // Bluesky post likes (aggregated by postUri) match the same, newest record.
+    const counts = new Map<
+      string,
+      { track: Track; count: number; postUri?: string; postedAt: string }
+    >();
     const hours = new Array(24).fill(0);
     for (const val of records) {
       // Group by artist + title (normalized). trackUri is unreliable here — some
@@ -62,8 +73,23 @@
       // wrongly collapse distinct tracks into one bucket.
       const key = songKey(val.artist, val.track, val.trackUri);
       const existing = counts.get(key);
-      if (existing) existing.count++;
-      else counts.set(key, { track: recordToTrack(val), count: 1 });
+      if (existing) {
+        existing.count++;
+        // Keep the latest record as the representative (postedAt is ISO 8601, so
+        // a lexicographic compare is chronological).
+        if ((val.postedAt || "") > (existing.postedAt || "")) {
+          existing.track = recordToTrack(val);
+          existing.postUri = val.postUri;
+          existing.postedAt = val.postedAt;
+        }
+      } else {
+        counts.set(key, {
+          track: recordToTrack(val),
+          count: 1,
+          postUri: val.postUri,
+          postedAt: val.postedAt,
+        });
+      }
 
       if (val.postedAt) {
         const h = new Date(val.postedAt).getHours();
@@ -72,7 +98,8 @@
     }
     const sorted = [...counts.values()]
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(({ track, count, postUri }) => ({ track, count, postUri }));
     return { total: records.length, top5: sorted, hourly: hours };
   }
 
@@ -232,7 +259,11 @@
             >
               {i + 1}
             </div>
-            <TrackCard variant="square" track={item.track} />
+            <TrackCard
+              variant="square"
+              track={item.track}
+              postUri={item.postUri}
+            />
           </div>
         {/each}
       </div>
