@@ -83,13 +83,19 @@
         embed.external.thumb = thumbBlob;
       }
 
-      await $agent.post({
+      const postRes = await $agent.post({
         text: rt.text,
         facets: rt.facets,
         embed: embed,
         createdAt: new Date().toISOString(),
         langs: ["ja"],
       });
+
+      // Save postUri to the playlist record if the user owns it
+      if (isOwner && playlistRecord) {
+        playlistRecord.value.postUri = postRes.uri;
+        await savePlaylist();
+      }
 
       alert("Shared to Bluesky!");
       showShareModal = false;

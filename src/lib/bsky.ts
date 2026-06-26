@@ -477,6 +477,7 @@ export async function getHotContent(
   // songKey -> { Bluesky post AT-URIs, representative metadata for display }.
   // Includes Last.fm auto-posts (no trackUri) so their likes can surface too.
   const songPosts = new Map<string, { postUris: Set<string>, meta: any }>();
+  const playlistPosts = new Map<string, { postUris: Set<string>, meta: any, author: any }>();
 
   const trackStats = new Map<string, HotStat>();
   const playlistStats = new Map<string, HotStat>();
@@ -649,6 +650,29 @@ export async function getHotContent(
         
         if (us.count > 0) userStats.set(did, us);
       } catch { /* ignore */ }
+
+      // Playlists: collect postUris for like aggregation
+      try {
+        let cursor: string | undefined = undefined;
+        let keepFetching = true;
+        while (keepFetching) {
+          const pRes = await pdsAgent.com.atproto.repo.listRecords({ repo: did, collection: NSID_PLAYLIST, limit: 100, cursor });
+          if (pRes.data.records.length === 0) break;
+          
+          for (const r of pRes.data.records) {
+            const v = (r.value as any) || {};
+            // For playlists, we want to count likes if it was posted recently, or even if it's an old playlist but shared recently.
+            // But since we just want to aggregate likes, we collect it if it has a postUri.
+            if (!v.postUri) continue;
+            const uri = r.uri;
+            if (!playlistPosts.has(uri)) playlistPosts.set(uri, { postUris: new Set(), meta: v, author: profilesMap.get(did) || { did, handle: 'unknown' } });
+            playlistPosts.get(uri)!.postUris.add(v.postUri);
+          }
+          
+          cursor = pRes.data.cursor;
+          if (!cursor) keepFetching = false;
+        }
+      } catch { /* ignore */ }
     }));
 
     onProgress?.(await buildResult(), false);
@@ -724,6 +748,68 @@ export async function getHotContent(
     }
     stat.count += likeCount;
     stat.recent24 += recent24; // likes within 24h (by like createdAt) count toward 急上昇
+    if (!stat.reactions[HEART]) stat.reactions[HEART] = [];
+    likers.forEach((a) => {
+      if (!stat!.reactions[HEART].find((u: any) => u.did === a.did)) {
+        stat!.reactions[HEART].push({ did: a.did, handle: a.handle, avatar: a.avatar, displayName: a.displayName, reactionUri: undefined });
+      }
+      if (!stat!.authors.find((x: any) => x.did === a.did)) stat!.authors.push(a);
+    });
+  });
+
+  // --- Aggregate Bluesky post likes for Playlists ---
+  const budgetedPlaylists: [string, string[]][] = [];
+  for (const [uri, { postUris }] of playlistPosts.entries()) {
+    if (budget <= 0) break;
+    const uris = Array.from(postUris).slice(0, MAX_POSTS_PER_SONG);
+    if (uris.length === 0) continue;
+    budget -= uris.length;
+    budgetedPlaylists.push([uri, uris]);
+  }
+
+  const playlistLikeResults = new Map<string, { likeCount: number, recent24: number, likers: any[], author: any }>();
+  for (let i = 0; i < budgetedPlaylists.length; i += 25) {
+    const chunk = budgetedPlaylists.slice(i, i + 25);
+    await Promise.all(chunk.map(async ([uri, uris]) => {
+      const results = await Promise.all(uris.map((u) => getPostLikesDetailed(u)));
+      const likersByDid = new Map<string, any>();
+      let likeCount = 0;
+      let recent24 = 0;
+      results.forEach((res) => {
+        likeCount += res.count;
+        recent24 += res.recent24;
+        res.likers.forEach((a: any) => { if (a?.did && !likersByDid.has(a.did)) likersByDid.set(a.did, a); });
+      });
+      if (likeCount === 0) return;
+      const author = playlistPosts.get(uri)!.author;
+      playlistLikeResults.set(uri, { likeCount, recent24, likers: Array.from(likersByDid.values()), author });
+    }));
+  }
+
+  playlistLikeResults.forEach(({ likeCount, recent24, likers, author }, uri) => {
+    let stat = playlistStats.get(uri);
+    if (!stat) {
+      const meta = playlistPosts.get(uri)?.meta || {};
+      stat = {
+        count: 0,
+        record: {
+          kind: 'playlist',
+          playlist: {
+            uri,
+            title: meta.name,
+            author,
+            record: meta,
+          },
+          author,
+        },
+        authors: [],
+        reactions: {},
+        recent24: 0,
+      };
+      playlistStats.set(uri, stat);
+    }
+    stat.count += likeCount;
+    stat.recent24 += recent24;
     if (!stat.reactions[HEART]) stat.reactions[HEART] = [];
     likers.forEach((a) => {
       if (!stat!.reactions[HEART].find((u: any) => u.did === a.did)) {
