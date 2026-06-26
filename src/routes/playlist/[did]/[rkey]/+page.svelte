@@ -27,11 +27,12 @@
   let isOwner = false;
   let saving = false;
 
-  // Share Modal State
   let showShareModal = false;
   let shareText = "";
   let sharing = false;
   let shareStatus = ""; // To show detailed status "Generating image...", "Uploading...", etc.
+  let previewBlob: Blob | null = null;
+  let previewUrl: string | null = null;
 
   // Drag State (Handled by dndzone)
 
@@ -50,11 +51,10 @@
       // Generate Thumbnail
       let thumbBlob = undefined;
       try {
-        const mappedTracks = tracks.map(mapToTrack);
-        const blob = await generatePlaylistThumbnail(mappedTracks);
-        if (blob) {
+        const blobToUpload = previewBlob || await generatePlaylistThumbnail(tracks.map(mapToTrack));
+        if (blobToUpload) {
           shareStatus = "Uploading image...";
-          const uploadRes = await $agent.uploadBlob(blob, {
+          const uploadRes = await $agent.uploadBlob(blobToUpload, {
             encoding: "image/jpeg",
           });
           thumbBlob = uploadRes.data.blob;
@@ -98,13 +98,40 @@
       }
 
       alert("Shared to Bluesky!");
-      showShareModal = false;
+      closeShareModal();
     } catch (e) {
       console.error("Failed to share:", e);
       alert("Failed to share: " + e);
     }
     sharing = false;
     shareStatus = "";
+  }
+
+  function closeShareModal() {
+    showShareModal = false;
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+    }
+    previewBlob = null;
+  }
+
+  async function generatePreview() {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+    }
+    previewBlob = null;
+    try {
+      const mappedTracks = tracks.map(mapToTrack);
+      const blob = await generatePlaylistThumbnail(mappedTracks);
+      if (blob) {
+        previewBlob = blob;
+        previewUrl = URL.createObjectURL(blob);
+      }
+    } catch (e) {
+      console.warn("Failed to generate preview thumbnail", e);
+    }
   }
 
   // Playlist Modal State (Add to OTHER playlist)
@@ -154,6 +181,7 @@
     // URL will be in the embed, not the text
     shareText = `Check out this playlist: "${playlistName}" by ${authorName} 🎵\n\n#なうぷれあっと`;
     showShareModal = true;
+    generatePreview();
   }
 
   async function savePlaylist() {
@@ -350,14 +378,13 @@
     <div class="text-center mt-20 text-red-500">Playlist not found</div>
   {/if}
 
-  <!-- Share Modal -->
   {#if showShareModal}
     <div
       class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      on:click|self={() => (showShareModal = false)}
+      on:click|self={closeShareModal}
       role="button"
       tabindex="0"
-      on:keydown={(e) => e.key === "Escape" && (showShareModal = false)}
+      on:keydown={(e) => e.key === "Escape" && closeShareModal()}
     >
       <div
         class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl"
@@ -365,11 +392,26 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-bold text-white">Share Playlist</h2>
           <button
-            on:click={() => (showShareModal = false)}
+            on:click={closeShareModal}
             class="text-gray-400 hover:text-white"
           >
             <X size={24} />
           </button>
+        </div>
+
+        <!-- OGP Preview -->
+        <div class="mb-4">
+          <p class="block text-sm text-gray-400 mb-2">Thumbnail Preview</p>
+          <div class="bg-black/50 border border-gray-800 rounded-lg overflow-hidden flex items-center justify-center min-h-[150px]">
+            {#if previewUrl}
+              <img src={previewUrl} alt="Thumbnail Preview" class="w-full h-auto object-cover" />
+            {:else}
+              <div class="flex flex-col items-center gap-2 text-gray-500">
+                <Loader2 class="animate-spin" size={24} />
+                <span class="text-xs">Generating image...</span>
+              </div>
+            {/if}
+          </div>
         </div>
 
         <div class="mb-4">
