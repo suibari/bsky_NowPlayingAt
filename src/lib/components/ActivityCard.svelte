@@ -35,7 +35,7 @@
     </a>
     <div>
       <div class="text-sm text-gray-300">
-        <a href={`/profile/${item.author.did}`} class="font-bold text-white hover:underline">
+        <a href={`/profile/${item.author.did}`} class="font-bold !text-white hover:underline">
           {item.author.displayName || item.author.handle}
         </a>
         {#if item.type === "history"}
