@@ -219,13 +219,14 @@
     </div>
   {:else if profile}
     <!-- Profile Header -->
-    <div class="mb-8 flex items-center gap-6">
+    <div class="mb-8 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left">
       {#if profile.avatar}
         <a
           href="https://bsky.app/profile/{profile.handle}"
           target="_blank"
           rel="noopener noreferrer"
           title="@{profile.handle} on Bluesky"
+          class="shrink-0"
         >
           <img
             src={profile.avatar}
@@ -234,11 +235,11 @@
           />
         </a>
       {/if}
-      <div>
-        <h1 class="text-3xl font-bold text-white mb-1">
+      <div class="min-w-0">
+        <h1 class="text-2xl sm:text-3xl font-bold text-white mb-1 wrap-break-word">
           {profile.displayName || profile.handle}
         </h1>
-        <p class="text-gray-400">@{profile.handle}</p>
+        <p class="text-gray-400 break-all">@{profile.handle}</p>
         <p class="text-gray-500 text-sm mt-2">{profile.description || ""}</p>
       </div>
     </div>
