@@ -219,7 +219,7 @@
         <div class="border-t border-gray-800 mt-6 pt-6">
           <div class="flex items-center gap-3 mb-2">
             <Radio size={18} class="text-green-400" />
-            <h3 class="text-base font-bold text-white">{$t('settings.privacy.title')}</h3>
+            <h3 class="text-xl font-bold text-white">{$t('settings.privacy.title')}</h3>
           </div>
           <p class="text-gray-400 text-sm mb-4">{$t('settings.privacy.description')}</p>
           <div class="flex items-center justify-between">
