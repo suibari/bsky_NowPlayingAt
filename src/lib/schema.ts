@@ -18,6 +18,7 @@ export interface Track {
   trackUri: string;
   img: string;
   imgBlob?: string | BlobRef;
+  genre?: string;
   links: {
     spotify?: string;
     youtube?: string;

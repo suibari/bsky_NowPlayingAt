@@ -14,6 +14,7 @@
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import { resolveArtworkUrl } from "$lib/artwork";
+  import { computeScore, type UserProfile } from "$lib/recommendation";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ActivityCard from "$lib/components/ActivityCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
@@ -51,6 +52,19 @@
   let recommendLoaded = false;
   let loadingHot = true;
   let loadingDiscovery = true;
+  let userProfilesMap: Record<string, UserProfile> | null = null;
+
+  $: authorScores = (() => {
+    const myDid = $userProfile?.did;
+    if (!userProfilesMap || !myDid || !userProfilesMap[myDid]) return new Map<string, number>();
+    const myProfile = userProfilesMap[myDid];
+    const scores = new Map<string, number>();
+    for (const [did, profile] of Object.entries(userProfilesMap)) {
+      if (did === myDid) continue;
+      scores.set(did, computeScore(myProfile, profile));
+    }
+    return scores;
+  })();
   let showSettingsBanner = false;
 
   const HOT_REFRESH_MS = 3 * 60 * 1000;
@@ -61,9 +75,22 @@
   let lastDiscoveryFetchedAt = 0;
   let bannerChecked = false;
 
+  async function loadUserProfiles() {
+    try {
+      const res = await fetch('/api/user-profiles').catch(() => null);
+      if (res && res.ok) {
+        const { data } = await res.json();
+        if (data) userProfilesMap = data;
+      }
+    } catch (e) {
+      console.error('Failed to load user profiles', e);
+    }
+  }
+
   onMount(() => {
     loadHotContent();
     loadDiscoveryContent();
+    loadUserProfiles();
 
     const hotTimer = setInterval(() => {
       if (document.visibilityState === "visible") refreshHotContent();
@@ -574,6 +601,7 @@
                 <ActivityCard
                   {item}
                   {processingItemUri}
+                  recommendScore={authorScores.get(item.author.did)}
                   on:nowPlaying={(e) => {
                     processingItemUri = e.detail.itemUri ?? null;
                     executeNowPlaying(e.detail.track, e.detail.postToBsky);
@@ -743,6 +771,7 @@
                   <ActivityCard
                     {item}
                     {processingItemUri}
+                    recommendScore={authorScores.get(item.author.did)}
                     on:nowPlaying={(e) => {
                       processingItemUri = e.detail.itemUri ?? null;
                       executeNowPlaying(e.detail.track, e.detail.postToBsky);

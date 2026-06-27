@@ -11,6 +11,7 @@ export interface Track {
   youtubeMusicUrl?: string; // Resolved by Odesli
   appleMusicUrl?: string; // Resolved by Odesli
   comment?: string; // User comment
+  genre?: string;
 }
 
 // Client-side iTunes Search
@@ -45,6 +46,7 @@ async function searchITunes(encodedQuery: string): Promise<Track[]> {
         artworkUrl: item.artworkUrl100?.replace('100x100', '600x600'),
         previewUrl: item.previewUrl,
         trackUri: item.trackViewUrl,
+        genre: item.primaryGenreName,
       }));
   } catch (e) {
     console.error("iTunes search failed (client):", e);

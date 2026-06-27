@@ -9,6 +9,7 @@
   // recommendation and realtime feeds.
   export let item: any;
   export let processingItemUri: string | null = null;
+  export let recommendScore: number | undefined = undefined;
 
   const dispatch = createEventDispatcher();
 
@@ -38,20 +39,27 @@
         ></div>
       {/if}
     </a>
-    <div>
-      <div class="text-sm text-gray-300">
-        <a href={`/profile/${item.author.did}`} class="font-bold !text-white hover:underline">
-          {item.author.displayName || item.author.handle}
-        </a>
-        {#if item.type === "history"}
-          <span class="text-gray-500">{$t('discovery.listening')}</span>
-        {:else if item.type === "reaction"}
-          <span class="text-gray-500">
-            {$t('discovery.reacted')}
-            <span class="text-lg">{item.record.emoji}</span>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm text-gray-300 flex items-center gap-2 flex-wrap">
+        <span>
+          <a href={`/profile/${item.author.did}`} class="font-bold text-white! hover:underline">
+            {item.author.displayName || item.author.handle}
+          </a>
+          {#if item.type === "history"}
+            <span class="text-gray-500">{$t('discovery.listening')}</span>
+          {:else if item.type === "reaction"}
+            <span class="text-gray-500">
+              {$t('discovery.reacted')}
+              <span class="text-lg">{item.record.emoji}</span>
+            </span>
+          {:else if item.type === "playlist"}
+            <span class="text-gray-500">{$t('discovery.playlist')}</span>
+          {/if}
+        </span>
+        {#if recommendScore !== undefined && recommendScore > 0}
+          <span class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 shrink-0">
+            ✨ {recommendScore}%
           </span>
-        {:else if item.type === "playlist"}
-          <span class="text-gray-500">{$t('discovery.playlist')}</span>
         {/if}
       </div>
       <div class="text-xs text-gray-600">

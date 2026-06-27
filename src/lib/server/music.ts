@@ -33,6 +33,7 @@ function mapDiscogsResults(results: any[], fallbackArtist = ''): Track[] {
       album: item.title,
       artworkUrl: item.cover_image ?? '',
       trackUri: `https://www.discogs.com${item.uri}`,
+      genre: item.genre?.[0],
     };
   });
 }

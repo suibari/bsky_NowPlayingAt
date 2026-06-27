@@ -18,7 +18,7 @@ export const POST: RequestHandler = async (event) => {
     throw error(401, 'Unauthorized');
   }
 
-  const { did, artist, title, album, skipPost } = await event.request.json();
+  const { did, artist, title, album, genre, skipPost } = await event.request.json();
   if (!did || !artist || !title) throw error(400, 'did, artist, title required');
 
   const warnings: string[] = [];
@@ -88,6 +88,7 @@ export const POST: RequestHandler = async (event) => {
         album: album ?? undefined,
         img: artworkUrl ?? undefined,
         imgBlob: thumbBlob ?? undefined,
+        genre: genre ?? undefined,
         postUri: postRes?.uri ?? undefined,
         postedAt: new Date().toISOString(),
       },
