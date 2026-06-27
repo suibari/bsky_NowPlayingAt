@@ -1,42 +1,64 @@
-# sv
+# なうぷれあっと (bsky-nowplayingat)
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+> Bluesky と連携する、音楽の「今」を共有するアプリ
 
-## Creating a project
+## 主な機能
 
-If you're seeing this, you've probably already done this step. Congrats!
+### 再生中の曲を記録・投稿する
+
+- 聴いている曲を「なうぷれ」として記録
+- Bluesky のタイムラインに自動投稿（投稿頻度・文面はカスタマイズ可）
+- Last.fm 連携で再生中の曲を自動取得
+
+### フォロー中のユーザーの音楽を見る（Recommend タブ）
+
+- Bluesky でフォローしているユーザーが今何を聴いているかを確認
+
+### 全体のトレンドを見る（Everyone タブ）
+
+- **Hot Tracks**：リアクションが多い注目曲
+- **Hot Playlists**：人気のプレイリスト
+- **Hot Users**：アクティブなユーザーランキング
+
+### 楽曲を検索する
+
+- 曲名・アーティスト名で検索
+- Spotify / YouTube Music / Apple Music へのリンク付き
+
+### リアクションする
+
+- 楽曲にリアクション（絵文字）を送る
+- リアクション数や最近のリアクターを確認
+
+### プレイリストを作る・共有する
+
+- お気に入りの曲をまとめてプレイリスト作成
+- プレイリストをサムネイル付きで Bluesky に投稿
+
+### ユーザープロフィール・履歴を見る
+
+- 任意のユーザーの再生履歴・統計を閲覧
+- リスニングレポートで傾向を把握
+
+### 設定
+
+- Last.fm アカウント連携
+- 自動投稿の ON/OFF・投稿確率スライダー
+- カスタム投稿テキスト・アートワーク添付
+- 言語切り替え（日本語 / English）
+
+---
+
+## 開発
 
 ```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv create --template minimal --types ts --add tailwindcss="plugins:none" --install npm bsky_nowplayingat
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
-
-To create a production version of your app:
+本番ビルド：
 
 ```sh
 npm run build
+npm run preview
 ```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
