@@ -56,18 +56,20 @@
             <span class="text-gray-500">{$t('discovery.playlist')}</span>
           {/if}
         </span>
-        {#if recommendScore !== undefined && recommendScore > 0}
-          <span
-            class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 shrink-0 cursor-help"
-            title={$t('recommend.score.tooltip')}
-          >
-            ✨ {$t('recommend.score')}: {recommendScore}%
-          </span>
-        {/if}
       </div>
       <div class="text-xs text-gray-600">
         {new Date(item.indexedAt).toLocaleString()}
       </div>
+      {#if recommendScore !== undefined && recommendScore > 0}
+        <div class="flex justify-end mt-0.5">
+          <span
+            class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 cursor-help"
+            title={$t('recommend.score.tooltip')}
+          >
+            ✨ {$t('recommend.score')}: {recommendScore}%
+          </span>
+        </div>
+      {/if}
     </div>
   </div>
 
