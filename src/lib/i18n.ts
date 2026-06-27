@@ -70,6 +70,8 @@ const translations: Record<Locale, Record<string, string>> = {
     'discovery.reacted': 'がリアクションしました',
     'discovery.playlist': 'がプレイリストを作成しました',
     'discovery.empty': 'まだリアクションがありません。一番乗りしましょう！',
+    'recommend.score': 'おすすめ度',
+    'recommend.score.tooltip': 'なうぷれあっとの記録から求めた、あなたへのこの曲のおすすめ度です',
 
     // --- Main page: playlist modal ---
     'playlist.modal.title': 'プレイリストに追加',
@@ -241,6 +243,8 @@ const translations: Record<Locale, Record<string, string>> = {
     'discovery.reacted': 'reacted with',
     'discovery.playlist': 'created a playlist',
     'discovery.empty': 'No reactions yet. Be the first!',
+    'recommend.score': 'Match',
+    'recommend.score.tooltip': 'How well this track matches your taste, based on your NowPlayingAt history',
 
     // --- Main page: playlist modal ---
     'playlist.modal.title': 'Add to Playlist',
@@ -346,14 +350,14 @@ const translations: Record<Locale, Record<string, string>> = {
     'setup.modal.step2.desc': 'Connect your music app to Last.fm so your plays are automatically recorded on Last.fm. Spotify can be connected from within the Spotify app settings.',
     'setup.modal.step2.link': 'Last.fm connected apps →',
     'setup.modal.step2.skip': 'Already connected? Skip to 3.',
-    'setup.modal.step3.title': '3. Enter your username in なうぷれあっと',
-    'setup.modal.step3.desc': 'Enter your Last.fm username in the "Last.fm Username" field on this page and click "Save" — なうぷれあっと will then automatically pull your Last.fm listening history!',
+    'setup.modal.step3.title': '3. Enter your username in NowPlayingAt',
+    'setup.modal.step3.desc': 'Enter your Last.fm username in the "Last.fm Username" field on this page and click "Save" — NowPlayingAt will then automatically pull your Last.fm listening history!',
     'setup.modal.btn.close': 'Close',
     'setup.help.btn': 'Setup Guide',
 
     // --- InfoModal ---
-    'info.title': 'About なうぷれあっと',
-    'info.p1': 'なうぷれあっと is a music sharing service built on AT protocol.',
+    'info.title': 'About NowPlayingAt',
+    'info.p1': 'NowPlayingAt is a music sharing service built on AT protocol.',
     'info.li1': 'Search and share tracks you\'ve been listening to!',
     'info.li2': 'Create original playlists and share them!',
     'info.li3': 'Send emoji reactions to tracks and playlists you love!',

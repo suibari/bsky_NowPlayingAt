@@ -57,8 +57,11 @@
           {/if}
         </span>
         {#if recommendScore !== undefined && recommendScore > 0}
-          <span class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 shrink-0">
-            ✨ {recommendScore}%
+          <span
+            class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 shrink-0 cursor-help"
+            title={$t('recommend.score.tooltip')}
+          >
+            ✨ {$t('recommend.score')}: {recommendScore}%
           </span>
         {/if}
       </div>
