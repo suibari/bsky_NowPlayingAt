@@ -25,7 +25,7 @@ export const POST: RequestHandler = async (event) => {
     trackUri: track.trackUri,
     img: track.artworkUrl,
     imgBlob: imgBlob ?? undefined,
-    genre: track.genre ?? undefined,
+    genres: track.genres?.length ? track.genres : undefined,
     links: {
       spotify: track.spotifyUrl ?? undefined,
       youtube: track.youtubeMusicUrl ?? undefined,
