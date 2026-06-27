@@ -6,20 +6,46 @@
   import { Loader2, Music } from "lucide-svelte";
   import { t } from "$lib/i18n";
 
+  const STATS_REFRESH_MS = 15 * 60 * 1000;
+  const STATS_STALE_MS = 5 * 60 * 1000;
+
   let loading = true;
   let totalPlays = 0;
   let daily: { date: string; count: number }[] = [];
+  let lastStatsFetchedAt = 0;
 
-  // Count-up animation for the cumulative total.
   const tweenedTotal = tweened(0, { duration: 600, easing: cubicOut });
 
   let canvas: HTMLCanvasElement;
   let chart: any = null;
+  let statsTimer: ReturnType<typeof setInterval> | null = null;
 
-  // "YYYY-MM-DD" -> "M/D" for compact axis labels.
   function shortLabel(date: string): string {
     const [, m, d] = date.split("-");
     return `${Number(m)}/${Number(d)}`;
+  }
+
+  async function silentRefreshStats() {
+    try {
+      const res = await fetch("/api/stats");
+      const data = await res.json();
+      totalPlays = data.totalPlays ?? 0;
+      daily = Array.isArray(data.daily) ? data.daily : [];
+      tweenedTotal.set(totalPlays);
+      lastStatsFetchedAt = Date.now();
+      if (chart) {
+        chart.data.labels = daily.map((d) => shortLabel(d.date));
+        chart.data.datasets[0].data = daily.map((d) => d.count);
+        chart.update();
+      }
+    } catch (e) {
+      console.warn("Failed to refresh global stats", e);
+    }
+  }
+
+  function onStatsVisibilityChange() {
+    if (document.visibilityState !== "visible") return;
+    if (Date.now() - lastStatsFetchedAt > STATS_STALE_MS) silentRefreshStats();
   }
 
   onMount(async () => {
@@ -29,6 +55,7 @@
       totalPlays = data.totalPlays ?? 0;
       daily = Array.isArray(data.daily) ? data.daily : [];
       tweenedTotal.set(totalPlays);
+      lastStatsFetchedAt = Date.now();
     } catch (e) {
       console.warn("Failed to load global stats", e);
     }
@@ -87,10 +114,17 @@
     });
     chart.update();
     loading = false;
+
+    statsTimer = setInterval(() => {
+      if (document.visibilityState === "visible") silentRefreshStats();
+    }, STATS_REFRESH_MS);
+    document.addEventListener("visibilitychange", onStatsVisibilityChange);
   });
 
   onDestroy(() => {
     chart?.destroy();
+    if (statsTimer) clearInterval(statsTimer);
+    document.removeEventListener("visibilitychange", onStatsVisibilityChange);
   });
 </script>
 

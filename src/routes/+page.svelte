@@ -51,12 +51,39 @@
   let loadingHot = true;
   let loadingDiscovery = true;
   let showSettingsBanner = false;
+
+  const HOT_REFRESH_MS = 3 * 60 * 1000;
+  const DISCOVERY_REFRESH_MS = 3 * 60 * 1000;
+  const STALE_THRESHOLD_MS = 2 * 60 * 1000;
+  let lastHotFetchedAt = 0;
+  let lastDiscoveryFetchedAt = 0;
   let bannerChecked = false;
 
   onMount(() => {
-    // Start background fetches
     loadHotContent();
     loadDiscoveryContent();
+
+    const hotTimer = setInterval(() => {
+      if (document.visibilityState === "visible") refreshHotContent();
+    }, HOT_REFRESH_MS);
+
+    const discoveryTimer = setInterval(() => {
+      if (document.visibilityState === "visible") refreshDiscoveryContent();
+    }, DISCOVERY_REFRESH_MS);
+
+    function onVisibilityChange() {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastHotFetchedAt > STALE_THRESHOLD_MS) refreshHotContent();
+      if (now - lastDiscoveryFetchedAt > STALE_THRESHOLD_MS) refreshDiscoveryContent();
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      clearInterval(hotTimer);
+      clearInterval(discoveryTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   });
 
   // Recommend feed needs the signed-in user's DID, which may not be ready at
@@ -111,31 +138,21 @@
   async function loadHotContent() {
     loadingHot = true;
     try {
-      // 1. Try to load from KV cache first for immediate display
       const cacheRes = await fetch("/api/hot").catch(() => null);
       if (cacheRes && cacheRes.ok) {
-        const { data, stale } = await cacheRes.json();
-        if (data && !stale) {
+        const { data } = await cacheRes.json();
+        if (data) {
           hotTracks = data.tracks;
           hotPlaylists = data.playlists;
           hotUsers = data.users;
-          loadingHot = false; // Show cached UI immediately
+          lastHotFetchedAt = Date.now();
         }
       }
     } catch (e) {
       console.error("Failed to load hot cache", e);
-    }
-
-    // 2. Fetch fresh data in the background (fire and forget)
-    getHotContent().then((data) => {
-      hotTracks = data.tracks;
-      hotPlaylists = data.playlists;
-      hotUsers = data.users;
-      loadingHot = false; // Turn off spinner if cache wasn't available
-    }).catch(e => {
-      console.error("Failed to load fresh hot content", e);
+    } finally {
       loadingHot = false;
-    });
+    }
   }
 
   async function loadRecommendFeed(did: string) {
@@ -152,27 +169,41 @@
   async function loadDiscoveryContent() {
     loadingDiscovery = true;
     try {
-      // 1. Try to load from KV cache first for immediate display
       const cacheRes = await fetch("/api/timeline").catch(() => null);
       if (cacheRes && cacheRes.ok) {
-        const { data, stale } = await cacheRes.json();
-        if (data && !stale) {
+        const { data } = await cacheRes.json();
+        if (data) {
           discoveryTimeline = mergeTimeline(data);
-          loadingDiscovery = false; // Show cached UI immediately
+          lastDiscoveryFetchedAt = Date.now();
         }
       }
     } catch (e) {
       console.error("Failed to load discovery cache", e);
+    } finally {
+      loadingDiscovery = false;
     }
+  }
 
-    // 2. Fetch fresh data in the background
-    getGlobalTimeline().then((items) => {
+  async function refreshHotContent() {
+    try {
+      const data = await getHotContent();
+      hotTracks = data.tracks;
+      hotPlaylists = data.playlists;
+      hotUsers = data.users;
+      lastHotFetchedAt = Date.now();
+    } catch (e) {
+      console.error("Failed to refresh hot content", e);
+    }
+  }
+
+  async function refreshDiscoveryContent() {
+    try {
+      const items = await getGlobalTimeline();
       discoveryTimeline = mergeTimeline(items);
-      loadingDiscovery = false;
-    }).catch(e => {
-      console.error("Failed to load fresh discovery content", e);
-      loadingDiscovery = false;
-    });
+      lastDiscoveryFetchedAt = Date.now();
+    } catch (e) {
+      console.error("Failed to refresh discovery content", e);
+    }
   }
 
   // Optimistic items (from the current user's just-now post/reaction) that should
