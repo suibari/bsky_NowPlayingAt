@@ -221,11 +221,18 @@
     <!-- Profile Header -->
     <div class="mb-8 flex items-center gap-6">
       {#if profile.avatar}
-        <img
-          src={profile.avatar}
-          alt={profile.handle}
-          class="w-24 h-24 rounded-full border-2 border-gray-700 shadow-xl"
-        />
+        <a
+          href="https://bsky.app/profile/{profile.handle}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="@{profile.handle} on Bluesky"
+        >
+          <img
+            src={profile.avatar}
+            alt={profile.handle}
+            class="w-24 h-24 rounded-full border-2 border-gray-700 shadow-xl hover:opacity-80 transition-opacity cursor-pointer"
+          />
+        </a>
       {/if}
       <div>
         <h1 class="text-3xl font-bold text-white mb-1">
