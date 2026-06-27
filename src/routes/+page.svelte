@@ -186,11 +186,16 @@
 
   async function refreshHotContent() {
     try {
-      const data = await getHotContent();
-      hotTracks = data.tracks;
-      hotPlaylists = data.playlists;
-      hotUsers = data.users;
-      lastHotFetchedAt = Date.now();
+      const cacheRes = await fetch("/api/hot").catch(() => null);
+      if (cacheRes && cacheRes.ok) {
+        const { data } = await cacheRes.json();
+        if (data) {
+          hotTracks = data.tracks;
+          hotPlaylists = data.playlists;
+          hotUsers = data.users;
+          lastHotFetchedAt = Date.now();
+        }
+      }
     } catch (e) {
       console.error("Failed to refresh hot content", e);
     }
@@ -198,9 +203,14 @@
 
   async function refreshDiscoveryContent() {
     try {
-      const items = await getGlobalTimeline();
-      discoveryTimeline = mergeTimeline(items);
-      lastDiscoveryFetchedAt = Date.now();
+      const cacheRes = await fetch("/api/timeline").catch(() => null);
+      if (cacheRes && cacheRes.ok) {
+        const { data } = await cacheRes.json();
+        if (data) {
+          discoveryTimeline = mergeTimeline(data);
+          lastDiscoveryFetchedAt = Date.now();
+        }
+      }
     } catch (e) {
       console.error("Failed to refresh discovery content", e);
     }
