@@ -112,6 +112,7 @@ export interface UserSession {
   custom_text: string | null;
   attach_image: boolean;
   post_probability: number;
+  hide_from_feed: boolean;
 }
 
 export async function upsertSession(data: {
@@ -122,6 +123,7 @@ export async function upsertSession(data: {
   custom_text?: string | null;
   attach_image?: boolean;
   post_probability?: number;
+  hide_from_feed?: boolean;
 }, onConflict: 'merge' | 'ignore' = 'merge'): Promise<void> {
   await pgFetch(`${env.POSTGREST_URL}/sessions`, {
     method: 'POST',
@@ -150,6 +152,14 @@ export async function getAllEnabledUsers(): Promise<UserSession[]> {
     { headers: readHeaders() }
   );
   return res.json();
+}
+
+export async function upsertHideFromFeed(did: string, bsky_handle: string, hide_from_feed: boolean): Promise<void> {
+  await pgFetch(`${env.POSTGREST_URL}/sessions`, {
+    method: 'POST',
+    headers: { ...writeHeaders(), 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ did, bsky_handle, hide_from_feed }),
+  });
 }
 
 export async function updateLastScrobble(did: string, key: string): Promise<void> {

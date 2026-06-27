@@ -120,6 +120,12 @@ const translations: Record<Locale, Record<string, string>> = {
     'settings.error.DB_SAVE_FAILED': 'データ保存に失敗しました。しばらく経ってから再試行してください',
     'settings.noauth': 'サインインしていません。',
     'settings.gotologin': 'ログイン画面へ',
+    'settings.privacy.title': 'プライバシー',
+    'settings.privacy.description': 'おすすめ・リアルタイム・なうぷれライブへの表示を設定します。',
+    'settings.privacy.hide.toggle': '自分の再生履歴をフィード・ライブに表示しない',
+    'settings.privacy.save': '保存する',
+    'settings.privacy.saving': '保存中...',
+    'settings.privacy.saved': '保存しました',
 
     // --- Profile page ---
     'profile.back': 'ホームに戻る',
@@ -285,6 +291,12 @@ const translations: Record<Locale, Record<string, string>> = {
     'settings.error.DB_SAVE_FAILED': 'Failed to save data. Please try again later.',
     'settings.noauth': 'Not signed in.',
     'settings.gotologin': 'Go to Login',
+    'settings.privacy.title': 'Privacy',
+    'settings.privacy.description': 'Configure visibility in recommendations, realtime, and live feeds.',
+    'settings.privacy.hide.toggle': 'Hide my listening history from feeds and live',
+    'settings.privacy.save': 'Save',
+    'settings.privacy.saving': 'Saving...',
+    'settings.privacy.saved': 'Saved',
 
     // --- Profile page ---
     'profile.back': 'Back to Home',

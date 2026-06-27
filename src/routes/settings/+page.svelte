@@ -1,7 +1,7 @@
 <script lang="ts">
   import { userProfile, authState, agent } from "$lib/stores";
   import { signOut } from "$lib/atproto";
-  import { LogOut, Music, Loader2, Globe, HelpCircle } from "lucide-svelte";
+  import { LogOut, Music, Loader2, Globe, HelpCircle, Radio } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
   import { get } from "svelte/store";
@@ -14,6 +14,7 @@
   let attachImage = true;
   let customText = "";
   let postProbability = 100;
+  let hideFromFeed = false;
   let savingLastfm = false;
   let lastfmSaved = false;
   let lastfmError = "";
@@ -30,6 +31,7 @@
         attachImage = data.attach_image ?? true;
         customText = data.custom_text ?? "";
         postProbability = data.post_probability ?? 100;
+        hideFromFeed = data.hide_from_feed ?? false;
       }
     } catch {
       // not registered yet
@@ -63,6 +65,7 @@
           attach_image: attachImage,
           custom_text: customText.trim() || null,
           post_probability: postProbability,
+          hide_from_feed: hideFromFeed,
         }),
       });
       if (!res.ok) {
@@ -210,7 +213,30 @@
               ></span>
             </button>
           </div>
+        </div>
 
+        <!-- Privacy subsection -->
+        <div class="border-t border-gray-800 mt-6 pt-6">
+          <div class="flex items-center gap-3 mb-2">
+            <Radio size={18} class="text-green-400" />
+            <h3 class="text-base font-bold text-white">{$t('settings.privacy.title')}</h3>
+          </div>
+          <p class="text-gray-400 text-sm mb-4">{$t('settings.privacy.description')}</p>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-400">{$t('settings.privacy.hide.toggle')}</span>
+            <button
+              on:click={() => (hideFromFeed = !hideFromFeed)}
+              class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {hideFromFeed ? 'bg-green-500' : 'bg-gray-600'}"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {hideFromFeed ? 'translate-x-6' : 'translate-x-1'}"
+              ></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Shared save -->
+        <div class="mt-6 space-y-2">
           {#if lastfmError}
             <p class="text-red-400 text-sm">{lastfmError}</p>
           {/if}
