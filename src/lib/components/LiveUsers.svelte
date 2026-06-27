@@ -171,7 +171,7 @@
           <div class="min-w-0 flex-1">
             <a
               href="/profile/{user.did}"
-              class="block text-xs font-semibold text-white truncate hover:underline leading-tight"
+              class="block text-xs font-semibold text-white! truncate hover:underline leading-tight"
             >
               {user.displayName}
             </a>
