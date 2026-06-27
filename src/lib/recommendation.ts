@@ -1,3 +1,9 @@
+// Recommendation score for the ActivityCard "おすすめ度 N%" badge.
+// score = 0.6 * Jaccard(song sets) + 0.4 * cosine(genre frequency vectors).
+// Profiles are built server-side (poller getHotContent → KV 'user_profiles') so
+// songKeys/genreFreq keys are already normalized & lowercased consistently; this
+// only does math. See bsky_nowplayingat_server/src/{normalize,ollama}.ts for how
+// the keys are derived (deterministic artist normalization, no embeddings).
 export type UserProfile = {
   songKeys: string[];
   genreFreq: Record<string, number>;
