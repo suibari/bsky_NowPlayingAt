@@ -8,12 +8,17 @@
   // A single activity (history / reaction / playlist) shown in the
   // recommendation and realtime feeds.
   export let item: any;
-  export let processingTrackId: string | null = null;
+  export let processingItemUri: string | null = null;
 
   const dispatch = createEventDispatcher();
 
   function forward(name: string) {
     return (e: CustomEvent) => dispatch(name, e.detail);
+  }
+
+  // Include item.uri so +page.svelte can track processing per card, not per song.
+  function forwardNowPlayingWithUri(e: CustomEvent) {
+    dispatch("nowPlaying", { ...e.detail, itemUri: item.uri });
   }
 </script>
 
@@ -74,8 +79,9 @@
         }}
         fallbackArtworkUrl={item.record.img}
         postUri={item.record.postUri}
-        isProcessing={processingTrackId === item.record.trackUri}
-        on:nowPlaying={forward("nowPlaying")}
+        subjectUriOverride={item.uri}
+        isProcessing={processingItemUri === item.uri}
+        on:nowPlaying={forwardNowPlayingWithUri}
         on:addToPlaylist={forward("addToPlaylist")}
         on:reaction={forward("reaction")}
       />
@@ -104,8 +110,8 @@
             provider: item.record.provider || "itunes",
           }}
           fallbackArtworkUrl={item.record.img}
-          isProcessing={processingTrackId === item.record.subjectUri}
-          on:nowPlaying={forward("nowPlaying")}
+          isProcessing={processingItemUri === item.uri}
+          on:nowPlaying={forwardNowPlayingWithUri}
           on:addToPlaylist={forward("addToPlaylist")}
           on:reaction={forward("reaction")}
         />

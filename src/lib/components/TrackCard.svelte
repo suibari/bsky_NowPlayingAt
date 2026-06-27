@@ -38,7 +38,10 @@
   // Some tracks (e.g. Last.fm auto-posts surfaced in What's hot) have no trackUri.
   // Fall back to a stable song key so reactions still have a valid, aggregatable
   // subject instead of sending an empty subjectUri (which the API rejects with 400).
-  $: reactionSubjectUri = track.trackUri || songKey(track.artist, track.title);
+  // When set (history cards), use the history record's AT-URI so reactions on
+  // different play events of the same song are stored separately.
+  export let subjectUriOverride: string | undefined = undefined;
+  $: reactionSubjectUri = subjectUriOverride || track.trackUri || songKey(track.artist, track.title);
   // AT-URI of the Bluesky post backing this track (history cards only).
   // Forwarded to ReactionBar so post likes are merged into reactions.
   export let postUri: string | undefined = undefined;
@@ -113,7 +116,7 @@
   }
 
   function handleReaction(e: CustomEvent) {
-    dispatch("reaction", { track: track, emoji: e.detail });
+    dispatch("reaction", { track: track, emoji: e.detail, historyUri: subjectUriOverride });
   }
 
   function handleDelete() {

@@ -196,7 +196,9 @@
   }
 
   // Reflect the current user's just-now post/history into Discover (no reload).
-  function reflectHistoryToDiscovery(track: Track, imgBlob?: string, uri?: string) {
+  // historyUri: AT-URI of the nowplayingat history record (used as item key for dedup).
+  // postUri: AT-URI of the Bluesky post, if the user also posted to Bluesky.
+  function reflectHistoryToDiscovery(track: Track, imgBlob?: string, historyUri?: string, postUri?: string) {
     const me = get(userProfile);
     if (!me) return;
     prependDiscovery({
@@ -216,9 +218,9 @@
         },
         comment: track.comment,
         provider: track.provider,
-        postUri: uri,
+        postUri,
       },
-      uri: uri ?? `optimistic:history:${track.trackUri}:${Date.now()}`,
+      uri: historyUri ?? `optimistic:history:${track.trackUri}:${Date.now()}`,
       indexedAt: new Date().toISOString(),
     });
   }
@@ -229,7 +231,8 @@
     const track = e.detail?.track;
     const emoji = e.detail?.emoji;
     if (!me || !track || !emoji) return;
-    const subjectUri = track.trackUri || songKey(track.artist, track.title);
+    const historyUri = e.detail?.historyUri;
+    const subjectUri = historyUri || track.trackUri || songKey(track.artist, track.title);
     if (
       optimisticItems.some(
         (o) =>
@@ -277,6 +280,7 @@
   let myPlaylists: any[] = [];
   let loadingPlaylists = false;
   let processingTrackId: string | null = null;
+  let processingItemUri: string | null = null;
 
   function performSearch(query: string) {
     if (searchTimeout) clearTimeout(searchTimeout);
@@ -301,21 +305,19 @@
       if (postToBsky) {
         if (!confirm(get(t)('confirm.post', { title: track.title }))) return;
 
-        // 1. Post to Feed (blob upload happens here, get post URI and thumbBlob back)
-        const { uri, thumbBlob } = await postToFeed(track, track.comment);
+        // 1. Post to Feed (blob upload happens here, get post URI back)
+        const { uri: bskyPostUri } = await postToFeed(track, track.comment);
 
-        // 2. Write to History (PDS) with jacketBlob for permanent image reference
-        //    and postUri so Bluesky likes on the post can be aggregated later.
-        await createHistoryRecord(track, undefined, uri, thumbBlob);
+        // 2. Write to History (PDS) with postUri so Bluesky likes can be aggregated later.
+        const histRes = await createHistoryRecord(track, undefined, bskyPostUri);
 
-        reflectHistoryToDiscovery(track, undefined, uri);
+        reflectHistoryToDiscovery(track, undefined, histRes.uri, bskyPostUri);
         alert(get(t)('alert.posted'));
       } else {
         // No confirmation dialog when just saving to history
-        // 1. Write to History (PDS)
-        await createHistoryRecord(track);
+        const histRes = await createHistoryRecord(track);
 
-        reflectHistoryToDiscovery(track);
+        reflectHistoryToDiscovery(track, undefined, histRes.uri);
         alert(get(t)('alert.history'));
       }
     } catch (e) {
@@ -323,6 +325,7 @@
       alert(get(t)('alert.failed') + e);
     } finally {
       processingTrackId = null;
+      processingItemUri = null;
     }
   }
 
@@ -518,9 +521,11 @@
               {#each recommendFeed.slice(0, recommendLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
                 <ActivityCard
                   {item}
-                  {processingTrackId}
-                  on:nowPlaying={(e) =>
-                    executeNowPlaying(e.detail.track, e.detail.postToBsky)}
+                  {processingItemUri}
+                  on:nowPlaying={(e) => {
+                    processingItemUri = e.detail.itemUri ?? null;
+                    executeNowPlaying(e.detail.track, e.detail.postToBsky);
+                  }}
                   on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
                   on:reaction={handleDiscoveryReaction}
                 />
@@ -685,9 +690,11 @@
                 {#each discoveryTimeline.slice(0, discoveryLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
                   <ActivityCard
                     {item}
-                    {processingTrackId}
-                    on:nowPlaying={(e) =>
-                      executeNowPlaying(e.detail.track, e.detail.postToBsky)}
+                    {processingItemUri}
+                    on:nowPlaying={(e) => {
+                      processingItemUri = e.detail.itemUri ?? null;
+                      executeNowPlaying(e.detail.track, e.detail.postToBsky);
+                    }}
                     on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
                     on:reaction={handleDiscoveryReaction}
                   />
