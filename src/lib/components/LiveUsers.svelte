@@ -6,7 +6,7 @@
   import { Play, Loader2 } from "lucide-svelte";
 
   const LIVE_WINDOW_MS = 10 * 60 * 1000;
-  const LIVE_REFRESH_MS = 60 * 1000;
+  const LIVE_REFRESH_MS = 3 * 60 * 1000;
   const LIVE_STALE_MS = 30 * 1000;
   const MAX_SHOWN = 6;
 

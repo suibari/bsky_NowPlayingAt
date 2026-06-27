@@ -223,12 +223,21 @@
 
   function mergeTimeline(fetched: any[]): any[] {
     if (optimisticItems.length === 0) return fetched;
-    const seen = new Set(
-      fetched.map((i) => `${i.type}:${i.uri ?? ""}:${i.record?.subjectUri ?? ""}`),
-    );
-    const stillPending = optimisticItems.filter(
-      (o) => !seen.has(`${o.type}:${o.uri ?? ""}:${o.record?.subjectUri ?? ""}`),
-    );
+    const seen = new Set<string>();
+    for (const i of fetched) {
+      seen.add(`${i.type}:${i.uri ?? ""}`);
+      // reaction の optimistic URI は偽 URI なので、セマンティックキーでも照合
+      if (i.type === "reaction" && i.author?.did && i.record?.subjectUri) {
+        seen.add(`reaction:${i.author.did}:${i.record.subjectUri}:${i.record.emoji ?? ""}`);
+      }
+    }
+    const stillPending = optimisticItems.filter((o) => {
+      if (seen.has(`${o.type}:${o.uri ?? ""}`)) return false;
+      if (o.type === "reaction" && o.author?.did && o.record?.subjectUri) {
+        if (seen.has(`reaction:${o.author.did}:${o.record.subjectUri}:${o.record.emoji ?? ""}`)) return false;
+      }
+      return true;
+    });
     return [...stillPending, ...fetched];
   }
 
