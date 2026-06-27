@@ -20,6 +20,7 @@
   import InfoModal from "$lib/components/InfoModal.svelte";
   import LangToggle from "$lib/components/LangToggle.svelte";
   import GlobalStats from "$lib/components/GlobalStats.svelte";
+  import LiveUsers from "$lib/components/LiveUsers.svelte";
   import SignInForm from "$lib/components/SignInForm.svelte";
   import SignInModal from "$lib/components/SignInModal.svelte";
   import { Loader2, Music, X, Plus, Info, LogIn } from "lucide-svelte";
@@ -1031,6 +1032,7 @@
             <SignInForm />
           </div>
         {/if}
+        <LiveUsers />
         <GlobalStats />
       </div>
     </aside>
