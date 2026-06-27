@@ -56,6 +56,7 @@
   const HOT_REFRESH_MS = 3 * 60 * 1000;
   const DISCOVERY_REFRESH_MS = 3 * 60 * 1000;
   const STALE_THRESHOLD_MS = 2 * 60 * 1000;
+  const DISCOVERY_STALE_MS = 30 * 1000;
   let lastHotFetchedAt = 0;
   let lastDiscoveryFetchedAt = 0;
   let bannerChecked = false;
@@ -76,7 +77,7 @@
       if (document.visibilityState !== "visible") return;
       const now = Date.now();
       if (now - lastHotFetchedAt > STALE_THRESHOLD_MS) refreshHotContent();
-      if (now - lastDiscoveryFetchedAt > STALE_THRESHOLD_MS) refreshDiscoveryContent();
+      if (now - lastDiscoveryFetchedAt > DISCOVERY_STALE_MS) refreshDiscoveryContent();
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
 
