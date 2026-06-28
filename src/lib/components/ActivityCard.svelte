@@ -62,12 +62,16 @@
       </div>
       {#if recommendScore !== undefined && recommendScore > 0}
         <div class="flex justify-end mt-0.5">
-          <span
-            class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 cursor-help"
-            title={$t('recommend.score.tooltip')}
-          >
-            ✨ {$t('recommend.score')}: {recommendScore}%
-          </span>
+          <div class="relative group inline-flex">
+            <span
+              class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 cursor-help"
+            >
+              ✨ {$t('recommend.score')}: {recommendScore}%
+            </span>
+            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 w-64 bg-gray-900 text-gray-200 text-xs rounded px-2 py-1 pointer-events-none z-50 text-center hidden group-hover:block">
+              {$t('recommend.score.tooltip')}
+            </div>
+          </div>
         </div>
       {/if}
     </div>

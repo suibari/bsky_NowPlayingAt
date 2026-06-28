@@ -14,7 +14,7 @@
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import { resolveArtworkUrl } from "$lib/artwork";
-  import { computeScore, type UserProfile } from "$lib/recommendation";
+  import { computeScore, computeTrackGenreScore, type UserProfile } from "$lib/recommendation";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ActivityCard from "$lib/components/ActivityCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
@@ -65,6 +65,22 @@
     }
     return scores;
   })();
+
+  $: myProfile = (() => {
+    const myDid = $userProfile?.did;
+    if (!userProfilesMap || !myDid) return null as UserProfile | null;
+    return userProfilesMap[myDid] ?? null;
+  })();
+
+  function getItemScore(item: any): number | undefined {
+    const userScore = authorScores.get(item.author.did);
+    if (userScore === undefined) return undefined;
+    const trackGenres: string[] = item.record?.genres ?? [];
+    if (trackGenres.length === 0 || !myProfile) return userScore;
+    const trackScore = computeTrackGenreScore(trackGenres, myProfile.genreFreq);
+    return Math.round(0.5 * userScore + 0.5 * trackScore);
+  }
+
   let showSettingsBanner = false;
 
   const HOT_REFRESH_MS = 3 * 60 * 1000;
@@ -601,7 +617,7 @@
                 <ActivityCard
                   {item}
                   {processingItemUri}
-                  recommendScore={authorScores.get(item.author.did)}
+                  recommendScore={getItemScore(item)}
                   on:nowPlaying={(e) => {
                     processingItemUri = e.detail.itemUri ?? null;
                     executeNowPlaying(e.detail.track, e.detail.postToBsky);
@@ -771,7 +787,7 @@
                   <ActivityCard
                     {item}
                     {processingItemUri}
-                    recommendScore={authorScores.get(item.author.did)}
+                    recommendScore={getItemScore(item)}
                     on:nowPlaying={(e) => {
                       processingItemUri = e.detail.itemUri ?? null;
                       executeNowPlaying(e.detail.track, e.detail.postToBsky);

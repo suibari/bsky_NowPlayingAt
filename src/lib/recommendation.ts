@@ -32,3 +32,19 @@ export function computeScore(myProfile: UserProfile, theirProfile: UserProfile):
 
   return Math.round((0.6 * jaccard + 0.4 * genreCosine) * 100);
 }
+
+// Score based on how well a specific track's genres match the user's genre preference.
+// trackGenres should already be lowercase-normalized (as stored by the poller).
+export function computeTrackGenreScore(
+  trackGenres: string[],
+  myGenreFreq: Record<string, number>
+): number {
+  if (trackGenres.length === 0) return 0;
+  const total = Object.values(myGenreFreq).reduce((s, v) => s + v, 0);
+  if (total === 0) return 0;
+  const match = trackGenres.reduce(
+    (s, g) => s + (myGenreFreq[g.trim().toLowerCase()] ?? 0),
+    0
+  );
+  return Math.round((match / total) * 100);
+}
