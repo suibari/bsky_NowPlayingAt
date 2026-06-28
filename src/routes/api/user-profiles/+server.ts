@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { readSnapshotField } from '$lib/server/snapshot';
 
 export async function GET(event) {
   if (!event.platform?.env?.CACHE) {
@@ -6,11 +7,11 @@ export async function GET(event) {
   }
 
   try {
-    const { value, metadata } = await event.platform.env.CACHE.getWithMetadata('user_profiles', 'json');
+    const { data, updatedAt } = await readSnapshotField(event.platform.env.CACHE, 'user_profiles');
 
-    if (value) {
+    if (data) {
       return json(
-        { data: value, updatedAt: metadata?.updatedAt, stale: false },
+        { data, updatedAt, stale: false },
         { headers: { 'Cache-Control': 'public, max-age=60' } },
       );
     } else {

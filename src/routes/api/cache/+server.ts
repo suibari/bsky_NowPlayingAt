@@ -13,7 +13,7 @@ export async function PUT(event) {
         const body = await event.request.json();
         const { key, data } = body;
 
-        if (key !== 'hot' && key !== 'timeline' && key !== 'stats' && key !== 'user_profiles') {
+        if (key !== 'snapshot' && key !== 'stats') {
             return json({ error: 'Invalid key' }, { status: 400 });
         }
 
