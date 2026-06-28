@@ -14,7 +14,7 @@
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
   import { resolveArtworkUrl } from "$lib/artwork";
-  import { computeScore, computeTrackGenreScore, type UserProfile } from "$lib/recommendation";
+  import { computeScore, computeTrackGenreScore, computeTrackArtistScore, type UserProfile } from "$lib/recommendation";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ActivityCard from "$lib/components/ActivityCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
@@ -74,10 +74,20 @@
 
   function getItemScore(item: any): number | undefined {
     const userScore = authorScores.get(item.author.did);
-    if (userScore === undefined) return undefined;
+    if (userScore === undefined || !myProfile) return undefined;
+
+    const trackArtist: string = item.record?.artist ?? '';
     const trackGenres: string[] = item.record?.genres ?? [];
-    if (trackGenres.length === 0 || !myProfile) return undefined;
-    const trackScore = computeTrackGenreScore(trackGenres, myProfile.genreFreq);
+    if (!trackArtist && trackGenres.length === 0) return undefined;
+
+    const artistScore = trackArtist && myProfile.artistFreq
+      ? computeTrackArtistScore(trackArtist, myProfile.artistFreq)
+      : 0;
+    const genreScore = trackGenres.length > 0
+      ? computeTrackGenreScore(trackGenres, myProfile.genreFreq)
+      : 0;
+    const trackScore = Math.round(0.6 * artistScore + 0.4 * genreScore);
+
     return Math.round(0.5 * userScore + 0.5 * trackScore);
   }
 
