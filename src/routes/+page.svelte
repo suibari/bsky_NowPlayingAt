@@ -269,6 +269,7 @@
     } catch (e) {
       console.error("Failed to refresh discovery content", e);
     }
+    await loadUserProfiles();
   }
 
   // Optimistic items (from the current user's just-now post/reaction) that should
@@ -552,7 +553,7 @@
 
     <!-- Below topbar: central pane + right pane -->
     <div class="flex gap-8 mt-2">
-    <main class="flex-1 min-w-0">
+    <main class="flex-1 min-w-0 relative z-10">
 
     <!-- Settings Banner -->
     {#if showSettingsBanner}
