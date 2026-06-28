@@ -265,6 +265,25 @@
   // timeline store 更新時に discoveryTimeline を再構築（optimistic items を維持）
   $: discoveryTimeline = mergeTimeline($timelineStore.data ?? []);
 
+  // なうぷれミックス: 24時間以内の他ユーザー履歴のうち、おすすめ度が最も高い1曲を選ぶ。
+  // フィードのバッジと完全に一致させるため getItemScore / myProfile をそのまま使う。
+  const MIX_WINDOW_MS = 24 * 60 * 60 * 1000;
+  $: mixBest = (() => {
+    const myDid = $userProfile?.did;
+    if (!myDid || !myProfile) return null as { item: any; score: number } | null;
+    const cutoff = Date.now() - MIX_WINDOW_MS;
+    let best: { item: any; score: number } | null = null;
+    for (const item of discoveryTimeline) {
+      if (item.type !== "history") continue;
+      if (item.author?.did === myDid) continue;
+      if (new Date(item.indexedAt).getTime() < cutoff) continue;
+      const score = getItemScore(item);
+      if (score === undefined || score <= 0) continue;
+      if (!best || score > best.score) best = { item, score };
+    }
+    return best;
+  })();
+
   function prependDiscovery(item: any) {
     optimisticItems = [item, ...optimisticItems];
   }
@@ -1071,7 +1090,7 @@
           </div>
         {/if}
         <LiveUsers />
-        <NowplayingMix />
+        <NowplayingMix best={mixBest} loading={loadingDiscovery} />
         <GlobalStats />
       </div>
     </aside>
