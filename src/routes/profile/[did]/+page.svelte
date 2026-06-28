@@ -240,7 +240,7 @@
           {profile.displayName || profile.handle}
         </h1>
         <p class="text-gray-400 break-all">@{profile.handle}</p>
-        <p class="text-gray-500 text-sm mt-2">{profile.description || ""}</p>
+        <p class="text-gray-500 text-sm mt-2 wrap-break-word whitespace-pre-wrap">{profile.description || ""}</p>
       </div>
     </div>
 
