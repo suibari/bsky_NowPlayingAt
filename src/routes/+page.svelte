@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { authState, userProfile } from "$lib/stores";
+  import { authState, userProfile, timelineStore } from "$lib/stores";
   import {
     createHistoryRecord,
     postToFeed,
@@ -57,8 +57,8 @@
   let loadingRecommend = true;
   let recommendLoaded = false;
   let loadingHot = true;
-  let loadingDiscovery = true;
-  let discoveryError = false;
+  $: loadingDiscovery = $timelineStore.loading;
+  $: discoveryError = $timelineStore.error;
   let userProfilesMap: Record<string, UserProfile> | null = null;
 
   $: authorScores = (() => {
@@ -101,11 +101,8 @@
   let showSettingsBanner = false;
 
   const HOT_REFRESH_MS = 3 * 60 * 1000;
-  const DISCOVERY_REFRESH_MS = 3 * 60 * 1000;
   const STALE_THRESHOLD_MS = 2 * 60 * 1000;
-  const DISCOVERY_STALE_MS = 30 * 1000;
   let lastHotFetchedAt = 0;
-  let lastDiscoveryFetchedAt = 0;
   let bannerChecked = false;
 
   async function loadUserProfiles() {
@@ -122,28 +119,24 @@
 
   onMount(() => {
     loadHotContent();
-    loadDiscoveryContent();
     loadUserProfiles();
 
     const hotTimer = setInterval(() => {
-      if (document.visibilityState === "visible") refreshHotContent();
+      if (document.visibilityState === "visible") {
+        refreshHotContent();
+        loadUserProfiles();
+      }
     }, HOT_REFRESH_MS);
-
-    const discoveryTimer = setInterval(() => {
-      if (document.visibilityState === "visible") refreshDiscoveryContent();
-    }, DISCOVERY_REFRESH_MS);
 
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") return;
       const now = Date.now();
       if (now - lastHotFetchedAt > STALE_THRESHOLD_MS) refreshHotContent();
-      if (now - lastDiscoveryFetchedAt > DISCOVERY_STALE_MS) refreshDiscoveryContent();
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       clearInterval(hotTimer);
-      clearInterval(discoveryTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   });
@@ -228,30 +221,6 @@
     }
   }
 
-  async function loadDiscoveryContent() {
-    loadingDiscovery = true;
-    discoveryError = false;
-    try {
-      const cacheRes = await fetch("/api/timeline").catch(() => null);
-      if (cacheRes && cacheRes.ok) {
-        const { data } = await cacheRes.json();
-        if (data) {
-          discoveryTimeline = mergeTimeline(data);
-          lastDiscoveryFetchedAt = Date.now();
-        } else {
-          discoveryError = true;
-        }
-      } else {
-        discoveryError = true;
-      }
-    } catch (e) {
-      console.error("Failed to load discovery cache", e);
-      discoveryError = true;
-    } finally {
-      loadingDiscovery = false;
-    }
-  }
-
   async function refreshHotContent() {
     try {
       const cacheRes = await fetch("/api/hot").catch(() => null);
@@ -267,28 +236,6 @@
     } catch (e) {
       console.error("Failed to refresh hot content", e);
     }
-  }
-
-  async function refreshDiscoveryContent() {
-    try {
-      const cacheRes = await fetch("/api/timeline").catch(() => null);
-      if (cacheRes && cacheRes.ok) {
-        const { data } = await cacheRes.json();
-        if (data) {
-          discoveryTimeline = mergeTimeline(data);
-          lastDiscoveryFetchedAt = Date.now();
-          discoveryError = false;
-        } else {
-          discoveryError = true;
-        }
-      } else {
-        discoveryError = true;
-      }
-    } catch (e) {
-      console.error("Failed to refresh discovery content", e);
-      discoveryError = true;
-    }
-    await loadUserProfiles();
   }
 
   // Optimistic items (from the current user's just-now post/reaction) that should
@@ -315,9 +262,11 @@
     return [...stillPending, ...fetched];
   }
 
+  // timeline store 更新時に discoveryTimeline を再構築（optimistic items を維持）
+  $: discoveryTimeline = mergeTimeline($timelineStore.data ?? []);
+
   function prependDiscovery(item: any) {
     optimisticItems = [item, ...optimisticItems];
-    discoveryTimeline = [item, ...discoveryTimeline];
   }
 
   // Reflect the current user's just-now post/history into Discover (no reload).

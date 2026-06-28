@@ -1,13 +1,11 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
   import { resolveArtworkUrl } from "$lib/artwork";
   import { resolveLinks } from "$lib/odesli";
   import { t } from "$lib/i18n";
+  import { timelineStore } from "$lib/stores";
   import { Play, Loader2 } from "lucide-svelte";
 
   const LIVE_WINDOW_MS = 10 * 60 * 1000;
-  const LIVE_REFRESH_MS = 3 * 60 * 1000;
-  const LIVE_STALE_MS = 30 * 1000;
   const MAX_SHOWN = 6;
 
   interface LiveUser {
@@ -24,61 +22,50 @@
     appleMusicUrl: string | null;
   }
 
-  let liveUsers: LiveUser[] = [];
-  let lastFetchedAt = 0;
-  let timer: ReturnType<typeof setInterval> | null = null;
   let resolvingDid: string | null = null;
 
-  $: isLive = liveUsers.length > 0;
-
-  async function fetchLive() {
-    try {
-      const res = await fetch("/api/timeline");
-      const json = await res.json();
-      const items: any[] = Array.isArray(json.data) ? json.data : [];
-      const cutoff = Date.now() - LIVE_WINDOW_MS;
-      const recent = items
-        .filter(
-          (i) =>
-            i.type === "history" &&
-            new Date(i.indexedAt).getTime() >= cutoff
-        )
-        .sort(
-          (a, b) =>
-            new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime()
-        );
-      const seen = new Set<string>();
-      const result: LiveUser[] = [];
-      for (const item of recent) {
-        const did = item.author?.did;
-        if (!did || seen.has(did)) continue;
-        seen.add(did);
-        result.push({
-          did,
-          handle: item.author.handle ?? "",
-          displayName:
-            item.author.displayName || item.author.handle || did,
-          avatar: item.author.avatar ?? null,
-          track: item.record?.track ?? "",
-          artist: item.record?.artist ?? "",
-          artworkUrl: resolveArtworkUrl(
-            item.record?.imgBlob,
-            item.record?.img,
-            did
-          ),
-          trackUri: item.record?.trackUri ?? "",
-          spotifyUrl: item.record?.links?.spotify ?? null,
-          ytMusicUrl: item.record?.links?.youtube ?? null,
-          appleMusicUrl: item.record?.links?.appleMusic ?? null,
-        });
-        if (result.length >= MAX_SHOWN) break;
-      }
-      liveUsers = result;
-      lastFetchedAt = Date.now();
-    } catch (e) {
-      console.warn("Failed to fetch live users", e);
+  function filterLiveUsers(items: any[]): LiveUser[] {
+    const cutoff = Date.now() - LIVE_WINDOW_MS;
+    const recent = items
+      .filter(
+        (i) =>
+          i.type === "history" &&
+          new Date(i.indexedAt).getTime() >= cutoff
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.indexedAt).getTime() - new Date(a.indexedAt).getTime()
+      );
+    const seen = new Set<string>();
+    const result: LiveUser[] = [];
+    for (const item of recent) {
+      const did = item.author?.did;
+      if (!did || seen.has(did)) continue;
+      seen.add(did);
+      result.push({
+        did,
+        handle: item.author.handle ?? "",
+        displayName: item.author.displayName || item.author.handle || did,
+        avatar: item.author.avatar ?? null,
+        track: item.record?.track ?? "",
+        artist: item.record?.artist ?? "",
+        artworkUrl: resolveArtworkUrl(
+          item.record?.imgBlob,
+          item.record?.img,
+          did
+        ),
+        trackUri: item.record?.trackUri ?? "",
+        spotifyUrl: item.record?.links?.spotify ?? null,
+        ytMusicUrl: item.record?.links?.youtube ?? null,
+        appleMusicUrl: item.record?.links?.appleMusic ?? null,
+      });
+      if (result.length >= MAX_SHOWN) break;
     }
+    return result;
   }
+
+  $: liveUsers = filterLiveUsers($timelineStore.data ?? []);
+  $: isLive = liveUsers.length > 0;
 
   async function resolveAndPlay(user: LiveUser) {
     const cached = user.spotifyUrl ?? user.ytMusicUrl ?? user.appleMusicUrl;
@@ -107,23 +94,6 @@
     }
   }
 
-  function onVisChange() {
-    if (document.visibilityState !== "visible") return;
-    if (Date.now() - lastFetchedAt > LIVE_STALE_MS) fetchLive();
-  }
-
-  onMount(() => {
-    fetchLive();
-    timer = setInterval(() => {
-      if (document.visibilityState === "visible") fetchLive();
-    }, LIVE_REFRESH_MS);
-    document.addEventListener("visibilitychange", onVisChange);
-  });
-
-  onDestroy(() => {
-    if (timer) clearInterval(timer);
-    document.removeEventListener("visibilitychange", onVisChange);
-  });
 </script>
 
 <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
