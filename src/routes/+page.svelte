@@ -33,6 +33,13 @@
   let showSignInModal = false;
   let everyoneTab: "realtime" | "tracks" | "playlists" | "users" = "realtime";
 
+  function sortHotTracks(tracks: any[]): any[] {
+    return [...tracks].sort((a, b) => {
+      if (a.trending !== b.trending) return a.trending ? -1 : 1;
+      return b.reactionCount - a.reactionCount;
+    });
+  }
+
   // Data State
   let recommendFeed: any[] = [];
   let hotTracks: any[] = [];
@@ -196,7 +203,7 @@
       if (cacheRes && cacheRes.ok) {
         const { data } = await cacheRes.json();
         if (data) {
-          hotTracks = data.tracks;
+          hotTracks = sortHotTracks(data.tracks);
           hotPlaylists = data.playlists;
           hotUsers = data.users;
           lastHotFetchedAt = Date.now();
@@ -250,7 +257,7 @@
       if (cacheRes && cacheRes.ok) {
         const { data } = await cacheRes.json();
         if (data) {
-          hotTracks = data.tracks;
+          hotTracks = sortHotTracks(data.tracks);
           hotPlaylists = data.playlists;
           hotUsers = data.users;
           lastHotFetchedAt = Date.now();
