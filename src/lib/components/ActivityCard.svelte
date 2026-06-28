@@ -60,9 +60,11 @@
       <div class="text-xs text-gray-600">
         {new Date(item.indexedAt).toLocaleString()}
       </div>
-      {#if recommendScore !== undefined && recommendScore > 0}
+      {#if recommendScore !== undefined && recommendScore > 0
+        && item.type !== "playlist"
+        && !(item.type === "reaction" && item.record?.kind === "playlist")}
         <div class="flex justify-end mt-0.5">
-          <div class="relative group inline-flex">
+          <div class="relative group inline-flex z-100">
             <span
               class="text-xs px-2 py-0.5 rounded-full bg-purple-900/60 text-purple-300 border border-purple-700/50 cursor-help"
             >

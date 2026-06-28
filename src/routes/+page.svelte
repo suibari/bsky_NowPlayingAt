@@ -76,7 +76,7 @@
     const userScore = authorScores.get(item.author.did);
     if (userScore === undefined) return undefined;
     const trackGenres: string[] = item.record?.genres ?? [];
-    if (trackGenres.length === 0 || !myProfile) return userScore;
+    if (trackGenres.length === 0 || !myProfile) return undefined;
     const trackScore = computeTrackGenreScore(trackGenres, myProfile.genreFreq);
     return Math.round(0.5 * userScore + 0.5 * trackScore);
   }
