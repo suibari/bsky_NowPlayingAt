@@ -12,7 +12,7 @@ export type UserProfile = {
 };
 
 // Mirrors server-side normalizeArtist (normalize.ts): NFKC + Discogs strip + lowercase.
-function normalizeArtistStr(raw: string): string {
+export function normalizeArtistStr(raw: string): string {
   let s = raw.normalize('NFKC');
   s = s.replace(/\s*\(\d+\)\s*$/, '').replace(/\*+\s*$/, '');
   return s.replace(/\s+/g, ' ').trim().toLowerCase();

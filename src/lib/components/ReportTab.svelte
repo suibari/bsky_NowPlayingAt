@@ -3,13 +3,15 @@
   import { tweened } from "svelte/motion";
   import { cubicOut } from "svelte/easing";
   import { get } from "svelte/store";
-  import { Loader2, Music } from "lucide-svelte";
+  import { Loader2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import { getHistory, songKey } from "$lib/bsky";
   import { resolveArtworkUrl } from "$lib/artwork";
   import type { HistoryRecord } from "$lib/schema";
   import type { Track } from "$lib/music";
   import { t } from "$lib/i18n";
+  import { GENRES } from "$lib/genres";
+  import { normalizeArtistStr, type UserProfile } from "$lib/recommendation";
 
   export let did: string | undefined = undefined;
 
@@ -21,11 +23,27 @@
   let top5: { track: Track; count: number; postUri?: string }[] = [];
   let hourly: number[] = new Array(24).fill(0);
 
+  // All-time genre listen counts (lowercased genre key → count) and a map from
+  // normalized artist key → original display casing, both derived from full
+  // history. Used for the radar chart and the listener "title".
+  let genreFreqAll: Record<string, number> = {};
+  let artistDisplay = new Map<string, string>();
+  // Per-user listening profiles from KV (7-day window, all app users) — the
+  // source for the cross-user artist title determination.
+  let userProfilesMap: Record<string, UserProfile> | null = null;
+  // The computed listener title words (0–2 entries: artists and/or genres).
+  let titleWords: string[] = [];
+
+  // Number of axes shown on the genre radar (top-N by listen count, zeros incl).
+  const RADAR_AXES = 10;
+
   // Count-up animation for the total play number.
   const tweenedTotal = tweened(0, { duration: 600, easing: cubicOut });
 
   let canvas: HTMLCanvasElement;
   let chart: any = null;
+  let radarCanvas: HTMLCanvasElement;
+  let radarChart: any = null;
 
   // Grid placement per rank (0-indexed). On mobile (base) the #1 card spans the
   // full width and the rest flow 2-per-row; on md+ the #1 card is a 2x2 block and
@@ -67,7 +85,24 @@
       { track: Track; count: number; postUri?: string; postedAt: string }
     >();
     const hours = new Array(24).fill(0);
+    // All-time genre counts and normalized-artist → display-name map.
+    const genreFreq: Record<string, number> = {};
+    const display = new Map<string, { name: string; postedAt: string }>();
     for (const val of records) {
+      // Genre listen counts (lowercased keys, all-time).
+      const gs: string[] = Array.isArray(val.genres) ? val.genres : [];
+      for (const g of gs) {
+        const gk = String(g).trim().toLowerCase();
+        if (gk) genreFreq[gk] = (genreFreq[gk] || 0) + 1;
+      }
+      // Keep the latest original artist casing per normalized key.
+      const ak = normalizeArtistStr(val.artist || "");
+      if (ak) {
+        const prev = display.get(ak);
+        if (!prev || (val.postedAt || "") > prev.postedAt) {
+          display.set(ak, { name: val.artist, postedAt: val.postedAt || "" });
+        }
+      }
       // Group by artist + title (normalized). trackUri is unreliable here — some
       // records share the same trackUri across different songs, which would
       // wrongly collapse distinct tracks into one bucket.
@@ -100,7 +135,60 @@
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
       .map(({ track, count, postUri }) => ({ track, count, postUri }));
-    return { total: records.length, top5: sorted, hourly: hours };
+    const artistMap = new Map<string, string>();
+    for (const [k, v] of display) artistMap.set(k, v.name);
+    return {
+      total: records.length,
+      top5: sorted,
+      hourly: hours,
+      genreFreq,
+      artistDisplay: artistMap,
+    };
+  }
+
+  // Top-N canonical genres by all-time listen count (zeros included to pad).
+  function topGenres(n: number): { genre: string; count: number }[] {
+    return GENRES.map((g) => ({ genre: g, count: genreFreqAll[g.toLowerCase()] ?? 0 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, n);
+  }
+
+  // Listener title: up to 2 artists where the user has ≥2 plays AND is the top
+  // listener across all app users (KV 7-day data); remaining slots filled by the
+  // user's top all-time genres. Returns 0–2 display words.
+  function computeTitleWords(): string[] {
+    const words: string[] = [];
+    const myFreq =
+      did && userProfilesMap?.[did]?.artistFreq
+        ? userProfilesMap[did].artistFreq
+        : null;
+    if (myFreq && userProfilesMap) {
+      const candidates: { key: string; count: number }[] = [];
+      for (const [artist, count] of Object.entries(myFreq)) {
+        if (count < 2) continue;
+        let isTop = true;
+        for (const [otherDid, prof] of Object.entries(userProfilesMap)) {
+          if (otherDid === did) continue;
+          if ((prof.artistFreq?.[artist] ?? 0) > count) {
+            isTop = false;
+            break;
+          }
+        }
+        if (isTop) candidates.push({ key: artist, count });
+      }
+      candidates.sort((a, b) => b.count - a.count);
+      for (const c of candidates.slice(0, 2)) {
+        words.push(artistDisplay.get(c.key) ?? c.key);
+      }
+    }
+    // Fill remaining slots (up to 2 total) with top genres that have plays.
+    if (words.length < 2) {
+      for (const { genre, count } of topGenres(GENRES.length)) {
+        if (words.length >= 2) break;
+        if (count > 0) words.push(genre);
+      }
+    }
+    return words;
   }
 
   function applyAggregate(records: HistoryRecord[]) {
@@ -108,17 +196,43 @@
     totalPlays = agg.total;
     top5 = agg.top5;
     hourly = agg.hourly;
+    genreFreqAll = agg.genreFreq;
+    artistDisplay = agg.artistDisplay;
     tweenedTotal.set(agg.total);
     if (chart) {
       chart.data.datasets[0].data = hourly;
       chart.update();
     }
+    updateRadar();
+    titleWords = computeTitleWords();
+  }
+
+  function updateRadar() {
+    if (!radarChart) return;
+    const top = topGenres(RADAR_AXES);
+    radarChart.data.labels = top.map((t) => t.genre);
+    radarChart.data.datasets[0].data = top.map((t) => t.count);
+    radarChart.update();
   }
 
   onMount(async () => {
     if (!did) {
       loading = false;
       return;
+    }
+
+    // 0. Load per-user listening profiles (KV, 7-day, all users) for the title.
+    try {
+      const res = await fetch("/api/user-profiles");
+      if (res.ok) {
+        const { data } = await res.json();
+        if (data) {
+          userProfilesMap = data;
+          titleWords = computeTitleWords();
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load user profiles for report title", e);
     }
 
     // 1. Seed from the TOP page timeline cache (latest ~5 records per user) for an
@@ -191,6 +305,54 @@
     });
     chart.update();
 
+    // 2b. Genre radar chart (top-10 genres by all-time listen count).
+    radarChart = new Chart(radarCanvas, {
+      type: "radar",
+      data: {
+        labels: [],
+        datasets: [
+          {
+            data: [],
+            backgroundColor: "rgba(29,185,84,0.2)",
+            borderColor: "#1db954",
+            borderWidth: 2,
+            pointBackgroundColor: "#1ed760",
+            pointRadius: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500, easing: "easeOutCubic" },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (item: any) =>
+                get(t)("profile.report.tooltip.plays", {
+                  count: String(item.parsed.r),
+                }),
+            },
+          },
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            angleLines: { color: "rgba(255,255,255,0.08)" },
+            grid: { color: "rgba(255,255,255,0.08)" },
+            pointLabels: { color: "#9ca3af", font: { size: 10 } },
+            ticks: {
+              display: false,
+              precision: 0,
+              backdropColor: "transparent",
+            },
+          },
+        },
+      },
+    });
+    updateRadar();
+
     // 3. Full fetch from the PDS, updating aggregates progressively so the number
     //    counts up and the bars grow as data streams in.
     try {
@@ -210,7 +372,16 @@
 
   onDestroy(() => {
     chart?.destroy();
+    radarChart?.destroy();
   });
+
+  // Build the localized listener-title string from the computed words.
+  $: titleText =
+    titleWords.length >= 2
+      ? $t("profile.report.title.two", { a: titleWords[0], b: titleWords[1] })
+      : titleWords.length === 1
+        ? $t("profile.report.title.one", { a: titleWords[0] })
+        : $t("profile.report.title.none");
 </script>
 
 <div class="relative">
@@ -227,22 +398,36 @@
   {#if !loading && totalPlays === 0}
     <p class="text-gray-500 italic">{$t("profile.report.empty")}</p>
   {:else}
-    <!-- Total plays -->
+    <!-- Listener title card: genre radar (left) + total plays & title (right) -->
     <div
-      class="mb-8 flex items-center gap-4 bg-gray-900 border border-gray-800 rounded-xl p-5"
+      class="mb-8 flex flex-col md:flex-row items-center gap-5 md:gap-6 bg-gray-900 border border-gray-800 rounded-xl p-5"
     >
-      <div
-        class="w-12 h-12 shrink-0 rounded-full bg-green-500/15 flex items-center justify-center"
-      >
-        <Music class="text-green-500" size={24} />
+      <!-- Genre radar -->
+      <div class="w-full md:w-1/2 max-w-xs shrink-0 h-56 sm:h-64">
+        <canvas bind:this={radarCanvas}></canvas>
       </div>
-      <div>
-        <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">
-          {$t("profile.report.totalplays")}
-        </p>
-        <p class="text-4xl font-black text-white tabular-nums">
-          {Math.round($tweenedTotal).toLocaleString()}
-        </p>
+      <!-- Total plays + title -->
+      <div
+        class="w-full md:w-1/2 flex flex-col justify-center gap-5 text-center md:text-left"
+      >
+        <div>
+          <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">
+            {$t("profile.report.totalplays")}
+          </p>
+          <p class="text-4xl font-black text-white tabular-nums">
+            {Math.round($tweenedTotal).toLocaleString()}
+          </p>
+        </div>
+        <div>
+          <p class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-1">
+            {$t("profile.report.title.label")}
+          </p>
+          <p
+            class="text-2xl sm:text-3xl font-black text-green-400 leading-tight wrap-break-word"
+          >
+            {titleText}
+          </p>
+        </div>
       </div>
     </div>
 
