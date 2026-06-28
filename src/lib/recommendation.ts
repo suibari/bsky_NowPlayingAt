@@ -40,23 +40,6 @@ function artistMatches(a: string, b: string): boolean {
   return pa.some(x => pb.some(y => partsMatch(x, y)));
 }
 
-// Soft cosine between two artist-freq vectors: partial matches count as the same dimension.
-function computeUserArtistSim(
-  myFreq: Record<string, number>,
-  theirFreq: Record<string, number>
-): number {
-  let dot = 0, normA = 0, normB = 0;
-  for (const [a, fa] of Object.entries(myFreq)) {
-    for (const [b, fb] of Object.entries(theirFreq)) {
-      if (artistMatches(a, b)) dot += fa * fb;
-    }
-    normA += fa * fa;
-  }
-  for (const fb of Object.values(theirFreq)) normB += fb * fb;
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
 // Standard cosine similarity between two genre-freq vectors.
 function computeGenreCosine(
   myFreq: Record<string, number>,
@@ -74,11 +57,9 @@ function computeGenreCosine(
   return normA === 0 || normB === 0 ? 0 : dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// User-to-user compatibility: 60% artist similarity + 40% genre similarity. Returns 0–100.
+// User-to-user compatibility: genre cosine only. Returns 0–100.
 export function computeScore(myProfile: UserProfile, theirProfile: UserProfile): number {
-  const artistSim = computeUserArtistSim(myProfile.artistFreq, theirProfile.artistFreq);
-  const genreCosine = computeGenreCosine(myProfile.genreFreq, theirProfile.genreFreq);
-  return Math.round((0.6 * artistSim + 0.4 * genreCosine) * 100);
+  return Math.round(computeGenreCosine(myProfile.genreFreq, theirProfile.genreFreq) * 100);
 }
 
 // How well a track's artist matches the user's artist listening history. Returns 0–100.

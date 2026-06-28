@@ -88,7 +88,7 @@
       : 0;
     const trackScore = Math.round(0.6 * artistScore + 0.4 * genreScore);
 
-    return Math.round(0.5 * userScore + 0.5 * trackScore);
+    return Math.round(0.7 * trackScore + 0.3 * userScore);
   }
 
   let showSettingsBanner = false;
