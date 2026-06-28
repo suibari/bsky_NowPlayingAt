@@ -88,13 +88,13 @@ export function computeTrackArtistScore(
 ): number {
   const normalized = normalizeArtistStr(trackArtist);
   if (!normalized) return 0;
-  const total = Object.values(myArtistFreq).reduce((s, v) => s + v, 0);
-  if (total === 0) return 0;
+  const maxFreq = Math.max(...Object.values(myArtistFreq), 0);
+  if (maxFreq === 0) return 0;
   let match = 0;
   for (const [artist, freq] of Object.entries(myArtistFreq)) {
     if (artistMatches(normalized, artist)) match += freq;
   }
-  return Math.round(match / total * 100);
+  return Math.round(match / maxFreq * 100);
 }
 
 // How well a track's genres match the user's genre listening history. Returns 0–100.
