@@ -10,7 +10,6 @@
     type UserProfile,
   } from "$lib/recommendation";
   import TrackCard from "$lib/components/TrackCard.svelte";
-  import { Sparkles } from "lucide-svelte";
 
   const MIX_WINDOW_MS = 24 * 60 * 60 * 1000;
   const LIVE_REFRESH_MS = 3 * 60 * 1000;
@@ -173,12 +172,9 @@
 
 {#if $userProfile}
   <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-    <div class="flex items-center gap-2 mb-4">
-      <Sparkles size={14} class="text-purple-400" />
-      <h2 class="text-sm font-bold text-white uppercase tracking-wider">
-        {$t("mix.title")}
-      </h2>
-    </div>
+    <h2 class="text-sm font-bold text-white mb-4 uppercase tracking-wider">
+      {$t("mix.title")}
+    </h2>
 
     {#if loading}
       <p class="text-xs text-gray-600 text-center py-3">...</p>
