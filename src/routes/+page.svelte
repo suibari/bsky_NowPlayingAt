@@ -7,9 +7,7 @@
     postToFeed,
     getPlaylists,
     addToPlaylist,
-    getGlobalTimeline,
     getFolloweesFeed,
-    getHotContent,
     songKey,
   } from "$lib/bsky";
   import { searchTracks, type Track } from "$lib/music";
@@ -52,6 +50,7 @@
   let recommendLoaded = false;
   let loadingHot = true;
   let loadingDiscovery = true;
+  let discoveryError = false;
   let userProfilesMap: Record<string, UserProfile> | null = null;
 
   $: authorScores = (() => {
@@ -223,6 +222,7 @@
 
   async function loadDiscoveryContent() {
     loadingDiscovery = true;
+    discoveryError = false;
     try {
       const cacheRes = await fetch("/api/timeline").catch(() => null);
       if (cacheRes && cacheRes.ok) {
@@ -230,10 +230,15 @@
         if (data) {
           discoveryTimeline = mergeTimeline(data);
           lastDiscoveryFetchedAt = Date.now();
+        } else {
+          discoveryError = true;
         }
+      } else {
+        discoveryError = true;
       }
     } catch (e) {
       console.error("Failed to load discovery cache", e);
+      discoveryError = true;
     } finally {
       loadingDiscovery = false;
     }
@@ -264,10 +269,16 @@
         if (data) {
           discoveryTimeline = mergeTimeline(data);
           lastDiscoveryFetchedAt = Date.now();
+          discoveryError = false;
+        } else {
+          discoveryError = true;
         }
+      } else {
+        discoveryError = true;
       }
     } catch (e) {
       console.error("Failed to refresh discovery content", e);
+      discoveryError = true;
     }
     await loadUserProfiles();
   }
@@ -791,6 +802,10 @@
                   class="w-8 h-8 animate-spin mx-auto mb-4 text-green-500"
                 />
                 <p>{$t('discovery.loading')}</p>
+              </div>
+            {:else if discoveryError}
+              <div class="text-center py-20 text-gray-500">
+                <p>{$t('discovery.error')}</p>
               </div>
             {:else if discoveryTimeline.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">

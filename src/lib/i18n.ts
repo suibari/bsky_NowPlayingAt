@@ -70,6 +70,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'discovery.reacted': 'がリアクションしました',
     'discovery.playlist': 'がプレイリストを作成しました',
     'discovery.empty': 'まだリアクションがありません。一番乗りしましょう！',
+    'discovery.error': 'フィードを読み込めませんでした',
     'recommend.score': 'おすすめ度',
     'recommend.score.tooltip': 'なうぷれあっとの記録から求めた、あなたへのこの曲のおすすめ度です',
 
@@ -243,6 +244,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'discovery.reacted': 'reacted with',
     'discovery.playlist': 'created a playlist',
     'discovery.empty': 'No reactions yet. Be the first!',
+    'discovery.error': 'Failed to load feed',
     'recommend.score': 'Match',
     'recommend.score.tooltip': 'How well this track matches your taste, based on your NowPlayingAt history',
 
