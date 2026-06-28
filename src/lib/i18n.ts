@@ -59,7 +59,7 @@ const translations: Record<Locale, Record<string, string>> = {
     // --- Main page: mix (right pane) ---
     'mix.title': 'なうぷれミックス',
     'mix.empty': 'おすすめの曲が見つかりません',
-    'mix.recommended_by': 'からのおすすめです',
+    'mix.recommended_by': 'からの今日のおすすめ',
 
     // --- Main page: global stats (right pane) ---
     'stats.title': 'なうぷれスタッツ',
@@ -242,7 +242,7 @@ const translations: Record<Locale, Record<string, string>> = {
     // --- Main page: mix (right pane) ---
     'mix.title': 'NowPlaying Mix',
     'mix.empty': 'No recommendations found',
-    'mix.recommended_by': 'recommends this',
+    'mix.recommended_by': "'s pick of today",
 
     // --- Main page: global stats (right pane) ---
     'stats.title': 'Now Playing Stats',
