@@ -56,6 +56,11 @@ const translations: Record<Locale, Record<string, string>> = {
     'live.title': 'なうぷれライブ',
     'live.empty': '誰も聴いていません',
 
+    // --- Main page: mix (right pane) ---
+    'mix.title': 'なうぷれミックス',
+    'mix.empty': 'おすすめの曲が見つかりません',
+    'mix.recommended_by': 'からのおすすめです',
+
     // --- Main page: global stats (right pane) ---
     'stats.title': 'なうぷれスタッツ',
     'stats.total': '総なうぷれ回数',
@@ -233,6 +238,11 @@ const translations: Record<Locale, Record<string, string>> = {
     // --- Main page: live users (right pane) ---
     'live.title': 'Now Playing Live',
     'live.empty': 'Nobody is listening right now',
+
+    // --- Main page: mix (right pane) ---
+    'mix.title': 'NowPlaying Mix',
+    'mix.empty': 'No recommendations found',
+    'mix.recommended_by': 'recommends this',
 
     // --- Main page: global stats (right pane) ---
     'stats.title': 'Now Playing Stats',

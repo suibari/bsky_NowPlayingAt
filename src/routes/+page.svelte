@@ -20,6 +20,7 @@
   import LangToggle from "$lib/components/LangToggle.svelte";
   import GlobalStats from "$lib/components/GlobalStats.svelte";
   import LiveUsers from "$lib/components/LiveUsers.svelte";
+  import NowplayingMix from "$lib/components/NowplayingMix.svelte";
   import SignInForm from "$lib/components/SignInForm.svelte";
   import SignInModal from "$lib/components/SignInModal.svelte";
   import { Loader2, Music, X, Plus, Info, LogIn } from "lucide-svelte";
@@ -1121,6 +1122,7 @@
           </div>
         {/if}
         <LiveUsers />
+        <NowplayingMix />
         <GlobalStats />
       </div>
     </aside>
