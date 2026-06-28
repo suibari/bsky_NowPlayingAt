@@ -83,6 +83,10 @@
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 500, easing: "easeOutCubic" },
+        interaction: {
+          mode: "index",
+          intersect: false,
+        },
         plugins: {
           legend: { display: false },
           tooltip: {

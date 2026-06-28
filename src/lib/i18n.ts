@@ -58,8 +58,8 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Main page: global stats (right pane) ---
     'stats.title': 'なうぷれスタッツ',
-    'stats.total': '総再生回数',
-    'stats.daily': '日ごとの再生回数',
+    'stats.total': '総なうぷれ回数',
+    'stats.daily': '日ごとのなうぷれ回数',
     'stats.tooltip.plays': '{{count}} 回再生',
 
     // --- Main page: sign-in modal ---
@@ -236,8 +236,8 @@ const translations: Record<Locale, Record<string, string>> = {
 
     // --- Main page: global stats (right pane) ---
     'stats.title': 'Now Playing Stats',
-    'stats.total': 'Total Plays',
-    'stats.daily': 'Plays per Day',
+    'stats.total': 'Total NowPlaying',
+    'stats.daily': 'NowPlaying per Day',
     'stats.tooltip.plays': '{{count}} plays',
 
     // --- Main page: sign-in modal ---
