@@ -15,6 +15,7 @@
   import { computeScore, computeTrackGenreScore, computeTrackArtistScore, type UserProfile } from "$lib/recommendation";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ActivityCard from "$lib/components/ActivityCard.svelte";
+  import GroupedActivityCard from "$lib/components/GroupedActivityCard.svelte";
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import InfoModal from "$lib/components/InfoModal.svelte";
   import LangToggle from "$lib/components/LangToggle.svelte";
@@ -267,6 +268,41 @@
   $: discoveryTimeline = mergeTimeline($timelineStore.data ?? []).filter(
     (item) => !$mutedDidsStore.dids.has(item.author?.did)
   );
+
+  // 同一ユーザーの連続 history をグループ化（2件以上 → __group、10件以上は最新9件に絞る）
+  function groupDiscoveryTimeline(items: any[]): any[] {
+    const result: any[] = [];
+    let i = 0;
+    while (i < items.length) {
+      const item = items[i];
+      if (item.type !== "history") {
+        result.push(item);
+        i++;
+        continue;
+      }
+      let j = i;
+      while (
+        j < items.length &&
+        items[j].type === "history" &&
+        items[j].author.did === item.author.did
+      ) {
+        j++;
+      }
+      if (j - i >= 2) {
+        result.push({
+          type: "__group",
+          items: items.slice(i, j).slice(0, 9),
+          author: item.author,
+        });
+      } else {
+        result.push(item);
+      }
+      i = j;
+    }
+    return result;
+  }
+
+  $: groupedDiscoveryTimeline = groupDiscoveryTimeline(discoveryTimeline);
 
   // ミュートしたユーザーの投稿をおすすめから除外する。
   $: visibleRecommendFeed = recommendFeed.filter(
@@ -791,23 +827,36 @@
               <div class="text-center py-20 text-gray-500">
                 <p>{$t('discovery.error')}</p>
               </div>
-            {:else if discoveryTimeline.length > 0}
+            {:else if groupedDiscoveryTimeline.length > 0}
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                {#each discoveryTimeline.slice(0, discoveryLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
-                  <ActivityCard
-                    {item}
-                    {processingItemUri}
-                    recommendScore={getItemScore(item)}
-                    on:nowPlaying={(e) => {
-                      processingItemUri = e.detail.itemUri ?? null;
-                      executeNowPlaying(e.detail.track, e.detail.postToBsky);
-                    }}
-                    on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-                    on:reaction={handleDiscoveryReaction}
-                  />
+                {#each groupedDiscoveryTimeline.slice(0, discoveryLimit) as item (item.type === "__group" ? `group:${item.items[0].uri ?? item.items[0].indexedAt}` : (item.uri ?? `${item.type}:${item.indexedAt}`))}
+                  {#if item.type === "__group"}
+                    <GroupedActivityCard
+                      items={item.items}
+                      {processingItemUri}
+                      on:nowPlaying={(e) => {
+                        processingItemUri = e.detail.itemUri ?? null;
+                        executeNowPlaying(e.detail.track, e.detail.postToBsky);
+                      }}
+                      on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                      on:reaction={handleDiscoveryReaction}
+                    />
+                  {:else}
+                    <ActivityCard
+                      {item}
+                      {processingItemUri}
+                      recommendScore={getItemScore(item)}
+                      on:nowPlaying={(e) => {
+                        processingItemUri = e.detail.itemUri ?? null;
+                        executeNowPlaying(e.detail.track, e.detail.postToBsky);
+                      }}
+                      on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                      on:reaction={handleDiscoveryReaction}
+                    />
+                  {/if}
                 {/each}
               </div>
-              {#if discoveryTimeline.length > discoveryLimit}
+              {#if groupedDiscoveryTimeline.length > discoveryLimit}
                 <div class="flex justify-center mt-8">
                   <button
                     on:click={() => (discoveryLimit += PAGE_SIZE)}

@@ -53,10 +53,11 @@
   export let index: number = 0; // For drag reference
   export let isProcessing: boolean = false;
   export let reactionGroups: any[] = [];
+  export let autoExpand: boolean = false;
 
   const dispatch = createEventDispatcher();
 
-  let expanded = false;
+  let expanded = autoExpand;
   let postToBsky = false;
   let comment = "";
 
