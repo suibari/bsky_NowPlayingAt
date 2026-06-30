@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { agent, userProfile, authState } from "$lib/stores";
+  import { agent, userProfile, authState, mutedDidsStore } from "$lib/stores";
   import {
     getHistory,
     getPlaylists,
@@ -29,6 +29,7 @@
 
   // Check ownership
   $: isOwner = $userProfile?.did === did;
+  $: isMuted = !!did && $mutedDidsStore.dids.has(did);
 
   let profile: any = null;
   let history: { uri: string; value: HistoryRecord }[] = [];
@@ -42,6 +43,10 @@
   let showPlaylistModal = false;
   let targetTrackForPlaylist: Track | null = null;
   let myPlaylists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
+
+  // Mute Modal State
+  let showMuteConfirm = false;
+  let muteActionLoading = false;
 
   onMount(async () => {
     // loadData handled by reactivity below
@@ -153,6 +158,51 @@
     }
   }
 
+  // --- Mute Logic ---
+
+  async function handleConfirmMute() {
+    if (!did) return;
+    const targetDid = did;
+    showMuteConfirm = false;
+    muteActionLoading = true;
+    mutedDidsStore.add(targetDid); // optimistic
+    try {
+      const res = await fetch("/api/mutes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muted_did: targetDid }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch (e) {
+      console.error(e);
+      mutedDidsStore.remove(targetDid); // revert
+      alert(get(t)("profile.mute.failed"));
+    } finally {
+      muteActionLoading = false;
+    }
+  }
+
+  async function handleUnmute() {
+    if (!did) return;
+    const targetDid = did;
+    muteActionLoading = true;
+    mutedDidsStore.remove(targetDid); // optimistic
+    try {
+      const res = await fetch("/api/mutes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ muted_did: targetDid }),
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch (e) {
+      console.error(e);
+      mutedDidsStore.add(targetDid); // revert
+      alert(get(t)("profile.unmute.failed"));
+    } finally {
+      muteActionLoading = false;
+    }
+  }
+
   async function handleDeleteHistory(idx: number) {
     if (!confirm(get(t)('profile.history.delete.confirm'))) return;
     const item = history[idx];
@@ -195,6 +245,16 @@
       >
         <Settings size={20} />
       </a>
+    {:else if $authState.isAuthenticated}
+      <button
+        on:click={() => (isMuted ? handleUnmute() : (showMuteConfirm = true))}
+        disabled={muteActionLoading}
+        class="px-4 py-2 rounded-full text-sm font-bold border transition-colors disabled:opacity-50 {isMuted
+          ? 'border-gray-700 text-gray-300 hover:bg-gray-800'
+          : 'border-red-500/40 text-red-400 hover:bg-red-500/10'}"
+      >
+        {isMuted ? $t("profile.unmute.button") : $t("profile.mute.button")}
+      </button>
     {/if}
   </div>
 
@@ -402,6 +462,38 @@
             {$t('profile.playlist.modal.empty')}
           </div>
         {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- Mute Confirm Modal -->
+  {#if showMuteConfirm}
+    <div
+      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      on:click|self={() => (showMuteConfirm = false)}
+      role="button"
+      tabindex="0"
+      on:keydown={(e) => e.key === "Escape" && (showMuteConfirm = false)}
+    >
+      <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
+        <h2 class="text-xl font-bold text-white mb-2">{$t("profile.mute.confirm.title")}</h2>
+        <p class="text-gray-400 mb-6">
+          {$t("profile.mute.confirm.body", { name: profile?.displayName || profile?.handle || "" })}
+        </p>
+        <div class="flex justify-end gap-3">
+          <button
+            on:click={() => (showMuteConfirm = false)}
+            class="px-4 py-2 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+          >
+            {$t("profile.mute.confirm.cancel")}
+          </button>
+          <button
+            on:click={handleConfirmMute}
+            class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold transition-colors"
+          >
+            {$t("profile.mute.confirm.ok")}
+          </button>
+        </div>
       </div>
     </div>
   {/if}

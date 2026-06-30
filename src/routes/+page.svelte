@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { get } from "svelte/store";
-  import { authState, userProfile, timelineStore } from "$lib/stores";
+  import { authState, userProfile, timelineStore, mutedDidsStore } from "$lib/stores";
   import {
     createHistoryRecord,
     postToFeed,
@@ -263,7 +263,15 @@
   }
 
   // timeline store 更新時に discoveryTimeline を再構築（optimistic items を維持）
-  $: discoveryTimeline = mergeTimeline($timelineStore.data ?? []);
+  // ミュートしたユーザーの投稿はみんなのなうぷれ・なうぷれミックス（discoveryTimeline派生）から除外する。
+  $: discoveryTimeline = mergeTimeline($timelineStore.data ?? []).filter(
+    (item) => !$mutedDidsStore.dids.has(item.author?.did)
+  );
+
+  // ミュートしたユーザーの投稿をおすすめから除外する。
+  $: visibleRecommendFeed = recommendFeed.filter(
+    (item) => !$mutedDidsStore.dids.has(item.author?.did)
+  );
 
   // なうぷれミックス: 24時間以内の他ユーザー履歴のうち、おすすめ度が最も高い1曲を選ぶ。
   // フィードのバッジと完全に一致させるため getItemScore / myProfile をそのまま使う。
@@ -609,9 +617,9 @@
               />
               <p>{$t('recommend.loading')}</p>
             </div>
-          {:else if recommendFeed.length > 0}
+          {:else if visibleRecommendFeed.length > 0}
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {#each recommendFeed.slice(0, recommendLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
+              {#each visibleRecommendFeed.slice(0, recommendLimit) as item (item.uri ?? `${item.type}:${item.indexedAt}`)}
                 <ActivityCard
                   {item}
                   {processingItemUri}
@@ -625,7 +633,7 @@
                 />
               {/each}
             </div>
-            {#if recommendFeed.length > recommendLimit}
+            {#if visibleRecommendFeed.length > recommendLimit}
               <div class="flex justify-center mt-8">
                 <button
                   on:click={() => (recommendLimit += PAGE_SIZE)}

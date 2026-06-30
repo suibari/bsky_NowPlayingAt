@@ -161,6 +161,14 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.history.empty': '履歴がまだありません。',
     'profile.history.delete.confirm': '再生履歴から削除しますか？',
     'profile.history.delete.failed': '再生履歴の削除に失敗しました',
+    'profile.mute.button': 'ユーザーミュート',
+    'profile.unmute.button': 'ミュート解除',
+    'profile.mute.confirm.title': 'ユーザーをミュートしますか？',
+    'profile.mute.confirm.body': '{{name}} さんをミュートすると、おすすめ・みんなのなうぷれ・なうぷれライブ・なうぷれミックスに表示されなくなります。',
+    'profile.mute.confirm.ok': 'ミュートする',
+    'profile.mute.confirm.cancel': 'キャンセル',
+    'profile.mute.failed': 'ミュートに失敗しました。',
+    'profile.unmute.failed': 'ミュート解除に失敗しました。',
 
     // --- TrackCard ---
     'track.play': '再生する',
@@ -344,6 +352,14 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.history.empty': 'No history yet.',
     'profile.history.delete.confirm': 'Remove from history?',
     'profile.history.delete.failed': 'Failed to delete',
+    'profile.mute.button': 'Mute User',
+    'profile.unmute.button': 'Unmute',
+    'profile.mute.confirm.title': 'Mute this user?',
+    'profile.mute.confirm.body': "Muting {{name}} will hide them from Recommend, Everyone's now-playing, Live, and Mix.",
+    'profile.mute.confirm.ok': 'Mute',
+    'profile.mute.confirm.cancel': 'Cancel',
+    'profile.mute.failed': 'Failed to mute user.',
+    'profile.unmute.failed': 'Failed to unmute user.',
 
     // --- TrackCard ---
     'track.play': 'Play',

@@ -113,6 +113,7 @@ export interface UserSession {
   attach_image: boolean;
   post_probability: number;
   hide_from_feed: boolean;
+  muted_dids: string[];
 }
 
 export async function upsertSession(data: {
@@ -171,4 +172,35 @@ export async function updateLastScrobble(did: string, key: string): Promise<void
       body: JSON.stringify({ last_scrobble_key: key, last_scrobble_ts: new Date().toISOString() }),
     }
   );
+}
+
+// --- mutes (per-viewer mute list, stored on sessions.muted_dids) ---
+
+export async function getMutedDids(viewerDid: string): Promise<string[]> {
+  const res = await pgFetch(
+    `${env.POSTGREST_URL}/sessions?did=eq.${encodeURIComponent(viewerDid)}&select=muted_dids`,
+    { headers: readHeaders() }
+  );
+  const rows: { muted_dids: string[] }[] = await res.json();
+  return rows[0]?.muted_dids ?? [];
+}
+
+export async function addMute(viewerDid: string, mutedDid: string): Promise<void> {
+  const current = await getMutedDids(viewerDid);
+  if (current.includes(mutedDid)) return;
+  await pgFetch(`${env.POSTGREST_URL}/sessions?did=eq.${encodeURIComponent(viewerDid)}`, {
+    method: 'PATCH',
+    headers: writeHeaders(),
+    body: JSON.stringify({ muted_dids: [...current, mutedDid] }),
+  });
+}
+
+export async function removeMute(viewerDid: string, mutedDid: string): Promise<void> {
+  const current = await getMutedDids(viewerDid);
+  const next = current.filter((d) => d !== mutedDid);
+  await pgFetch(`${env.POSTGREST_URL}/sessions?did=eq.${encodeURIComponent(viewerDid)}`, {
+    method: 'PATCH',
+    headers: writeHeaders(),
+    body: JSON.stringify({ muted_dids: next }),
+  });
 }

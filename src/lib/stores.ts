@@ -98,3 +98,72 @@ function createTimelineStore() {
 }
 
 export const timelineStore = createTimelineStore();
+
+// Per-viewer muted-did set. Lazily fetched on first subscribe (mirrors
+// timelineStore's lazy-subscribe pattern) but with no polling timer, since
+// mutes only change via direct user action (handled with local optimistic
+// updates via add()/remove()).
+export type MutedDidsState = {
+  dids: Set<string>;
+  loaded: boolean;
+};
+
+function createMutedDidsStore() {
+  const { subscribe: _sub, update } = writable<MutedDidsState>({
+    dids: new Set(),
+    loaded: false,
+  });
+
+  let subscriberCount = 0;
+  let fetched = false;
+
+  async function doFetch() {
+    try {
+      const res = await fetch('/api/mutes');
+      if (res.ok) {
+        const json = await res.json();
+        if (Array.isArray(json.mutedDids)) {
+          update(() => ({ dids: new Set(json.mutedDids), loaded: true }));
+          return;
+        }
+      }
+      update((s) => ({ ...s, loaded: true }));
+    } catch {
+      update((s) => ({ ...s, loaded: true }));
+    }
+  }
+
+  return {
+    subscribe(
+      run: (value: MutedDidsState) => void,
+      invalidate?: (value?: MutedDidsState) => void,
+    ): () => void {
+      const unsub = _sub(run, invalidate);
+      subscriberCount++;
+      if (subscriberCount === 1 && !fetched && typeof window !== 'undefined') {
+        fetched = true;
+        doFetch();
+      }
+      return () => {
+        unsub();
+        subscriberCount--;
+      };
+    },
+    add(did: string) {
+      update((s) => ({ ...s, dids: new Set(s.dids).add(did) }));
+    },
+    remove(did: string) {
+      update((s) => {
+        const next = new Set(s.dids);
+        next.delete(did);
+        return { ...s, dids: next };
+      });
+    },
+    reset() {
+      fetched = false;
+      update(() => ({ dids: new Set(), loaded: false }));
+    },
+  };
+}
+
+export const mutedDidsStore = createMutedDidsStore();

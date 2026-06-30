@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { userProfile, authState, agent } from "$lib/stores";
+  import { userProfile, authState, agent, mutedDidsStore } from "$lib/stores";
   import { signOut } from "$lib/atproto";
   import { LogOut, Music, Loader2, Globe, HelpCircle, Radio } from "lucide-svelte";
   import { goto } from "$app/navigation";
@@ -45,6 +45,7 @@
     authState.set({ isLoading: false, error: null, isAuthenticated: false });
     userProfile.set(null);
     agent.set(null);
+    mutedDidsStore.reset();
 
     goto("/");
   }

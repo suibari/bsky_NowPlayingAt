@@ -2,7 +2,7 @@
   import { resolveArtworkUrl } from "$lib/artwork";
   import { resolveLinks } from "$lib/odesli";
   import { t } from "$lib/i18n";
-  import { timelineStore } from "$lib/stores";
+  import { timelineStore, mutedDidsStore } from "$lib/stores";
   import { Play, Loader2 } from "lucide-svelte";
 
   const LIVE_WINDOW_MS = 10 * 60 * 1000;
@@ -24,13 +24,14 @@
 
   let resolvingDid: string | null = null;
 
-  function filterLiveUsers(items: any[]): LiveUser[] {
+  function filterLiveUsers(items: any[], mutedDids: Set<string>): LiveUser[] {
     const cutoff = Date.now() - LIVE_WINDOW_MS;
     const recent = items
       .filter(
         (i) =>
           i.type === "history" &&
-          new Date(i.indexedAt).getTime() >= cutoff
+          new Date(i.indexedAt).getTime() >= cutoff &&
+          !mutedDids.has(i.author?.did)
       )
       .sort(
         (a, b) =>
@@ -64,7 +65,7 @@
     return result;
   }
 
-  $: liveUsers = filterLiveUsers($timelineStore.data ?? []);
+  $: liveUsers = filterLiveUsers($timelineStore.data ?? [], $mutedDidsStore.dids);
   $: isLive = liveUsers.length > 0;
 
   async function resolveAndPlay(user: LiveUser) {
