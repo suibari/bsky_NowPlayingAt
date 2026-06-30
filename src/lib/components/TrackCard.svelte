@@ -3,17 +3,15 @@
   import { createEventDispatcher } from "svelte";
   import {
     ChevronDown,
-    Share2,
     Disc,
     Loader2,
     GripVertical,
     Trash2,
-    Plus,
     Play,
   } from "lucide-svelte";
   import { resolveLinks } from "$lib/odesli";
   import { songKey } from "$lib/bsky";
-  import ReactionBar from "$lib/components/ReactionBar.svelte";
+  import TrackActionPane from "$lib/components/TrackActionPane.svelte";
   import { t } from "$lib/i18n";
 
   export let track: Track;
@@ -58,8 +56,6 @@
   const dispatch = createEventDispatcher();
 
   let expanded = autoExpand;
-  let postToBsky = false;
-  let comment = "";
 
   // Link Resolution
   let resolving = false;
@@ -104,20 +100,6 @@
       console.error("Link resolution failed", e);
     }
     resolving = false;
-  }
-
-  function handleNowPlaying() {
-    // If track doesn't have comment but local input does, attach it temporarily for the event
-    const trackWithComment = { ...track, comment: comment || track.comment };
-    dispatch("nowPlaying", { track: trackWithComment, postToBsky });
-  }
-
-  function handleAddToPlaylist() {
-    dispatch("addToPlaylist", track);
-  }
-
-  function handleReaction(e: CustomEvent) {
-    dispatch("reaction", { track: track, emoji: e.detail, historyUri: subjectUriOverride });
   }
 
   function handleDelete() {
@@ -298,65 +280,16 @@
         : 'mt-4 pt-4 border-t border-gray-800'}"
       on:click|stopPropagation={() => {}}
     >
-      <!-- Reactions Showcase -->
-      <ReactionBar
+      <TrackActionPane
         subjectUri={reactionSubjectUri}
         {postUri}
         {track}
         initialReactions={reactionGroups}
-        on:reaction={handleReaction}
+        {isProcessing}
+        on:nowPlaying
+        on:reaction
+        on:addToPlaylist
       />
-
-      <div class="bg-gray-800/50 p-3 rounded-lg flex flex-col gap-3">
-        <!-- Row 1: Comment Input -->
-        <div class="w-full">
-          <input
-            type="text"
-            bind:value={comment}
-            placeholder={$t('track.comment.placeholder')}
-            class="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-green-500 focus:outline-none placeholder-gray-600"
-            on:click|stopPropagation
-            on:keydown|stopPropagation
-          />
-        </div>
-
-        <!-- Row 2: Actions (Checkbox & Post Button) -->
-        <div class="flex justify-between items-center flex-wrap gap-2">
-          <label
-            class="flex items-center gap-2 cursor-pointer text-sm text-gray-300 select-none"
-          >
-            <input
-              type="checkbox"
-              bind:checked={postToBsky}
-              class="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500 bg-gray-700"
-            />
-            {$t('track.post.bsky')}
-          </label>
-
-          <button
-            on:click={handleNowPlaying}
-            disabled={isProcessing}
-            class="bg-green-500 hover:bg-green-400 disabled:bg-green-500/50 disabled:cursor-not-allowed text-black font-bold px-4 py-1.5 rounded-full text-sm flex items-center gap-2 transition-transform active:scale-95 disabled:active:scale-100"
-            title={$t('track.nowplaying.btn')}
-          >
-            {#if isProcessing}
-              <Loader2 size={16} class="animate-spin" />
-              {$t('track.processing')}
-            {:else}
-              <Share2 size={16} /> #NowPlaying
-            {/if}
-          </button>
-        </div>
-      </div>
-
-      <div class="flex gap-2">
-        <button
-          on:click={handleAddToPlaylist}
-          class="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-2 rounded-lg text-sm flex items-center justify-center gap-2 transition-colors"
-        >
-          <Plus size={16} /> {$t('track.add.playlist')}
-        </button>
-      </div>
     </div>
   {/if}
 </div>

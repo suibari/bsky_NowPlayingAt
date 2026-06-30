@@ -833,7 +833,12 @@
                   {#if item.type === "__group"}
                     <GroupedActivityCard
                       items={item.items}
+                      {processingItemUri}
                       recommendScores={item.items.map((it: any) => getItemScore(it))}
+                      on:nowPlaying={(e) => {
+                        processingItemUri = e.detail.itemUri ?? null;
+                        executeNowPlaying(e.detail.track, e.detail.postToBsky);
+                      }}
                       on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
                       on:reaction={handleDiscoveryReaction}
                     />

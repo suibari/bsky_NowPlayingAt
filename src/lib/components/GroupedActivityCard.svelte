@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import ReactionBar from "$lib/components/ReactionBar.svelte";
+  import TrackActionPane from "$lib/components/TrackActionPane.svelte";
   import { resolveArtworkUrl } from "$lib/artwork";
   import { songKey } from "$lib/bsky";
   import { t } from "$lib/i18n";
@@ -8,6 +8,7 @@
 
   // 2〜9件の同一ユーザー連続 history アイテム（新しい順）
   export let items: any[];
+  export let processingItemUri: string | null = null;
   // 各アイテムのおすすめ度（undefined = 非表示）
   export let recommendScores: (number | undefined)[] = [];
 
@@ -81,6 +82,7 @@
         spotifyUrl: selectedItem.record.links?.spotify,
         youtubeMusicUrl: selectedItem.record.links?.youtube,
         appleMusicUrl: selectedItem.record.links?.appleMusic,
+        comment: selectedItem.record.comment,
         provider: selectedItem.record.provider || "itunes",
       }
     : null;
@@ -91,14 +93,10 @@
       songKey(selectedItem.record.artist, selectedItem.record.track)
     : "";
 
-  function handleReaction(e: CustomEvent) {
-    if (!selectedItem || !selectedTrack) return;
-    dispatch("reaction", {
-      track: selectedTrack,
-      emoji: e.detail,
-      historyUri: selectedItem.uri,
-    });
-  }
+  $: isProcessing =
+    processingItemUri !== null &&
+    selectedItem !== null &&
+    processingItemUri === selectedItem.uri;
 </script>
 
 <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
@@ -160,7 +158,6 @@
                 class="w-full h-full object-cover"
                 loading="lazy"
               />
-              <!-- Hover darken -->
               <div class="absolute inset-0 bg-black/0 group-hover/jacket:bg-black/25 transition-colors"></div>
             </button>
 
@@ -189,17 +186,21 @@
 
   <!-- リアクションペイン（ジャケット選択時） -->
   {#if selectedItem !== null && selectedTrack !== null}
-    <div class="mt-2 p-3 bg-gray-900 border border-gray-800 rounded-xl animate-fade-in">
-      <div class="mb-2">
+    <div class="mt-2 p-3 bg-gray-900 border border-gray-800 rounded-xl animate-fade-in flex flex-col gap-3">
+      <div>
         <p class="font-bold text-white text-sm truncate">{selectedItem.record.track}</p>
         <p class="text-gray-400 text-xs truncate">{selectedItem.record.artist}</p>
       </div>
-      <ReactionBar
+      <TrackActionPane
         subjectUri={reactionSubjectUri}
         postUri={selectedItem.record.postUri}
         track={selectedTrack}
         initialReactions={[]}
-        on:reaction={handleReaction}
+        {isProcessing}
+        on:nowPlaying={(e) =>
+          dispatch("nowPlaying", { ...e.detail, itemUri: selectedItem?.uri })}
+        on:reaction
+        on:addToPlaylist={(e) => dispatch("addToPlaylist", e.detail)}
       />
     </div>
   {/if}
