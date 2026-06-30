@@ -1,28 +1,35 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import TrackCard from "$lib/components/TrackCard.svelte";
+  import ReactionBar from "$lib/components/ReactionBar.svelte";
   import { resolveArtworkUrl } from "$lib/artwork";
+  import { songKey } from "$lib/bsky";
   import { t } from "$lib/i18n";
+  import { Play } from "lucide-svelte";
 
   // 2〜9件の同一ユーザー連続 history アイテム（新しい順）
   export let items: any[];
-  export let processingItemUri: string | null = null;
+  // 各アイテムのおすすめ度（undefined = 非表示）
+  export let recommendScores: (number | undefined)[] = [];
 
   const dispatch = createEventDispatcher();
-
-  function forward(name: string) {
-    return (e: CustomEvent) => dispatch(name, e.detail);
-  }
-
-  function forwardNowPlayingWithUri(item: any) {
-    return (e: CustomEvent) => dispatch("nowPlaying", { ...e.detail, itemUri: item.uri });
-  }
 
   // 選択中のジャケットインデックス（null = 折りたたみ）
   let expandedIndex: number | null = null;
 
   function toggleExpand(index: number) {
     expandedIndex = expandedIndex === index ? null : index;
+  }
+
+  function playItem(item: any, e: MouseEvent) {
+    e.stopPropagation();
+    const links = item.record?.links;
+    const url = links?.spotify ?? links?.youtube ?? links?.appleMusic;
+    if (url) {
+      window.open(url, "_blank");
+    } else {
+      const q = encodeURIComponent(`${item.record.artist} ${item.record.track}`);
+      window.open(`https://open.spotify.com/search/${q}`, "_blank");
+    }
   }
 
   // n 枚のジャケットを余白なしで並べるための行ごとのアイテム数
@@ -42,7 +49,6 @@
 
   $: rowConfig = getRowConfig(items.length);
 
-  // 行ごとのアイテム配列と、各行の先頭インデックスを計算
   $: rows = (() => {
     const result: { item: any; index: number }[][] = [];
     let idx = 0;
@@ -59,6 +65,40 @@
 
   $: author = items[0]?.author;
   $: selectedItem = expandedIndex !== null ? items[expandedIndex] : null;
+
+  $: selectedTrack = selectedItem
+    ? {
+        id: selectedItem.record.trackUri,
+        title: selectedItem.record.track,
+        artist: selectedItem.record.artist,
+        album: selectedItem.record.album,
+        artworkUrl: resolveArtworkUrl(
+          selectedItem.record.imgBlob,
+          selectedItem.record.img,
+          author?.did,
+        ),
+        trackUri: selectedItem.record.trackUri,
+        spotifyUrl: selectedItem.record.links?.spotify,
+        youtubeMusicUrl: selectedItem.record.links?.youtube,
+        appleMusicUrl: selectedItem.record.links?.appleMusic,
+        provider: selectedItem.record.provider || "itunes",
+      }
+    : null;
+
+  $: reactionSubjectUri = selectedItem
+    ? selectedItem.uri ??
+      selectedItem.record.trackUri ??
+      songKey(selectedItem.record.artist, selectedItem.record.track)
+    : "";
+
+  function handleReaction(e: CustomEvent) {
+    if (!selectedItem || !selectedTrack) return;
+    dispatch("reaction", {
+      track: selectedTrack,
+      emoji: e.detail,
+      historyUri: selectedItem.uri,
+    });
+  }
 </script>
 
 <div class="bg-gray-900/50 rounded-xl p-4 border border-gray-800">
@@ -76,7 +116,7 @@
       {/if}
     </a>
     <div class="flex-1 min-w-0 flex items-center justify-between gap-2">
-      <div class="text-sm text-gray-300 min-w-0">
+      <div class="text-sm text-gray-300 min-w-0 truncate">
         <a
           href={`/profile/${author?.did}`}
           class="font-bold text-white! hover:underline"
@@ -99,64 +139,67 @@
       >
         {#each row as { item, index }}
           {@const artworkUrl = resolveArtworkUrl(item.record.imgBlob, item.record.img, author?.did)}
-          <button
-            class="relative overflow-hidden focus:outline-none group/jacket transition-all"
+          {@const score = recommendScores[index]}
+          <div
+            class="relative overflow-hidden group/jacket"
             style="aspect-ratio: 1;"
-            class:ring-2={expandedIndex === index}
-            class:ring-inset={expandedIndex === index}
-            class:ring-green-500={expandedIndex === index}
-            on:click={() => toggleExpand(index)}
-            title={item.record.track}
-            aria-label={item.record.track}
           >
-            <img
-              src={artworkUrl || "/placeholder_art.png"}
-              alt={item.record.track}
-              class="w-full h-full object-cover"
-              loading="lazy"
-            />
-            <!-- Hover overlay with track title -->
-            <div
-              class="absolute inset-0 bg-black/0 group-hover/jacket:bg-black/30 transition-colors pointer-events-none"
-            ></div>
-            <div
-              class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5 translate-y-full group-hover/jacket:translate-y-0 transition-transform pointer-events-none"
+            <!-- Jacket (クリックでリアクションペイン開閉) -->
+            <button
+              class="absolute inset-0 focus:outline-none"
+              class:ring-2={expandedIndex === index}
+              class:ring-inset={expandedIndex === index}
+              class:ring-green-500={expandedIndex === index}
+              on:click={() => toggleExpand(index)}
+              title={item.record.track}
+              aria-label={item.record.track}
             >
-              <p class="text-white text-[10px] font-bold truncate leading-tight">
-                {item.record.track}
-              </p>
-            </div>
-          </button>
+              <img
+                src={artworkUrl || "/placeholder_art.png"}
+                alt={item.record.track}
+                class="w-full h-full object-cover"
+                loading="lazy"
+              />
+              <!-- Hover darken -->
+              <div class="absolute inset-0 bg-black/0 group-hover/jacket:bg-black/25 transition-colors"></div>
+            </button>
+
+            <!-- 再生ボタン (左上) -->
+            <button
+              class="absolute top-1 left-1 bg-black/60 hover:bg-black/85 text-white rounded-full p-1.5 transition-all z-10 opacity-0 group-hover/jacket:opacity-100 active:scale-95"
+              on:click={(e) => playItem(item, e)}
+              title={$t('track.play')}
+            >
+              <Play size={13} class="fill-current" />
+            </button>
+
+            <!-- おすすめ度バッジ (右上) -->
+            {#if score !== undefined && score > 0}
+              <span
+                class="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded-full bg-purple-900/80 text-purple-300 font-bold z-10 leading-none pointer-events-none"
+              >
+                {score}%
+              </span>
+            {/if}
+          </div>
         {/each}
       </div>
     {/each}
   </div>
 
-  <!-- Expanded track detail (reaction pane pre-opened) -->
-  {#if selectedItem !== null}
-    <div class="mt-2 animate-fade-in">
-      <TrackCard
-        track={{
-          id: selectedItem.record.trackUri,
-          title: selectedItem.record.track,
-          artist: selectedItem.record.artist,
-          album: selectedItem.record.album,
-          artworkUrl: resolveArtworkUrl(selectedItem.record.imgBlob, selectedItem.record.img, author?.did),
-          trackUri: selectedItem.record.trackUri,
-          spotifyUrl: selectedItem.record.links?.spotify,
-          youtubeMusicUrl: selectedItem.record.links?.youtube,
-          appleMusicUrl: selectedItem.record.links?.appleMusic,
-          comment: selectedItem.record.comment,
-          provider: selectedItem.record.provider || "itunes",
-        }}
-        fallbackArtworkUrl={selectedItem.record.img}
-        subjectUriOverride={selectedItem.uri}
+  <!-- リアクションペイン（ジャケット選択時） -->
+  {#if selectedItem !== null && selectedTrack !== null}
+    <div class="mt-2 p-3 bg-gray-900 border border-gray-800 rounded-xl animate-fade-in">
+      <div class="mb-2">
+        <p class="font-bold text-white text-sm truncate">{selectedItem.record.track}</p>
+        <p class="text-gray-400 text-xs truncate">{selectedItem.record.artist}</p>
+      </div>
+      <ReactionBar
+        subjectUri={reactionSubjectUri}
         postUri={selectedItem.record.postUri}
-        isProcessing={processingItemUri === selectedItem.uri}
-        autoExpand={true}
-        on:nowPlaying={forwardNowPlayingWithUri(selectedItem)}
-        on:addToPlaylist={forward("addToPlaylist")}
-        on:reaction={forward("reaction")}
+        track={selectedTrack}
+        initialReactions={[]}
+        on:reaction={handleReaction}
       />
     </div>
   {/if}
