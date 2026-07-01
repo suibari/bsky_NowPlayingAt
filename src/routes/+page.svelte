@@ -243,8 +243,8 @@
   // stay pinned at the top even as fetched batches stream in.
   let optimisticItems: any[] = [];
 
-  function mergeTimeline(fetched: any[]): any[] {
-    if (optimisticItems.length === 0) return fetched;
+  function mergeTimeline(fetched: any[], optimistic: any[]): any[] {
+    if (optimistic.length === 0) return fetched;
     const seen = new Set<string>();
     for (const i of fetched) {
       seen.add(`${i.type}:${i.uri ?? ""}`);
@@ -253,7 +253,7 @@
         seen.add(`reaction:${i.author.did}:${i.record.subjectUri}:${i.record.emoji ?? ""}`);
       }
     }
-    const stillPending = optimisticItems.filter((o) => {
+    const stillPending = optimistic.filter((o) => {
       if (seen.has(`${o.type}:${o.uri ?? ""}`)) return false;
       if (o.type === "reaction" && o.author?.did && o.record?.subjectUri) {
         if (seen.has(`reaction:${o.author.did}:${o.record.subjectUri}:${o.record.emoji ?? ""}`)) return false;
@@ -265,9 +265,13 @@
 
   // timeline store 更新時に discoveryTimeline を再構築（optimistic items を維持）
   // ミュートしたユーザーの投稿はみんなのなうぷれ・なうぷれミックス（discoveryTimeline派生）から除外する。
-  $: discoveryTimeline = mergeTimeline($timelineStore.data ?? []).filter(
-    (item) => !$mutedDidsStore.dids.has(item.author?.did)
-  );
+  $: {
+    const fetched = $timelineStore.data ?? [];
+    const optimistic = optimisticItems;
+    discoveryTimeline = mergeTimeline(fetched, optimistic).filter(
+      (item) => !$mutedDidsStore.dids.has(item.author?.did)
+    );
+  }
 
   // 同一ユーザーの連続 history をグループ化（2件以上 → __group、10件以上は最新9件に絞る）
   function groupDiscoveryTimeline(items: any[]): any[] {
