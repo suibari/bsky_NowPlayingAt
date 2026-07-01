@@ -4,6 +4,7 @@
   import PlaylistCard from "$lib/components/PlaylistCard.svelte";
   import { t } from "$lib/i18n";
   import { resolveArtworkUrl } from "$lib/artwork";
+  import { userProfile } from "$lib/stores";
 
   // A single activity (history / reaction / playlist) shown in the
   // recommendation and realtime feeds.
@@ -61,8 +62,8 @@
         {new Date(item.indexedAt).toLocaleString()}
       </div>
       {#if recommendScore !== undefined && recommendScore > 0
-        && item.type !== "playlist"
-        && !(item.type === "reaction" && item.record?.kind === "playlist")}
+        && item.type === "history"
+        && item.author.did !== $userProfile?.did}
         <div class="flex justify-end mt-0.5">
           <div class="relative group inline-flex z-100">
             <span

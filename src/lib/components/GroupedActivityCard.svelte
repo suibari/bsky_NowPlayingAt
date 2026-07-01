@@ -4,6 +4,7 @@
   import { resolveArtworkUrl } from "$lib/artwork";
   import { songKey } from "$lib/bsky";
   import { t } from "$lib/i18n";
+  import { userProfile } from "$lib/stores";
   import { Play } from "lucide-svelte";
 
   // 2〜9件の同一ユーザー連続 history アイテム（新しい順）
@@ -171,7 +172,7 @@
             </button>
 
             <!-- おすすめ度バッジ (右上) -->
-            {#if score !== undefined && score > 0}
+            {#if score !== undefined && score > 0 && author?.did !== $userProfile?.did}
               <span
                 class="absolute top-1 right-1 text-[9px] px-1.5 py-0.5 rounded-full bg-purple-900/80 text-purple-300 font-bold z-10 leading-none pointer-events-none"
               >
