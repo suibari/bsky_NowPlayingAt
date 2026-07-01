@@ -41,11 +41,17 @@ export const POST: RequestHandler = async (event) => {
         collection: NSID_CONFIG,
         record: { $type: NSID_CONFIG, hubRef: HUB_REF, updatedAt: new Date().toISOString() },
       });
-      // Create default favorites playlist
+      // Tag the auto-created favorites so timeline filters can identify it reliably.
       await agent.com.atproto.repo.createRecord({
         repo: did,
         collection: NSID_PLAYLIST,
-        record: { $type: NSID_PLAYLIST, name: 'お気に入り', tracks: [], createdAt: new Date().toISOString() },
+        record: {
+          $type: NSID_PLAYLIST,
+          name: 'お気に入り',
+          tracks: [],
+          createdAt: new Date().toISOString(),
+          isDefault: true,
+        },
       });
     }
   } catch (e) {
