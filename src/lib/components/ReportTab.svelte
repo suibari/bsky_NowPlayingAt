@@ -25,7 +25,7 @@
 
   // All-time genre listen counts (lowercased genre key → count) and a map from
   // normalized artist key → original display casing, both derived from full
-  // history. Used for the radar chart and the listener "title".
+  // history. Used for the genre chart and the listener "title".
   let genreFreqAll: Record<string, number> = {};
   let artistDisplay = new Map<string, string>();
   // Per-user listening profiles from KV (7-day window, all app users) — the
@@ -34,16 +34,19 @@
   // The computed listener title words (0–2 entries: artists and/or genres).
   let titleWords: string[] = [];
 
-  // Number of axes shown on the genre radar (top-N by listen count, zeros incl).
-  const RADAR_AXES = 10;
-
   // Count-up animation for the total play number.
   const tweenedTotal = tweened(0, { duration: 600, easing: cubicOut });
 
   let canvas: HTMLCanvasElement;
   let chart: any = null;
-  let radarCanvas: HTMLCanvasElement;
-  let radarChart: any = null;
+
+  // Keep every canonical genre in a stable position. Bar lengths share the
+  // same scale, while the count remains visible for an exact comparison.
+  $: genreData = GENRES.map((genre) => ({
+    genre,
+    count: genreFreqAll[genre.toLowerCase()] ?? 0,
+  }));
+  $: genreMax = Math.max(1, ...genreData.map(({ count }) => count));
 
   // Grid placement per rank (0-indexed). On mobile (base) the #1 card spans the
   // full width and the rest flow 2-per-row; on md+ the #1 card is a 2x2 block and
@@ -203,16 +206,7 @@
       chart.data.datasets[0].data = hourly;
       chart.update();
     }
-    updateRadar();
     titleWords = computeTitleWords();
-  }
-
-  function updateRadar() {
-    if (!radarChart) return;
-    const top = topGenres(RADAR_AXES);
-    radarChart.data.labels = top.map((t) => t.genre);
-    radarChart.data.datasets[0].data = top.map((t) => t.count);
-    radarChart.update();
   }
 
   onMount(async () => {
@@ -305,54 +299,6 @@
     });
     chart.update();
 
-    // 2b. Genre radar chart (top-10 genres by all-time listen count).
-    radarChart = new Chart(radarCanvas, {
-      type: "radar",
-      data: {
-        labels: [],
-        datasets: [
-          {
-            data: [],
-            backgroundColor: "rgba(29,185,84,0.2)",
-            borderColor: "#1db954",
-            borderWidth: 2,
-            pointBackgroundColor: "#1ed760",
-            pointRadius: 2,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 500, easing: "easeOutCubic" },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (item: any) =>
-                get(t)("profile.report.tooltip.plays", {
-                  count: String(item.parsed.r),
-                }),
-            },
-          },
-        },
-        scales: {
-          r: {
-            beginAtZero: true,
-            angleLines: { color: "rgba(255,255,255,0.08)" },
-            grid: { color: "rgba(255,255,255,0.08)" },
-            pointLabels: { color: "#9ca3af", font: { size: 10 } },
-            ticks: {
-              display: false,
-              precision: 0,
-              backdropColor: "transparent",
-            },
-          },
-        },
-      },
-    });
-    updateRadar();
-
     // 3. Full fetch from the PDS, updating aggregates progressively so the number
     //    counts up and the bars grow as data streams in.
     try {
@@ -372,7 +318,6 @@
 
   onDestroy(() => {
     chart?.destroy();
-    radarChart?.destroy();
   });
 
   // Build the localized listener-title string from the computed words.
@@ -398,14 +343,41 @@
   {#if !loading && totalPlays === 0}
     <p class="text-gray-500 italic">{$t("profile.report.empty")}</p>
   {:else}
-    <!-- Listener title card: genre radar (left) + total plays & title (right) -->
+    <!-- Listener title card: fixed genre bars (left) + total plays & title (right) -->
     <div
       class="mb-8 flex flex-col md:flex-row items-center gap-5 md:gap-6 bg-gray-900 border border-gray-800 rounded-xl p-5"
     >
-      <!-- Genre radar -->
-      <div class="w-full md:w-1/2 max-w-xs shrink-0 h-56 sm:h-64">
-        <canvas bind:this={radarCanvas}></canvas>
-      </div>
+      <!-- The order never changes, even while history is loading. -->
+      <section class="w-full md:w-1/2 min-w-0" aria-labelledby="genre-chart-title">
+        <div class="mb-3">
+          <h2 id="genre-chart-title" class="text-sm font-bold text-white">
+            {$t("profile.report.genres")}
+          </h2>
+          <p class="text-[11px] text-gray-500">
+            {$t("profile.report.genres.hint")}
+          </p>
+        </div>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-2" role="list">
+          {#each genreData as item (item.genre)}
+            <div class:opacity-45={item.count === 0} role="listitem">
+              <div class="mb-1 flex items-baseline justify-between gap-1">
+                <span class="truncate text-[11px] font-medium text-gray-300" title={item.genre}>
+                  {item.genre}
+                </span>
+                <span class="shrink-0 text-[11px] font-bold tabular-nums text-gray-400">
+                  {item.count.toLocaleString()}
+                </span>
+              </div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-gray-800">
+                <div
+                  class="h-full rounded-full bg-green-500 transition-[width] duration-500 ease-out"
+                  style:width={`${(item.count / genreMax) * 100}%`}
+                ></div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </section>
       <!-- Total plays + title -->
       <div
         class="w-full md:w-1/2 flex flex-col justify-center gap-5 text-center md:text-left"
