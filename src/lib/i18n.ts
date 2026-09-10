@@ -216,6 +216,60 @@ const translations: Record<Locale, Record<string, string>> = {
     'info.other': 'その他',
     'info.other.desc': 'このページに記載される文章は予告なく変更することがあります。',
     'info.links': 'リンク',
+
+    // --- About page ---
+    'about.head.title': 'なうぷれあっと とは | 音楽共有ATprotoサービス',
+    'about.head.desc': '聴いている曲を記録して、Blueskyでシェアする。AT Protocol 上の音楽共有サービス「なうぷれあっと」の紹介ページです。',
+    'about.hero.label': '#NowPlaying on ATprotocol',
+    'about.hero.tagline': '聴いてる音楽が、そのまま人とつながる。',
+    'about.hero.sub': 'なうぷれあっとは、AT Protocol の上に立つ音楽共有サービス。いま聴いている曲を記録して、Bluesky の友達とシェアできます。',
+    'about.hero.cta.start': 'はじめる',
+    'about.hero.cta.explore': 'どんなサービス？',
+    'about.hero.scroll': '下にスクロール',
+
+    'about.what.label': 'What is it',
+    'about.what.title': 'なうぷれあっと とは',
+    'about.what.lead': '聴いた曲を記録して、Blueskyでシェアする。やることはシンプルですが、そこから音楽の話がはじまります。',
+    'about.what.1.title': '聴いた曲が、自動で残る',
+    'about.what.1.desc': 'Last.fm と連携すれば、スマホやPCで再生した曲がそのまま再生履歴になります。Bluesky への投稿も自動です。',
+    'about.what.2.title': 'みんなの「いま」が見える',
+    'about.what.2.desc': 'フォロー中のユーザーがいま何を聴いているかが流れてきます。知らなかった一曲に出会えます。',
+    'about.what.3.title': '反応して、まとめて、渡す',
+    'about.what.3.desc': 'ビビッときた曲には絵文字リアクション。お気に入りはプレイリストにまとめて、そのまま Bluesky にシェアできます。',
+
+    'about.why.label': 'Why',
+    'about.why.title': '選ばれる理由',
+    'about.why.1.title': 'データはあなたのPDSに',
+    'about.why.1.desc': '再生履歴もプレイリストも、保存先はあなた自身の PDS です。サービスが終わってもデータそのものは消えません。',
+    'about.why.2.title': '投稿はあなたのペースで',
+    'about.why.2.desc': '投稿確率を 0〜100% で調整できる「気まぐれモード」。タイムラインを埋めない距離感で使えます。',
+    'about.why.3.title': '音楽サービスをまたいで届く',
+    'about.why.3.desc': 'Spotify / Apple Music / YouTube Music のリンクを自動で解決。相手が別のサービスでもそのまま聴けます。',
+    'about.why.4.title': '無料・オープンソース',
+    'about.why.4.desc': '個人が趣味で開発していて、広告もサブスクもありません。ソースコードは GitHub で公開しています。',
+
+    'about.stats.label': 'Numbers',
+    'about.stats.title': 'これまでに聴かれた曲',
+    'about.stats.total': '総なうぷれ回数',
+    'about.stats.unit': '回',
+    'about.stats.daily': '日ごとのなうぷれ回数',
+    'about.stats.note': 'なうぷれあっとに記録された再生履歴の総数です。',
+
+    'about.cta.title': 'さっそく、はじめよう',
+    'about.cta.desc': 'Bluesky のアカウントがあれば、すぐに使えます。',
+    'about.cta.nosignup': 'Bluesky のアカウントをまだ持っていませんか？',
+    'about.cta.signup': 'Blueskyでアカウントを作る',
+    'about.cta.signup.hint': 'Bluesky のアカウント作成画面が開きます。作成が終わるとそのまま なうぷれあっと に戻ってきます。',
+    'about.cta.signedin': '{{name}} さんとしてサインイン済みです。',
+    'about.cta.home': 'ホームへ',
+
+    'about.footer.home': '← ホームに戻る',
+    'about.footer.dev': '開発: すいばり',
+
+    // --- Main page: about banner (guests) ---
+    'about.banner.bold': 'なうぷれあっと ってなに？',
+    'about.banner.desc': ' 30秒でわかる紹介ページを用意しました。',
+    'about.banner.cta': '見てみる →',
   },
   en: {
     // --- Main page: banner ---
@@ -410,6 +464,60 @@ const translations: Record<Locale, Record<string, string>> = {
     'info.other': 'Other',
     'info.other.desc': 'The text on this page may change without notice.',
     'info.links': 'Links',
+
+    // --- About page ---
+    'about.head.title': 'About NowPlayingAt | Music sharing on AT Protocol',
+    'about.head.desc': 'Log what you listen to and share it on Bluesky. An introduction to NowPlayingAt, a music sharing service built on AT Protocol.',
+    'about.hero.label': '#NowPlaying on ATprotocol',
+    'about.hero.tagline': 'The music you play, turned into a conversation.',
+    'about.hero.sub': 'NowPlayingAt is a music sharing service built on AT Protocol. Log the track you are playing right now and share it with your friends on Bluesky.',
+    'about.hero.cta.start': 'Get started',
+    'about.hero.cta.explore': 'What is this?',
+    'about.hero.scroll': 'Scroll down',
+
+    'about.what.label': 'What is it',
+    'about.what.title': 'What is NowPlayingAt',
+    'about.what.lead': 'Log the tracks you play, and share them on Bluesky. It is that simple, and that is where the music talk begins.',
+    'about.what.1.title': 'Your plays log themselves',
+    'about.what.1.desc': 'Link Last.fm and every track you play on your phone or PC becomes listening history. Posting to Bluesky is automatic too.',
+    'about.what.2.title': 'See what everyone is playing',
+    'about.what.2.desc': 'Watch what the people you follow are listening to right now, and run into the one track you would never have found.',
+    'about.what.3.title': 'React, collect, pass it on',
+    'about.what.3.desc': 'Send an emoji reaction to a track that hits. Collect favourites into a playlist and share it straight to Bluesky.',
+
+    'about.why.label': 'Why',
+    'about.why.title': 'Why people choose it',
+    'about.why.1.title': 'Your data lives on your PDS',
+    'about.why.1.desc': 'History and playlists are stored on your own PDS. Even if this service shuts down, the data itself stays with you.',
+    'about.why.2.title': 'Post at your own pace',
+    'about.why.2.desc': 'A whim mode lets you dial posting probability anywhere from 0 to 100%, so you never flood your timeline.',
+    'about.why.3.title': 'Works across music services',
+    'about.why.3.desc': 'Spotify, Apple Music and YouTube Music links are resolved automatically, so anyone can play it wherever they listen.',
+    'about.why.4.title': 'Free and open source',
+    'about.why.4.desc': 'Built by one person as a hobby, with no ads and no subscription. The source code is public on GitHub.',
+
+    'about.stats.label': 'Numbers',
+    'about.stats.title': 'Tracks played so far',
+    'about.stats.total': 'Total plays',
+    'about.stats.unit': 'plays',
+    'about.stats.daily': 'Plays per day',
+    'about.stats.note': 'The total number of listening records logged on NowPlayingAt.',
+
+    'about.cta.title': 'Start listening together',
+    'about.cta.desc': 'If you have a Bluesky account, you can start right away.',
+    'about.cta.nosignup': "Don't have a Bluesky account yet?",
+    'about.cta.signup': 'Create a Bluesky account',
+    'about.cta.signup.hint': "Opens Bluesky's account creation screen. Once you are done you come straight back to NowPlayingAt.",
+    'about.cta.signedin': 'You are signed in as {{name}}.',
+    'about.cta.home': 'Home',
+
+    'about.footer.home': '← Back to home',
+    'about.footer.dev': 'Made by suibari',
+
+    // --- Main page: about banner (guests) ---
+    'about.banner.bold': 'New to NowPlayingAt?',
+    'about.banner.desc': ' Here is a 30-second tour of what it does.',
+    'about.banner.cta': 'Take a look →',
   },
 };
 

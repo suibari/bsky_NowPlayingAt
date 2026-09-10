@@ -24,7 +24,7 @@
   import NowplayingMix from "$lib/components/NowplayingMix.svelte";
   import SignInForm from "$lib/components/SignInForm.svelte";
   import SignInModal from "$lib/components/SignInModal.svelte";
-  import { Loader2, Music, X, Plus, Info, LogIn } from "lucide-svelte";
+  import { Loader2, Music, X, Plus, Info, LogIn, Sparkles } from "lucide-svelte";
   import { swipe } from "$lib/actions/swipe";
   import { t } from "$lib/i18n";
 
@@ -589,6 +589,22 @@
     <!-- Below topbar: central pane + right pane -->
     <div class="flex gap-8 mt-2">
     <main class="flex-1 min-w-0 relative z-10">
+
+    <!-- About Banner (guests only): 新規ユーザーを紹介ページへ誘導する -->
+    {#if !$authState.isAuthenticated}
+      <a
+        href="/about"
+        class="flex items-center justify-between gap-3 mb-6 px-4 py-3 bg-green-500/10 border border-green-500/40 rounded-xl text-sm text-green-300 hover:bg-green-500/20 hover:border-green-400 transition-all group"
+      >
+        <div class="flex items-center gap-3">
+          <Sparkles size={18} class="text-green-400 shrink-0" />
+          <span>
+            <span class="font-bold text-green-400">{$t('about.banner.bold')}</span>{$t('about.banner.desc')}
+          </span>
+        </div>
+        <span class="text-green-400 font-bold whitespace-nowrap group-hover:underline">{$t('about.banner.cta')}</span>
+      </a>
+    {/if}
 
     <!-- Settings Banner -->
     {#if showSettingsBanner}
