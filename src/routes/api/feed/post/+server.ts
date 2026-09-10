@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { Agent, RichText } from '@atproto/api';
 import { getDid } from '$lib/server/session';
-import { createOAuthClient } from '$lib/server/oauth';
+import { createSessionOAuthClient } from '$lib/server/oauth';
 import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
 import { processImage } from '$lib/server/image';
 
@@ -12,7 +12,7 @@ export const POST: RequestHandler = async (event) => {
 
   const { track, text } = await event.request.json();
 
-  const oauthClient = await createOAuthClient(event.url.origin);
+  const oauthClient = await createSessionOAuthClient(event.url.origin, did);
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 

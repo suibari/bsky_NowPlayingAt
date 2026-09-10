@@ -2,7 +2,7 @@ import { json, error, isHttpError } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { env } from '$env/dynamic/private';
 import { Agent, RichText } from '@atproto/api';
-import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
+import { createSessionOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 import { getSession } from '$lib/server/db';
 import { resolveArtworkUrl } from '$lib/server/artwork';
 import { processImage } from '$lib/server/image';
@@ -24,7 +24,7 @@ export const POST: RequestHandler = async (event) => {
   const warnings: string[] = [];
 
   try {
-  const oauthClient = await createOAuthClient(event.url.origin);
+  const oauthClient = await createSessionOAuthClient(event.url.origin, did);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 

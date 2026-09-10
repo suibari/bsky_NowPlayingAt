@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { Agent } from '@atproto/api';
 import { getDid } from '$lib/server/session';
-import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
+import { createSessionOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 
 const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 
@@ -12,7 +12,7 @@ export const POST: RequestHandler = async (event) => {
 
   const { imgBlob, ...track } = await event.request.json();
 
-  const oauthClient = await createOAuthClient(event.url.origin);
+  const oauthClient = await createSessionOAuthClient(event.url.origin, did);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 
@@ -49,7 +49,7 @@ export const DELETE: RequestHandler = async (event) => {
 
   const { rkey } = await event.request.json();
 
-  const oauthClient = await createOAuthClient(event.url.origin);
+  const oauthClient = await createSessionOAuthClient(event.url.origin, did);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 

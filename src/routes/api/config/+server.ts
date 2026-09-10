@@ -2,7 +2,7 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { Agent } from '@atproto/api';
 import { getDid } from '$lib/server/session';
-import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
+import { createSessionOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 
 const NSID_CONFIG = 'com.suibari.nowplayingat.config';
 const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
@@ -13,7 +13,7 @@ export const POST: RequestHandler = async (event) => {
   const did = getDid(event);
   if (!did) throw error(401, 'Unauthorized');
 
-  const oauthClient = await createOAuthClient(event.url.origin);
+  const oauthClient = await createSessionOAuthClient(event.url.origin, did);
   const session = await restoreOAuthSession(oauthClient, did, event);
   const agent = new Agent(session);
 

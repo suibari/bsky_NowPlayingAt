@@ -2,12 +2,12 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestEvent, RequestHandler } from './$types';
 import { Agent } from '@atproto/api';
 import { getDid } from '$lib/server/session';
-import { createOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
+import { createSessionOAuthClient, restoreOAuthSession } from '$lib/server/oauth';
 
 const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
 
 async function getAgent(did: string, event: RequestEvent) {
-  const oauthClient = await createOAuthClient(event.url.origin);
+  const oauthClient = await createSessionOAuthClient(event.url.origin, did);
   const session = await restoreOAuthSession(oauthClient, did, event);
   return new Agent(session);
 }
