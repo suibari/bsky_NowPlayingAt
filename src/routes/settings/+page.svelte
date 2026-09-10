@@ -87,6 +87,11 @@
   }
 </script>
 
+<svelte:head>
+  <title>設定 | なうぷれあっと</title>
+  <meta name="robots" content="noindex,follow" />
+</svelte:head>
+
 <div class="min-h-screen p-6 max-w-4xl mx-auto">
   <div class="topbar-layout">
     <a
