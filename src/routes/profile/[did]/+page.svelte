@@ -225,6 +225,16 @@
   }
 </script>
 
+<svelte:head>
+  <title>{profile?.displayName || profile?.handle || "プロフィール"} のなうぷれ | なうぷれあっと</title>
+  <meta
+    name="description"
+    content={profile
+      ? `${profile.displayName || profile.handle} さんがなうぷれあっとでシェアしたなうぷれ (#NowPlaying) の再生履歴とプレイリスト。`
+      : "Blueskyでシェアされたなうぷれ (#NowPlaying) の再生履歴とプレイリスト。"}
+  />
+</svelte:head>
+
 <div class="min-h-screen p-6 max-w-4xl mx-auto">
   <div class="topbar-layout">
     <a

@@ -265,7 +265,22 @@
       alert("Failed to delete playlist: " + e);
     }
   }
+
+  // SEO: derive page metadata from the loaded playlist.
+  $: metaPlaylistName = playlistRecord?.value?.name ?? "";
+  $: metaAuthorName = authorProfile?.displayName || authorProfile?.handle || "";
+  $: pageTitle = metaPlaylistName
+    ? `${metaPlaylistName} | なうぷれあっと`
+    : "プレイリスト | なうぷれあっと";
+  $: pageDescription = metaPlaylistName
+    ? `${metaAuthorName || "ユーザー"} さんがなうぷれあっとで作ったプレイリスト「${metaPlaylistName}」。聴いてる曲をシェアする音楽SNSで新しい音楽と出会おう。`
+    : "なうぷれあっとで作られたプレイリスト。聴いてる曲をシェアする音楽SNSで新しい音楽と出会おう。";
 </script>
+
+<svelte:head>
+  <title>{pageTitle}</title>
+  <meta name="description" content={pageDescription} />
+</svelte:head>
 
 <div class="min-h-screen p-6 max-w-4xl mx-auto relative">
   <div class="topbar-layout">
