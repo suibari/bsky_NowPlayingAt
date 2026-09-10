@@ -272,41 +272,42 @@ export async function restoreOAuthSession(client: OAuthClient, sub: string, even
   }
 }
 
-export async function createOAuthClient(origin: string): Promise<OAuthClient> {
-  // Only http: origins (localhost / 127.0.0.1) are local dev.
-  // https: origins — including Cloudflare Pages Preview — use the production client.
-  const isLocal = new URL(origin).protocol === 'http:';
+// Only http: origins (localhost / 127.0.0.1) are local dev.
+// https: origins — including Cloudflare Pages Preview — use the production client.
+function isLocalOrigin(origin: string): boolean {
+  return new URL(origin).protocol === 'http:';
+}
 
-  if (isLocal) {
-    // ATProto loopback client:
-    //   - client_id MUST start with "http://localhost" (exact string, per ATProto spec)
-    //   - redirect_uri MUST use 127.0.0.1, NOT "localhost" (per RFC 8252 / library validation)
-    const port = new URL(origin).port || '5173';
-    const redirectUri = `http://127.0.0.1:${port}/oauth/callback`;
-    return makeClient({
-      client_id: `http://localhost?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(SCOPE)}`,
-      redirect_uris: [redirectUri],
-      scope: SCOPE,
-      grant_types: ['authorization_code', 'refresh_token'],
-      response_types: ['code'],
-      token_endpoint_auth_method: 'none',
-      application_type: 'web',
-      dpop_bound_access_tokens: true,
-    });
-  }
+// ATProto loopback client, used when the app is served over http: (local dev):
+//   - client_id MUST start with "http://localhost" (exact string, per ATProto spec)
+//   - redirect_uri MUST use 127.0.0.1, NOT "localhost" (per RFC 8252 / library validation)
+// This is a PUBLIC client (token_endpoint_auth_method 'none'): the PDS cannot fetch
+// a client metadata document from a developer's machine, so the confidential client
+// below is unusable for a local sign-in.
+function makeLoopbackClient(origin: string): OAuthClient {
+  const port = new URL(origin).port || '5173';
+  const redirectUri = `http://127.0.0.1:${port}/oauth/callback`;
+  return makeClient({
+    client_id: `http://localhost?redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(SCOPE)}`,
+    redirect_uris: [redirectUri],
+    scope: SCOPE,
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'none',
+    application_type: 'web',
+    dpop_bound_access_tokens: true,
+  });
+}
 
-  // For production AND Preview (any https: origin), use the production client_id.
-  // The redirect_uri uses the actual request origin so Preview callbacks work,
-  // but it must also be listed in /client-metadata.json on PROD_ORIGIN.
-  //
-  // Confidential client: authenticate at the token endpoint with `private_key_jwt`
-  // using the signing key from env. This raises the session lifetime from the
-  // public-client cap (2 weeks) to effectively unlimited (refresh tokens up to
-  // 180 days), fixing the ~1-day session death seen in auto-post. The `jwks` is
-  // omitted here — validateClientMetadata derives it from the keyset, and the
-  // public keys are also published in static/client-metadata.json for the PDS.
+// Production (and Preview) client. Confidential client: authenticate at the token
+// endpoint with `private_key_jwt` using the signing key from env. This raises the
+// session lifetime from the public-client cap (2 weeks) to effectively unlimited
+// (refresh tokens up to 180 days), fixing the ~1-day session death seen in
+// auto-post. The `jwks` is omitted here — validateClientMetadata derives it from
+// the keyset, and the public keys are also published in static/client-metadata.json
+// for the PDS.
+async function makeProdClient(redirectUri: string): Promise<OAuthClient> {
   const clientKey = await getClientKey();
-  const redirectUri = `${origin}/oauth/callback`;
   return makeClient({
     client_id: `${PROD_ORIGIN}/client-metadata.json`,
     client_name: 'なうぷれあっと',
@@ -320,4 +321,39 @@ export async function createOAuthClient(origin: string): Promise<OAuthClient> {
     application_type: 'web',
     dpop_bound_access_tokens: true,
   }, [clientKey]);
+}
+
+// Client for STARTING a flow (authorize / callback), where redirect_uri matters and
+// must belong to the origin the browser is actually on.
+export async function createOAuthClient(origin: string): Promise<OAuthClient> {
+  if (isLocalOrigin(origin)) return makeLoopbackClient(origin);
+
+  // For production AND Preview (any https: origin), use the production client_id.
+  // The redirect_uri uses the actual request origin so Preview callbacks work,
+  // but it must also be listed in /client-metadata.json on PROD_ORIGIN.
+  return makeProdClient(`${origin}/oauth/callback`);
+}
+
+// Client for RESTORING an existing session (and for revoking one). redirect_uri is
+// never sent by these flows, so the only thing that has to match is the client
+// AUTHENTICATION: a refresh token is bound to the client_id it was issued to, and
+// the token endpoint checks the client_assertion against that client's JWKS.
+//
+// In production this is always the confidential client, exactly as before. In local
+// dev the two kinds of session coexist in the SHARED oauth_sessions table, so pick
+// per session:
+//   - authMethod 'none'  → created by a loopback sign-in on this machine; only the
+//     loopback client can refresh it.
+//   - anything else      → created by production (private_key_jwt). Using the
+//     loopback client here would raise AuthMethodUnsatisfiableError, which the
+//     library treats as a dead session and DELETES the row — signing every real
+//     user out of production. The confidential client works from localhost because
+//     the PDS only needs to reach PROD_ORIGIN/client-metadata.json for the JWKS.
+export async function createSessionOAuthClient(origin: string, sub: string): Promise<OAuthClient> {
+  if (isLocalOrigin(origin)) {
+    const stored = await getOAuthSession(sub).catch(() => undefined);
+    if ((stored as any)?.authMethod?.method === 'none') return makeLoopbackClient(origin);
+    return makeProdClient(`${PROD_ORIGIN}/oauth/callback`);
+  }
+  return makeProdClient(`${origin}/oauth/callback`);
 }
