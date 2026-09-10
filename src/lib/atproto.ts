@@ -10,6 +10,21 @@ export async function signIn(handle: string) {
   window.location.href = url;
 }
 
+// Bluesky のアカウントを持っていない人向けのサインアップ導線。
+// ハンドルの代わりに entryway を渡し、prompt=create で認可サーバーの
+// アカウント作成画面から始める。作成が終わるとそのまま同意画面に進むので、
+// 戻ってきた時点でサインイン済みになる。
+export const DEFAULT_ENTRYWAY = 'https://bsky.social';
+
+export async function signUp(entryway: string = DEFAULT_ENTRYWAY) {
+  const res = await fetch(
+    `/api/auth/login?handle=${encodeURIComponent(entryway)}&prompt=create`
+  );
+  if (!res.ok) throw new Error('Failed to start OAuth signup flow');
+  const { url } = await res.json();
+  window.location.href = url;
+}
+
 export async function signOut() {
   await fetch('/api/auth/logout', { method: 'POST' });
 }
