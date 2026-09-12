@@ -13,7 +13,10 @@ export async function PUT(event) {
         const body = await event.request.json();
         const { key, data } = body;
 
-        if (key !== 'snapshot' && key !== 'stats') {
+        // `artists` is sharded (artists_0 … artists_N); the rest are single entries.
+        const ALLOWED_KEYS = ['snapshot', 'stats', 'user_stats'];
+        const isArtistShard = /^artists_\d+$/.test(key);
+        if (!ALLOWED_KEYS.includes(key) && !isArtistShard) {
             return json({ error: 'Invalid key' }, { status: 400 });
         }
 

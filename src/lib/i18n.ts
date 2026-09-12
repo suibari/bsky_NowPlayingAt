@@ -180,6 +180,14 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.unmute.failed': 'ミュート解除に失敗しました。',
     'profile.bluesky': 'Blueskyのプロフィールを開く',
     'profile.tags.label': 'よく聴いているアーティスト',
+
+    // --- Artist page ---
+    'artist.label': 'アーティスト',
+    'artist.summary': '{{plays}} 回再生 ・ {{listeners}} 人が聴いています',
+    'artist.tracks': 'よく聴かれている曲',
+    'artist.listeners': '聴いている人',
+    'artist.listeners.empty': '表示できるリスナーがいません。',
+    'artist.empty': 'このアーティストのなうぷれはまだ集計されていません。',
     'profile.edit.button': 'プロフィールを編集',
     'profile.edit.title': 'プロフィールを編集',
     'profile.edit.note': 'なうぷれあっとで表示されるプロフィールです。Blueskyのプロフィールは変更されません。',
@@ -452,6 +460,14 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.unmute.failed': 'Failed to unmute user.',
     'profile.bluesky': 'Open Bluesky profile',
     'profile.tags.label': 'Most played artists',
+
+    // --- Artist page ---
+    'artist.label': 'Artist',
+    'artist.summary': '{{plays}} plays · {{listeners}} listeners',
+    'artist.tracks': 'Most played tracks',
+    'artist.listeners': 'Listeners',
+    'artist.listeners.empty': 'No listeners to show.',
+    'artist.empty': 'No plays have been aggregated for this artist yet.',
     'profile.edit.button': 'Edit profile',
     'profile.edit.title': 'Edit profile',
     'profile.edit.note': 'This profile is shown on NowPlayingAt. Your Bluesky profile is not changed.',
