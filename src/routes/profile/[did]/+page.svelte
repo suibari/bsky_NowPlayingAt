@@ -10,9 +10,10 @@
     addToPlaylist,
     deleteHistoryRecord,
   } from "$lib/bsky";
-  import { Loader2, Music, Disc, Plus, X, Settings, BarChart3 } from "lucide-svelte";
+  import { Loader2, Disc, Plus, X, Settings, BarChart3 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReportTab from "$lib/components/ReportTab.svelte";
+  import PromotionBanner from "$lib/components/PromotionBanner.svelte";
   import { resolveArtworkUrl } from "$lib/artwork";
   import type { Track } from "$lib/music";
   import type {
@@ -312,20 +313,7 @@
     {/if}
   </div>
 
-  {#if !$authState.isAuthenticated}
-    <a
-      href="/"
-      class="flex items-center justify-between gap-3 mb-6 px-4 py-3 bg-green-500/10 border border-green-500/40 rounded-xl text-sm text-green-300 hover:bg-green-500/20 hover:border-green-400 transition-all group"
-    >
-      <div class="flex items-center gap-3">
-        <Music size={18} class="text-green-400 shrink-0" />
-        <span>
-          <span class="font-bold text-green-400">{$t('banner.bold')}</span>{$t('banner.desc')}
-        </span>
-      </div>
-      <span class="text-green-400 font-bold whitespace-nowrap group-hover:underline">{$t('banner.cta')}</span>
-    </a>
-  {/if}
+  <PromotionBanner />
 
   {#if loading}
     <div class="flex justify-center mt-20">
