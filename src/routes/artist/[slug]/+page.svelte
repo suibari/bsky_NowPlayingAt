@@ -172,7 +172,7 @@
             <div class="relative">
               <TrackCard track={item.track} postUri={item.postUri} />
               <span
-                class="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 text-[10px] font-bold text-green-300"
+                class="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-black/70 text-[10px] font-bold text-green-300"
                 title={$t("profile.report.tooltip.plays", { count: String(item.plays) })}
               >
                 {item.plays}
