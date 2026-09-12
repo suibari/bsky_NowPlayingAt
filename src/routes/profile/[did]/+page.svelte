@@ -22,7 +22,14 @@
   } from "$lib/schema";
   import { publicAgent } from "$lib/atproto";
   import { get } from "svelte/store";
-  import { t } from "$lib/i18n";
+  import { locale, t } from "$lib/i18n";
+
+  type HistoryItem = { uri: string; value: HistoryRecord };
+  type HistoryGroup = {
+    key: string;
+    label: string;
+    items: { item: HistoryItem; originalIndex: number }[];
+  };
 
   // $page.params is reactive but derived, so we react to it.
   $: did = $page.params.did;
@@ -32,12 +39,49 @@
   $: isMuted = !!did && $mutedDidsStore.dids.has(did);
 
   let profile: any = null;
-  let history: { uri: string; value: HistoryRecord }[] = [];
+  let history: HistoryItem[] = [];
   let playlists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
   let historyCursor: string | undefined = undefined;
   let loadingMoreHistory = false;
   let loading = true;
   let activeTab = "report"; // 'report' | 'history' | 'playlists'
+
+  // Keep the API order within each day, while retaining the original array
+  // index used by the optimistic delete handler.
+  $: historyGroups = groupHistoryByDate(history, $locale);
+
+  function groupHistoryByDate(
+    items: HistoryItem[],
+    currentLocale: "ja" | "en",
+  ): HistoryGroup[] {
+    const groups = new Map<string, HistoryGroup>();
+    const formatter = new Intl.DateTimeFormat(currentLocale === "ja" ? "ja-JP" : "en-US", {
+      year: "numeric",
+      month: currentLocale === "ja" ? "long" : "short",
+      day: "numeric",
+      weekday: "short",
+    });
+
+    items.forEach((item, originalIndex) => {
+      const date = new Date(item.value.postedAt);
+      const isValid = !Number.isNaN(date.getTime());
+      const key = isValid
+        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+        : "unknown";
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          key,
+          label: isValid ? formatter.format(date) : get(t)("profile.history.date.unknown"),
+          items: [],
+        };
+        groups.set(key, group);
+      }
+      group.items.push({ item, originalIndex });
+    });
+
+    return [...groups.values()];
+  }
 
   // Playlist Modal State (For 'Add to Playlist' from History)
   let showPlaylistModal = false;
@@ -395,22 +439,37 @@
         </div>
       {:else}
         <!-- HISTORY LIST -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {#each history as item, i}
-            <TrackCard
-              variant="square"
-              track={mapHistoryToTrack(item)}
-              postUri={item.value.postUri}
-              showDelete={isOwner}
-              index={i}
-              on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
-              on:delete={(e) => handleDeleteHistory(e.detail)}
-            />
+        <div class="space-y-8">
+          {#each historyGroups as group (group.key)}
+            <section aria-labelledby={`history-date-${group.key}`}>
+              <div class="mb-3 flex items-center gap-3">
+                <h2
+                  id={`history-date-${group.key}`}
+                  class="shrink-0 text-sm font-bold text-gray-300"
+                >
+                  {group.label}
+                </h2>
+                <div class="h-px flex-1 bg-gray-800"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                {#each group.items as { item, originalIndex } (item.uri)}
+                  <TrackCard
+                    variant="square"
+                    track={mapHistoryToTrack(item)}
+                    postUri={item.value.postUri}
+                    showDelete={isOwner}
+                    index={originalIndex}
+                    on:addToPlaylist={(e) => openPlaylistModal(e.detail)}
+                    on:delete={(e) => handleDeleteHistory(e.detail)}
+                  />
+                {/each}
+              </div>
+            </section>
           {/each}
           {#if history.length === 0}
-            <p class="text-gray-500 italic col-span-full">{$t('profile.history.empty')}</p>
+            <p class="text-gray-500 italic">{$t('profile.history.empty')}</p>
           {:else if historyCursor}
-            <div class="flex justify-center pt-4 col-span-full">
+            <div class="flex justify-center pt-4">
               <button
                 on:click={loadMoreHistory}
                 disabled={loadingMoreHistory}
