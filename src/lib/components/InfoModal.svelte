@@ -73,6 +73,16 @@
                     <h3 class="font-bold text-white mb-1">{$t('info.links')}</h3>
                     <ul class="list-disc pl-5 space-y-1">
                         <li>
+                            <a href="/terms" class="text-green-500 hover:underline"
+                                >{$t('legal.terms')}</a
+                            >
+                        </li>
+                        <li>
+                            <a href="/privacy" class="text-green-500 hover:underline"
+                                >{$t('legal.privacy')}</a
+                            >
+                        </li>
+                        <li>
                             <a
                                 href="https://bsky.app/profile/suibari.com"
                                 target="_blank"

@@ -67,6 +67,11 @@ const translations: Record<Locale, Record<string, string>> = {
     'stats.daily': '日ごとのなうぷれ回数',
     'stats.tooltip.plays': '{{count}} 回再生',
 
+    // --- Legal links ---
+    'legal.terms': '利用規約',
+    'legal.privacy': 'プライバシーポリシー',
+    'legal.nav': '法的情報',
+
     // --- Main page: sign-in modal ---
     'signin.modal.title': 'サインイン',
 
@@ -211,7 +216,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'info.li3': 'ビビッときた曲、プレイリストには絵文字リアクションを送ろう！',
     'info.dev.pre': '本アプリは ',
     'info.dev.post': ' 個人が趣味で開発しています。',
-    'info.storage': '本アプリは専用のサーバーは持たず、認証情報はユーザーの端末に保存され、データはユーザーのPDSに保存されます。',
+    'info.storage': '再生履歴やプレイリストなどはユーザーのPDSに保存されます。OAuthセッションと自動投稿設定は、機能提供のため運営者が利用するデータベースに保存されます。詳しくはプライバシーポリシーをご確認ください。',
     'info.caveat': '個人開発のため手厚いサポートはできず、突如サービスを終了する可能性があります。ただし、データはユーザーのPDSに置くため、サービスが終了してもデータそのものは消えません。',
     'info.other': 'その他',
     'info.other.desc': 'このページに記載される文章は予告なく変更することがあります。',
@@ -314,6 +319,11 @@ const translations: Record<Locale, Record<string, string>> = {
     'stats.total': 'Total NowPlaying',
     'stats.daily': 'NowPlaying per Day',
     'stats.tooltip.plays': '{{count}} plays',
+
+    // --- Legal links ---
+    'legal.terms': 'Terms',
+    'legal.privacy': 'Privacy',
+    'legal.nav': 'Legal information',
 
     // --- Main page: sign-in modal ---
     'signin.modal.title': 'Sign In',
@@ -459,7 +469,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'info.li3': 'Send emoji reactions to tracks and playlists you love!',
     'info.dev.pre': '',
     'info.dev.post': ' is developing this as a personal hobby project.',
-    'info.storage': 'This app has no dedicated server. Authentication is stored on your device and data is stored on your PDS.',
+    'info.storage': 'Listening history, playlists and similar data are stored on your PDS. OAuth sessions and auto-post settings are stored in a database used by the Operator to provide the Service. See the Privacy Policy for details.',
     'info.caveat': 'As a personal project, support may be limited and the service may end without notice. However, since data is stored on your PDS, it won\'t disappear if the service ends.',
     'info.other': 'Other',
     'info.other.desc': 'The text on this page may change without notice.',
