@@ -5,7 +5,7 @@
   import { get } from "svelte/store";
   import { Loader2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
-  import { getHistory, songKey } from "$lib/bsky";
+  import { fetchAllHistory, songKey } from "$lib/bsky";
   import { resolveArtworkUrl } from "$lib/artwork";
   import type { HistoryRecord } from "$lib/schema";
   import type { Track } from "$lib/music";
@@ -39,6 +39,9 @@
 
   let canvas: HTMLCanvasElement;
   let chart: any = null;
+  // A shared history scan can outlive this component; stop touching the chart
+  // (already destroyed) once it does.
+  let destroyed = false;
 
   // Keep every canonical genre in a stable position. Bar lengths share the
   // same scale, while the count remains visible for an exact comparison.
@@ -299,17 +302,14 @@
     });
     chart.update();
 
-    // 3. Full fetch from the PDS, updating aggregates progressively so the number
-    //    counts up and the bars grow as data streams in.
+    // 3. Full fetch from the PDS (shared with the profile page), updating
+    //    aggregates progressively so the number counts up and the bars grow as
+    //    data streams in.
     try {
-      const all: HistoryRecord[] = [];
-      let cursor: string | undefined;
-      do {
-        const { records, cursor: next } = await getHistory(did, cursor);
-        all.push(...records.map((r) => r.value));
-        applyAggregate(all);
-        cursor = next;
-      } while (cursor);
+      const all = await fetchAllHistory(did, (records) => {
+        if (!destroyed) applyAggregate(records);
+      });
+      if (!destroyed) applyAggregate(all);
     } catch (e) {
       console.error("Failed to load full history for report", e);
     }
@@ -317,6 +317,7 @@
   });
 
   onDestroy(() => {
+    destroyed = true;
     chart?.destroy();
   });
 

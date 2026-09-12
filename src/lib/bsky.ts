@@ -21,6 +21,9 @@ export async function createHistoryRecord(track: MusicTrack, imgBlob?: string | 
     body: JSON.stringify({ ...track, imgBlob, postUri }),
   });
   if (!res.ok) throw new Error('Failed to create history record');
+  // Any cached full scan of my own history is now one record short.
+  const myDid = get(userProfile)?.did;
+  if (myDid) invalidateHistoryScan(myDid);
   return res.json();
 }
 
@@ -42,6 +45,85 @@ export async function getHistory(did: string, cursor?: string): Promise<{
     records: res.data.records as unknown as { uri: string, cid: string, value: HistoryRecord }[],
     cursor: res.data.cursor,
   };
+}
+
+// Full-history scans are shared per DID: the profile page (artist tags) and the
+// report tab both need every record, and paging the PDS twice for the same user
+// is pure waste. Callers can watch progress so the UI fills in as pages land.
+type HistoryScan = {
+  records: HistoryRecord[];
+  done: boolean;
+  completedAt: number;
+  listeners: Set<(records: HistoryRecord[]) => void>;
+  promise: Promise<HistoryRecord[]>;
+};
+
+const historyScans = new Map<string, HistoryScan>();
+// A finished scan is reused for this long, so switching tabs is instant without
+// the view going stale when records are added elsewhere (e.g. an auto-post).
+const HISTORY_SCAN_TTL_MS = 2 * 60 * 1000;
+
+/**
+ * Page through a user's whole history, caching the result per DID.
+ * `onProgress` receives the records collected so far — immediately if a scan is
+ * already underway or finished, then once per additional page.
+ */
+export function fetchAllHistory(
+  did: string,
+  onProgress?: (records: HistoryRecord[]) => void,
+): Promise<HistoryRecord[]> {
+  let scan = historyScans.get(did);
+  if (scan?.done && Date.now() - scan.completedAt > HISTORY_SCAN_TTL_MS) {
+    historyScans.delete(did);
+    scan = undefined;
+  }
+
+  if (!scan) {
+    const created: HistoryScan = {
+      records: [],
+      done: false,
+      completedAt: 0,
+      listeners: new Set(),
+      promise: null as unknown as Promise<HistoryRecord[]>,
+    };
+    created.promise = (async () => {
+      let cursor: string | undefined;
+      do {
+        const { records, cursor: next } = await getHistory(did, cursor);
+        // A fresh array each time, so callers can assign it straight to state.
+        created.records = [...created.records, ...records.map((r) => r.value)];
+        created.listeners.forEach((listener) => listener(created.records));
+        cursor = next;
+      } while (cursor);
+      return created.records;
+    })();
+    created.promise.then(
+      () => {
+        created.done = true;
+        created.completedAt = Date.now();
+        created.listeners.clear();
+      },
+      () => {
+        // Let the next caller retry from scratch.
+        historyScans.delete(did);
+        created.listeners.clear();
+      },
+    );
+    historyScans.set(did, created);
+    scan = created;
+  }
+
+  if (onProgress) {
+    if (scan.records.length > 0) onProgress(scan.records);
+    if (!scan.done) scan.listeners.add(onProgress);
+  }
+
+  return scan.promise;
+}
+
+/** Drop a cached scan, e.g. after the owner deletes one of their records. */
+export function invalidateHistoryScan(did: string) {
+  historyScans.delete(did);
 }
 
 export async function deleteHistoryRecord(rkey: string) {

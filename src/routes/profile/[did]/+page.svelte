@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import { page } from "$app/stores";
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { agent, userProfile, authState, mutedDidsStore } from "$lib/stores";
   import {
     getHistory,
@@ -9,16 +10,32 @@
     createReactionRecord,
     addToPlaylist,
     deleteHistoryRecord,
+    fetchAllHistory,
+    invalidateHistoryScan,
   } from "$lib/bsky";
-  import { Loader2, Disc, Plus, X, Settings, BarChart3 } from "lucide-svelte";
+  import {
+    Loader2,
+    Disc,
+    Plus,
+    X,
+    Settings,
+    BarChart3,
+    Pencil,
+    User,
+  } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import ReportTab from "$lib/components/ReportTab.svelte";
   import PromotionBanner from "$lib/components/PromotionBanner.svelte";
+  import ProfileEditModal from "$lib/components/ProfileEditModal.svelte";
+  import BlueskyIcon from "$lib/components/BlueskyIcon.svelte";
   import { resolveArtworkUrl } from "$lib/artwork";
+  import { getNowplayingProfile, resolveAvatarUrl } from "$lib/profile";
+  import { normalizeArtistStr } from "$lib/recommendation";
   import type { Track } from "$lib/music";
   import type {
     HistoryRecord,
     PlaylistRecord,
+    ProfileRecord,
     Track as SchemaTrack,
   } from "$lib/schema";
   import { publicAgent } from "$lib/atproto";
@@ -40,12 +57,33 @@
   $: isMuted = !!did && $mutedDidsStore.dids.has(did);
 
   let profile: any = null;
+  // NowPlayingAt's own profile record (null for anyone who never edited it —
+  // the Bluesky profile is then used as the fallback).
+  let npProfile: ProfileRecord | null = null;
+  // Local crop shown right after a save, while the image CDN catches up.
+  let avatarPreviewUrl: string | null = null;
+  let showProfileEdit = false;
+  let artistTags: { key: string; name: string; count: number }[] = [];
   let history: HistoryItem[] = [];
   let playlists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
   let historyCursor: string | undefined = undefined;
   let loadingMoreHistory = false;
   let loading = true;
   let activeTab = "report"; // 'report' | 'history' | 'playlists'
+
+  // Up to this many artist hashtags under the handle.
+  const MAX_ARTIST_TAGS = 10;
+
+  $: avatarUrl =
+    avatarPreviewUrl ??
+    resolveAvatarUrl(npProfile?.avatar, did) ??
+    profile?.avatar ??
+    null;
+  $: displayName =
+    npProfile?.displayName?.trim() ||
+    profile?.displayName ||
+    profile?.handle ||
+    "";
 
   // Keep the API order within each day, while retaining the original array
   // index used by the optimistic delete handler.
@@ -104,10 +142,18 @@
   async function loadData(actorDid: string) {
     if (!actorDid) return;
     loading = true;
+    npProfile = null;
+    artistTags = [];
+    clearAvatarPreview();
     try {
-      // 1. Get Profile
-      const pRes = await publicAgent.getProfile({ actor: actorDid });
+      // 1. Get Profile: NowPlayingAt's own record, with Bluesky as the fallback
+      //    for users who have never edited it.
+      const [pRes, npRes] = await Promise.all([
+        publicAgent.getProfile({ actor: actorDid }),
+        getNowplayingProfile(actorDid),
+      ]);
       profile = pRes.data;
+      npProfile = npRes;
 
       // 2. Get Playlists
       const plRes = await getPlaylists(actorDid);
@@ -121,7 +167,64 @@
       console.error("Failed to load profile data", e);
     }
     loading = false;
+
+    // 4. Artist tags need every record, not just the first page. The scan is
+    //    shared with the report tab and streams in, so it runs unawaited — and
+    //    only in the browser, so SSR never pages through a whole repo.
+    if (browser) loadArtistTags(actorDid);
   }
+
+  // Most-played artists, all-time, counted on the normalized artist name and
+  // displayed with the casing of the most recent play.
+  function computeArtistTags(records: HistoryRecord[]) {
+    const counts = new Map<string, { name: string; count: number; postedAt: string }>();
+    for (const val of records) {
+      const key = normalizeArtistStr(val.artist || "");
+      if (!key) continue;
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count++;
+        if ((val.postedAt || "") > existing.postedAt) {
+          existing.name = val.artist;
+          existing.postedAt = val.postedAt || "";
+        }
+      } else {
+        counts.set(key, { name: val.artist, count: 1, postedAt: val.postedAt || "" });
+      }
+    }
+    return [...counts.entries()]
+      .sort(([, a], [, b]) => b.count - a.count || a.name.localeCompare(b.name))
+      .slice(0, MAX_ARTIST_TAGS)
+      .map(([key, { name, count }]) => ({ key, name, count }));
+  }
+
+  async function loadArtistTags(actorDid: string) {
+    try {
+      const records = await fetchAllHistory(actorDid, (partial) => {
+        if (did === actorDid) artistTags = computeArtistTags(partial);
+      });
+      if (did === actorDid) artistTags = computeArtistTags(records);
+    } catch (e) {
+      console.warn("Failed to aggregate artist tags", e);
+    }
+  }
+
+  function clearAvatarPreview() {
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    avatarPreviewUrl = null;
+  }
+
+  function handleProfileSaved(
+    e: CustomEvent<{ record: ProfileRecord; previewUrl: string }>,
+  ) {
+    npProfile = e.detail.record;
+    // Show the local crop until the image CDN has the new blob.
+    clearAvatarPreview();
+    avatarPreviewUrl = e.detail.previewUrl;
+    showProfileEdit = false;
+  }
+
+  onDestroy(clearAvatarPreview);
 
   async function loadMoreHistory() {
     if (!did || !historyCursor || loadingMoreHistory) return;
@@ -261,6 +364,9 @@
       const rkey = item.uri.split("/").pop();
       if (rkey) {
         await deleteHistoryRecord(rkey);
+        // The cached full-history scan (artist tags, report) now holds a record
+        // that no longer exists.
+        if (did) invalidateHistoryScan(did);
       }
     } catch (e) {
       console.error(e);
@@ -271,11 +377,11 @@
 </script>
 
 <svelte:head>
-  <title>{profile?.displayName || profile?.handle || "プロフィール"} のなうぷれ | なうぷれあっと</title>
+  <title>{displayName || "プロフィール"} のなうぷれ | なうぷれあっと</title>
   <meta
     name="description"
     content={profile
-      ? `${profile.displayName || profile.handle} さんがなうぷれあっとでシェアしたなうぷれ (#NowPlaying) の再生履歴とプレイリスト。`
+      ? `${displayName} さんがなうぷれあっとでシェアしたなうぷれ (#NowPlaying) の再生履歴とプレイリスト。`
       : "Blueskyでシェアされたなうぷれ (#NowPlaying) の再生履歴とプレイリスト。"}
   />
 </svelte:head>
@@ -322,28 +428,61 @@
   {:else if profile}
     <!-- Profile Header -->
     <div class="mb-8 flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left">
-      {#if profile.avatar}
-        <a
-          href="https://bsky.app/profile/{profile.handle}"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="@{profile.handle} on Bluesky"
-          class="shrink-0"
+      {#if avatarUrl}
+        <img
+          src={avatarUrl}
+          alt={profile.handle}
+          class="w-24 h-24 shrink-0 rounded-full border-2 border-gray-700 shadow-xl object-cover"
+        />
+      {:else}
+        <div
+          class="w-24 h-24 shrink-0 rounded-full border-2 border-gray-700 bg-gray-800 shadow-xl flex items-center justify-center text-gray-500"
         >
-          <img
-            src={profile.avatar}
-            alt={profile.handle}
-            class="w-24 h-24 rounded-full border-2 border-gray-700 shadow-xl hover:opacity-80 transition-opacity cursor-pointer"
-          />
-        </a>
+          <User size={36} />
+        </div>
       {/if}
-      <div class="min-w-0">
+      <div class="min-w-0 flex-1">
         <h1 class="text-2xl sm:text-3xl font-bold text-white mb-1 wrap-break-word">
-          {profile.displayName || profile.handle}
+          {displayName}
         </h1>
-        <p class="text-gray-400 break-all">@{profile.handle}</p>
-        <p class="text-gray-500 text-sm mt-2 wrap-break-word whitespace-pre-wrap">{profile.description || ""}</p>
+        <div class="flex items-center justify-center sm:justify-start gap-2">
+          <p class="text-gray-400 break-all">@{profile.handle}</p>
+          <a
+            href="https://bsky.app/profile/{profile.handle}"
+            target="_blank"
+            rel="noopener noreferrer"
+            title={$t("profile.bluesky")}
+            aria-label={$t("profile.bluesky")}
+            class="shrink-0 text-gray-500 hover:text-[#0085ff] transition-colors"
+          >
+            <BlueskyIcon size={16} />
+          </a>
+        </div>
+        {#if artistTags.length > 0}
+          <ul
+            class="mt-3 flex flex-wrap gap-2 justify-center sm:justify-start"
+            aria-label={$t("profile.tags.label")}
+          >
+            {#each artistTags as tag (tag.key)}
+              <li
+                class="px-2.5 py-1 rounded-full bg-gray-800/80 border border-gray-700 text-xs font-medium text-green-300 max-w-full truncate"
+                title={$t("profile.report.tooltip.plays", { count: String(tag.count) })}
+              >
+                #{tag.name}
+              </li>
+            {/each}
+          </ul>
+        {/if}
       </div>
+      {#if isOwner}
+        <button
+          on:click={() => (showProfileEdit = true)}
+          class="shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-gray-700 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors"
+        >
+          <Pencil size={14} />
+          {$t("profile.edit.button")}
+        </button>
+      {/if}
     </div>
 
     <!-- Tabs -->
@@ -477,6 +616,15 @@
         </div>
       {/if}
     </div>
+  {/if}
+
+  <!-- Profile Edit Modal (owner only) -->
+  {#if showProfileEdit}
+    <ProfileEditModal
+      currentAvatarUrl={avatarUrl}
+      on:close={() => (showProfileEdit = false)}
+      on:saved={handleProfileSaved}
+    />
   {/if}
 
   <!-- Playlist Modal -->

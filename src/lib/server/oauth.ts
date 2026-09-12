@@ -36,7 +36,7 @@ import { clearDidCookie } from './session';
 }
 
 const PROD_ORIGIN = 'https://nowplayingat.suibari.com';
-const SCOPE = 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create';
+const SCOPE = 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.profile repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create';
 
 // CF Workers can generate secp256k1 keys but cannot import them back for ECDSA
 // signing (SubtleCrypto only supports P-256/P-384/P-521). Sessions that contain
