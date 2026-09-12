@@ -177,10 +177,47 @@ const ARTIST_TOP_LISTENERS = 20;
 const USER_TOP_SONGS = 12;   // report tab shows 5
 const USER_TOP_ARTISTS = 30; // profile shows 10 tags
 
-// Trim the payload if it would ever outgrow a comfortable KV value. Not expected
-// at the current scale (~21k plays); the escape hatch if it ever trips is to
-// shard by key prefix across several KV entries.
-const INDEX_SIZE_BUDGET = 4 * 1024 * 1024;
+// The artist index is split across this many KV entries so a single artist page
+// only ever parses a quarter of it. Four shards at the 30-minute cadence is 192
+// writes/day, which together with snapshot/stats/user_stats stays well inside
+// the 1000 writes/day KV limit.
+const ARTIST_INDEX_SHARDS = 4;
+
+// Trim a payload if it would ever outgrow a comfortable KV value.
+const INDEX_SIZE_BUDGET = 2 * 1024 * 1024;
+
+/**
+ * Which shard an artist key lives in. FNV-1a over the key: cheap, stable, and
+ * mirrored byte for byte in the web app (src/lib/server/artists.ts) — both sides
+ * must agree or lookups miss.
+ */
+export function artistShard(key: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % ARTIST_INDEX_SHARDS;
+}
+
+/**
+ * Keep only what a track card renders. Full history records carry genres,
+ * comments, timestamps and resolved streaming links, none of which the artist
+ * page shows — and `links` alone is two long URLs per record. Cards resolve
+ * streaming links through Odesli on demand anyway.
+ */
+function trimTrackRecord(v: any) {
+  return {
+    track: v.track,
+    artist: v.artist,
+    album: v.album || undefined,
+    img: v.img || undefined,
+    imgBlob: v.imgBlob || undefined,
+    trackUri: v.trackUri || undefined,
+    postUri: v.postUri || undefined,
+    provider: v.provider || undefined,
+  };
+}
 
 /** Cross-user artist aggregate. DIDs are interned into `dids` and referenced by index. */
 export interface ArtistIndex {
@@ -193,9 +230,10 @@ export interface ArtistIndex {
       k: string;                // songKey
       c: number;                // plays
       d: number;                // didIndex of the representative record's owner
-      r: any;                   // the representative (most recent) history record
+      r: any;                   // trimmed representative (most recent) record
     }[];
   }>;
+  shard: number;
   updatedAt: number;
 }
 
@@ -214,7 +252,8 @@ export interface UserStatsIndex {
 
 export interface ScanResult {
   stats: { totalPlays: number; daily: Record<string, number>; updatedAt: number };
-  artists: ArtistIndex;
+  /** One entry per shard, in shard order. */
+  artists: ArtistIndex[];
   users: UserStatsIndex;
 }
 
@@ -369,9 +408,13 @@ export async function scanAllHistory(): Promise<ScanResult> {
             const track = a.tracks.get(sk);
             if (track) {
               track.c++;
-              if (isNewer(iso, track.at)) { track.r = v; track.did = did; track.at = iso; }
+              if (isNewer(iso, track.at)) {
+                track.r = trimTrackRecord(v);
+                track.did = did;
+                track.at = iso;
+              }
             } else {
-              a.tracks.set(sk, { c: 1, r: v, did, at: iso });
+              a.tracks.set(sk, { c: 1, r: trimTrackRecord(v), did, at: iso });
             }
           }
         }
@@ -391,45 +434,52 @@ export async function scanAllHistory(): Promise<ScanResult> {
   };
 }
 
-function buildArtistIndex(acc: Map<string, ArtistAcc>, updatedAt: number): ArtistIndex {
-  // DIDs repeat across thousands of artists while only a few dozen exist, so
-  // interning them is where most of the payload size goes away.
-  const dids: string[] = [];
-  const didIndex = new Map<string, number>();
-  const intern = (did: string): number => {
-    let i = didIndex.get(did);
+function buildArtistIndex(acc: Map<string, ArtistAcc>, updatedAt: number): ArtistIndex[] {
+  // Each shard interns its own DIDs so it stays self-contained: one KV read is
+  // all an artist page needs. DIDs repeat across thousands of artists while only
+  // a few dozen exist, so interning is where most of the payload size goes away.
+  const shards: ArtistIndex[] = Array.from({ length: ARTIST_INDEX_SHARDS }, (_, shard) => ({
+    dids: [],
+    artists: {},
+    shard,
+    updatedAt,
+  }));
+  const didIndex = shards.map(() => new Map<string, number>());
+  const intern = (shard: number, did: string): number => {
+    let i = didIndex[shard].get(did);
     if (i === undefined) {
-      i = dids.length;
-      dids.push(did);
-      didIndex.set(did, i);
+      i = shards[shard].dids.length;
+      shards[shard].dids.push(did);
+      didIndex[shard].set(did, i);
     }
     return i;
   };
 
-  const artists: ArtistIndex['artists'] = {};
   for (const [key, a] of acc) {
-    artists[key] = {
+    const shard = artistShard(key);
+    shards[shard].artists[key] = {
       n: a.n,
       p: a.p,
       l: [...a.listeners.entries()]
         .sort(([, x], [, y]) => y - x)
         .slice(0, ARTIST_TOP_LISTENERS)
-        .map(([did, c]) => [intern(did), c] as [number, number]),
+        .map(([did, c]) => [intern(shard, did), c] as [number, number]),
       t: [...a.tracks.entries()]
         .sort(([, x], [, y]) => y.c - x.c)
         .slice(0, ARTIST_TOP_TRACKS)
-        .map(([k, t]) => ({ k, c: t.c, d: intern(t.did), r: t.r })),
+        .map(([k, t]) => ({ k, c: t.c, d: intern(shard, t.did), r: t.r })),
     };
   }
 
-  const index: ArtistIndex = { dids, artists, updatedAt };
-  trimToBudget(
-    index,
-    'artists',
-    () => Object.entries(index.artists).sort(([, x], [, y]) => x.p - y.p),
-    ([key]) => { index.artists[key].t = []; index.artists[key].l = []; },
-  );
-  return index;
+  for (const index of shards) {
+    trimToBudget(
+      index,
+      `artists_${index.shard}`,
+      () => Object.entries(index.artists).sort(([, x], [, y]) => x.p - y.p),
+      ([key]) => { index.artists[key].t = []; index.artists[key].l = []; },
+    );
+  }
+  return shards;
 }
 
 function buildUserStatsIndex(acc: Map<string, UserAcc>, updatedAt: number): UserStatsIndex {

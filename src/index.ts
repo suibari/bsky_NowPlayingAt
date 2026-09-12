@@ -164,7 +164,7 @@ async function tick() {
   }
 }
 
-async function pushCache(key: 'snapshot' | 'stats' | 'artists' | 'user_stats', data: any) {
+async function pushCache(key: string, data: any) {
   try {
     const res = await fetch(`${API_URL}/api/cache`, {
       method: 'PUT',
@@ -211,11 +211,16 @@ async function refreshStats() {
   try {
     const { stats, artists, users } = await scanAllHistory();
     await pushCache('stats', stats);
-    await pushCache('artists', artists);
+    for (const shard of artists) {
+      await pushCache(`artists_${shard.shard}`, shard);
+    }
     await pushCache('user_stats', users);
+
+    const artistCount = artists.reduce((n, s) => n + Object.keys(s.artists).length, 0);
+    const shardSizes = artists.map((s) => JSON.stringify(s).length).join('/');
     console.log(
       `[STATS] totalPlays=${stats.totalPlays}, days=${Object.keys(stats.daily).length},`,
-      `artists=${Object.keys(artists.artists).length} (${JSON.stringify(artists).length}B),`,
+      `artists=${artistCount} (shards ${shardSizes}B),`,
       `users=${Object.keys(users.users).length} (${JSON.stringify(users).length}B)`,
     );
   } catch (e) {
