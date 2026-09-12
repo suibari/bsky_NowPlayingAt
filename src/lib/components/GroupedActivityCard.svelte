@@ -190,7 +190,12 @@
     <div class="mt-2 p-3 bg-gray-900 border border-gray-800 rounded-xl animate-fade-in flex flex-col gap-3">
       <div>
         <p class="font-bold text-white text-sm truncate">{selectedItem.record.track}</p>
-        <p class="text-gray-400 text-xs truncate">{selectedItem.record.artist}</p>
+        <p class="text-gray-400 text-xs truncate">
+          <a
+            href="/artist/{encodeURIComponent(selectedItem.record.artist)}"
+            class="hover:underline decoration-green-500 underline-offset-2"
+          >{selectedItem.record.artist}</a>
+        </p>
       </div>
       <TrackActionPane
         subjectUri={reactionSubjectUri}
