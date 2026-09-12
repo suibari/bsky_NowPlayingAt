@@ -4,6 +4,7 @@ export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
 export const NSID_REACTION = 'com.suibari.nowplayingat.reaction';
 export const NSID_PLAYLIST = 'com.suibari.nowplayingat.playlist';
+export const NSID_PROFILE = 'com.suibari.nowplayingat.profile';
 
 // Constellation Source Path
 export const REACTION_SOURCE = `${NSID_REACTION}:subjectUri`;
@@ -59,6 +60,18 @@ export interface PlaylistRecord {
   createdAt: string;
   isDefault?: boolean;
   postUri?: string;
+}
+
+// NowPlayingAt's own actor profile. The shape mirrors app.bsky.actor.profile so
+// a Bluesky profile can be used as a drop-in fallback when a user has never
+// edited their NowPlayingAt profile. Only `avatar` is editable for now.
+export interface ProfileRecord {
+  $type: typeof NSID_PROFILE;
+  displayName?: string;
+  description?: string;
+  avatar?: BlobRef;
+  banner?: BlobRef;
+  createdAt?: string;
 }
 
 export interface ConfigRecord {
