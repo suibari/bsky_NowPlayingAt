@@ -111,3 +111,35 @@ npm run seed:kv -- http://127.0.0.1:5174
 
 本番に対しては読み取りのみ。実データを自前で生成したい場合は poller を
 ローカルに向けて動かす（`PUT /api/cache` で snapshot が書かれる）。
+
+**`artists_*` と `user_stats` は `seed:kv` では入らない。** この2つを作るのは poller の
+全履歴掃引だけで、本番にも一括で読み出す公開エンドポイントがない。ローカルに用意するには
+poller を掃引モードで一度走らせる（全ユーザーの PDS を読むので数分かかる）：
+
+```sh
+cd ../bsky_NowPlayingAt_server
+NOWPLAYINGAT_API_URL=http://127.0.0.1:5173 \
+NOWPLAYINGAT_SHARED_SECRET=<このリポジトリの .env と同じ値> \
+  npx tsx src/index.ts --stats-only
+```
+
+`--stats-only` は必須。付けないと `tick()` が動き、**実ユーザーの Bluesky に投稿する**。
+共有シークレットが両リポジトリの `.env` で食い違っていると `/api/cache` が 401 を返し、
+掃引は完走するのに KV が空のままになる。
+
+### 画面の目視確認
+
+`src/routes/+layout.ts` が `ssr = false` なので、`curl` は空のシェルしか返さない。
+HTTP ステータスが 200 でも画面が真っ白なことがある。実ブラウザで見ること。
+
+このマシンには共用の Playwright ハーネスが入っている（`~/tools/uitest`、詳細はそこの
+README）。dev サーバーを起動したまま：
+
+```sh
+uishot --full-page http://127.0.0.1:5173/artist/サカナクション
+uishot --viewport 400x900 http://127.0.0.1:5173/            # スマホ幅
+```
+
+スクリーンショットのパスと、コンソールエラー・失敗したリクエストが出力される。
+サインアウト状態では `/api/me` の 401 と、独自プロフィール未作成ユーザーの
+`com.suibari.nowplayingat.profile` に対する 400 が必ず出る。どちらも既存の正常動作。
