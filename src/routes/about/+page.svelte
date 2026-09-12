@@ -498,6 +498,18 @@
       </a>
       <div class="flex items-center gap-5">
         <a
+          href="/terms"
+          class="text-gray-400 hover:text-white transition-colors no-underline"
+        >
+          {$t('legal.terms')}
+        </a>
+        <a
+          href="/privacy"
+          class="text-gray-400 hover:text-white transition-colors no-underline"
+        >
+          {$t('legal.privacy')}
+        </a>
+        <a
           href="https://bsky.app/profile/suibari.com"
           target="_blank"
           rel="noopener noreferrer"

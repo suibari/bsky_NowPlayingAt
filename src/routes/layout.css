@@ -13,13 +13,17 @@ body {
   @apply antialiased;
 }
 
-a {
-  color: var(--color-accent);
-  text-decoration: none;
-}
+/* Keep the default link treatment in the base layer so explicit Tailwind
+   text/decoration utilities on buttons, tabs and muted links can override it. */
+@layer base {
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
 
-a:hover {
-  text-decoration: underline;
+  a:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Custom Scrollbar */

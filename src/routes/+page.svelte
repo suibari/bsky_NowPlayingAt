@@ -1170,9 +1170,28 @@
         <LiveUsers />
         <NowplayingMix best={mixBest} loading={loadingDiscovery} />
         <GlobalStats />
+        <nav
+          class="flex items-center justify-center gap-3 px-2 pb-4 text-xs text-gray-500"
+          aria-label={$t('legal.nav')}
+        >
+          <a href="/terms" class="text-gray-500 hover:text-gray-300 no-underline transition-colors">
+            {$t('legal.terms')}
+          </a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy" class="text-gray-500 hover:text-gray-300 no-underline transition-colors">
+            {$t('legal.privacy')}
+          </a>
+        </nav>
       </div>
     </aside>
     </div>
+
+    <!-- The right pane is hidden on small screens, so keep legal links reachable. -->
+    <footer class="lg:hidden flex items-center justify-center gap-3 border-t border-gray-900 pt-5 pb-2 text-xs text-gray-500">
+      <a href="/terms" class="text-gray-500 hover:text-gray-300 no-underline">{$t('legal.terms')}</a>
+      <span aria-hidden="true">·</span>
+      <a href="/privacy" class="text-gray-500 hover:text-gray-300 no-underline">{$t('legal.privacy')}</a>
+    </footer>
   </div>
 {/if}
 
