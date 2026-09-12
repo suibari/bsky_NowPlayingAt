@@ -17,7 +17,7 @@ try {
 
 import { getAllEnabledUsers, updateLastScrobble, updateLastScrobbleKeyOnly } from './db.js';
 import { getLatestScrobble, getGenreTags } from './lastfm.js';
-import { getHotContent, getPlayStats } from './bsky.js';
+import { getHotContent, scanAllHistory } from './bsky.js';
 import { normalizeGenres } from './ollama.js';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -164,7 +164,7 @@ async function tick() {
   }
 }
 
-async function pushCache(key: 'snapshot' | 'stats', data: any) {
+async function pushCache(key: 'snapshot' | 'stats' | 'artists' | 'user_stats', data: any) {
   try {
     const res = await fetch(`${API_URL}/api/cache`, {
       method: 'PUT',
@@ -202,26 +202,45 @@ async function refreshCache() {
   }
 }
 
+// One full pass over every registered user's PDS history feeds three KV entries:
+// the global counter, the cross-user artist index, and the per-user aggregate
+// that lets the profile page skip its own scan. Three writes per run (48/day
+// each) sit well inside the 1000 writes/day KV limit.
 async function refreshStats() {
-  console.log('[STATS] Starting global play-stats scan...');
+  console.log('[STATS] Starting global history scan...');
   try {
-    const stats = await getPlayStats();
+    const { stats, artists, users } = await scanAllHistory();
     await pushCache('stats', stats);
-    console.log(`[STATS] totalPlays=${stats.totalPlays}, days=${Object.keys(stats.daily).length}`);
+    await pushCache('artists', artists);
+    await pushCache('user_stats', users);
+    console.log(
+      `[STATS] totalPlays=${stats.totalPlays}, days=${Object.keys(stats.daily).length},`,
+      `artists=${Object.keys(artists.artists).length} (${JSON.stringify(artists).length}B),`,
+      `users=${Object.keys(users.users).length} (${JSON.stringify(users).length}B)`,
+    );
   } catch (e) {
     console.error('[STATS] Error during refresh:', e);
   }
 }
 
-console.log(`Now Playing poller started. Polling every ${POLL_INTERVAL_MS / 1000}s`);
+// `--stats-only` runs just the read-only history scan. `tick()` posts to real
+// users' Bluesky accounts and writes records to their PDS, so local development
+// against a dev server must never start it.
+const STATS_ONLY = process.argv.includes('--stats-only');
 
-// Run immediately on start, then on interval
-tick();
-setInterval(tick, POLL_INTERVAL_MS);
+if (STATS_ONLY) {
+  console.log('Now Playing poller started in --stats-only mode (no posting, no hot refresh)');
+} else {
+  console.log(`Now Playing poller started. Polling every ${POLL_INTERVAL_MS / 1000}s`);
 
-// Run cache refresh immediately on start, then on interval
-refreshCache();
-setInterval(refreshCache, CACHE_REFRESH_INTERVAL_MS);
+  // Run immediately on start, then on interval
+  tick();
+  setInterval(tick, POLL_INTERVAL_MS);
+
+  // Run cache refresh immediately on start, then on interval
+  refreshCache();
+  setInterval(refreshCache, CACHE_REFRESH_INTERVAL_MS);
+}
 
 // Global play-stats scan (heavier; slower cadence)
 refreshStats();
