@@ -180,7 +180,13 @@
         <h3 class="font-bold text-white truncate leading-tight">
           {track.title}
         </h3>
-        <p class="text-gray-200 text-sm truncate">{track.artist}</p>
+        <p class="text-gray-200 text-sm truncate">
+          <a
+            href="/artist/{encodeURIComponent(track.artist)}"
+            class="pointer-events-auto hover:underline decoration-green-500 underline-offset-2"
+            on:click|stopPropagation
+          >{track.artist}</a>
+        </p>
         {#if track.album}
           <p class="text-gray-400 text-xs truncate">{track.album}</p>
         {/if}
@@ -234,7 +240,13 @@
         <h3 class="font-bold text-white truncate text-lg leading-tight">
           {track.title}
         </h3>
-        <p class="text-gray-400 text-sm truncate">{track.artist}</p>
+        <p class="text-gray-400 text-sm truncate">
+          <a
+            href="/artist/{encodeURIComponent(track.artist)}"
+            class="hover:underline decoration-green-500 underline-offset-2"
+            on:click|stopPropagation
+          >{track.artist}</a>
+        </p>
         {#if track.album}
           <p class="text-gray-500 text-xs truncate">{track.album}</p>
         {/if}

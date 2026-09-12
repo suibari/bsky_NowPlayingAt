@@ -31,6 +31,13 @@
   import { resolveArtworkUrl } from "$lib/artwork";
   import { getNowplayingProfile, resolveAvatarUrl } from "$lib/profile";
   import { normalizeArtistStr } from "$lib/recommendation";
+  import {
+    fetchUserStats,
+    fetchHistoryDelta,
+    mergeDelta,
+    toArtistTags,
+    type HistoryPage,
+  } from "$lib/userStats";
   import type { Track } from "$lib/music";
   import type {
     HistoryRecord,
@@ -67,6 +74,9 @@
   let history: HistoryItem[] = [];
   let playlists: { uri: string; cid: string; value: PlaylistRecord }[] = [];
   let historyCursor: string | undefined = undefined;
+  // First page of history, handed to the report tab so its cache delta reuses
+  // this fetch instead of asking the PDS for the same page again.
+  let historySeed: HistoryPage | undefined = undefined;
   let loadingMoreHistory = false;
   let loading = true;
   let activeTab = "report"; // 'report' | 'history' | 'playlists'
@@ -144,6 +154,7 @@
     loading = true;
     npProfile = null;
     artistTags = [];
+    historySeed = undefined;
     clearAvatarPreview();
     try {
       // 1. Get Profile: NowPlayingAt's own record, with Bluesky as the fallback
@@ -163,14 +174,15 @@
       const hRes = await getHistory(actorDid);
       history = hRes.records;
       historyCursor = hRes.cursor;
+      historySeed = { records: hRes.records, cursor: hRes.cursor };
     } catch (e) {
       console.error("Failed to load profile data", e);
     }
     loading = false;
 
-    // 4. Artist tags need every record, not just the first page. The scan is
-    //    shared with the report tab and streams in, so it runs unawaited — and
-    //    only in the browser, so SSR never pages through a whole repo.
+    // 4. Artist tags need every record, not just the first page. They come from
+    //    the poller's cached aggregate, falling back to a full scan — unawaited
+    //    either way, and only in the browser so SSR never pages through a repo.
     if (browser) loadArtistTags(actorDid);
   }
 
@@ -200,6 +212,20 @@
 
   async function loadArtistTags(actorDid: string) {
     try {
+      // The cached aggregate already covers every record, so the tags appear
+      // without waiting on a scan; the PDS only has to supply what came after it.
+      const cached = await fetchUserStats(actorDid);
+      if (cached) {
+        if (did !== actorDid) return;
+        artistTags = toArtistTags(cached, MAX_ARTIST_TAGS);
+        const delta = await fetchHistoryDelta(actorDid, cached.rkey, historySeed);
+        if (did === actorDid && delta.length > 0) {
+          artistTags = toArtistTags(mergeDelta(cached, delta), MAX_ARTIST_TAGS);
+        }
+        return;
+      }
+
+      // No cache entry for this DID — page through the whole repo as before.
       const records = await fetchAllHistory(actorDid, (partial) => {
         if (did === actorDid) artistTags = computeArtistTags(partial);
       });
@@ -464,11 +490,14 @@
             aria-label={$t("profile.tags.label")}
           >
             {#each artistTags as tag (tag.key)}
-              <li
-                class="px-2.5 py-1 rounded-full bg-gray-800/80 border border-gray-700 text-xs font-medium text-green-300 max-w-full truncate"
-                title={$t("profile.report.tooltip.plays", { count: String(tag.count) })}
-              >
-                #{tag.name}
+              <li class="max-w-full">
+                <a
+                  href="/artist/{encodeURIComponent(tag.name)}"
+                  class="block px-2.5 py-1 rounded-full bg-gray-800/80 border border-gray-700 text-xs font-medium text-green-300 max-w-full truncate hover:bg-gray-700/80 hover:border-gray-600 transition-colors"
+                  title={$t("profile.report.tooltip.plays", { count: String(tag.count) })}
+                >
+                  #{tag.name}
+                </a>
               </li>
             {/each}
           </ul>
@@ -519,7 +548,7 @@
     <!-- Content -->
     <div>
       {#if activeTab === "report"}
-        <ReportTab {did} />
+        <ReportTab {did} {historySeed} />
       {:else if activeTab === "playlists"}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Create New Card (Owner Only) -->

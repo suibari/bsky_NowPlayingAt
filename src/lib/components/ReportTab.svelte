@@ -6,14 +6,26 @@
   import { Loader2 } from "lucide-svelte";
   import TrackCard from "$lib/components/TrackCard.svelte";
   import { fetchAllHistory, songKey } from "$lib/bsky";
-  import { resolveArtworkUrl } from "$lib/artwork";
   import type { HistoryRecord } from "$lib/schema";
   import type { Track } from "$lib/music";
   import { t } from "$lib/i18n";
   import { GENRES } from "$lib/genres";
   import { normalizeArtistStr, type UserProfile } from "$lib/recommendation";
+  import {
+    fetchUserStats,
+    fetchHistoryDelta,
+    mergeDelta,
+    toReportAggregate,
+    historyRecordToTrack,
+    type HistoryPage,
+    type ReportAggregate,
+    type UserStatsEntry,
+  } from "$lib/userStats";
 
   export let did: string | undefined = undefined;
+  // The profile page already fetched the first page of history for its own list.
+  // Handing it over lets the cache delta cost no extra PDS request.
+  export let historySeed: HistoryPage | undefined = undefined;
 
   let loading = true;
   let totalPlays = 0;
@@ -31,6 +43,9 @@
   // Per-user listening profiles from KV (7-day window, all app users) — the
   // source for the cross-user artist title determination.
   let userProfilesMap: Record<string, UserProfile> | null = null;
+  // This user's cached all-time aggregate, or null when the sweep has no entry
+  // for them (unregistered DID). Null is what selects the full-scan fallback.
+  let cached: UserStatsEntry | null = null;
   // The computed listener title words (0–2 entries: artists and/or genres).
   let titleWords: string[] = [];
 
@@ -62,23 +77,10 @@
     "md:col-start-4 md:row-start-2",
   ];
 
-  // Map a history record to a TrackCard track. Artwork is resolved via the
-  // shared resolveArtworkUrl helper (legacy getBlob URLs fall back to img).
+  // Map a history record to a TrackCard track. Shared with the artist page and
+  // the cached-aggregate path so all three build the same shape.
   function recordToTrack(val: HistoryRecord): Track {
-    const artworkUrl = resolveArtworkUrl(val.imgBlob, val.img, did);
-    return {
-      id: val.trackUri,
-      // @ts-ignore – provider is a loose string on history records
-      provider: val.provider || "itunes",
-      title: val.track,
-      artist: val.artist,
-      album: val.album,
-      artworkUrl,
-      trackUri: val.trackUri,
-      spotifyUrl: val.links?.spotify,
-      youtubeMusicUrl: val.links?.youtube,
-      comment: val.comment,
-    };
+    return historyRecordToTrack(val, did);
   }
 
   function aggregate(records: HistoryRecord[]) {
@@ -198,7 +200,10 @@
   }
 
   function applyAggregate(records: HistoryRecord[]) {
-    const agg = aggregate(records);
+    applyReport(aggregate(records));
+  }
+
+  function applyReport(agg: ReportAggregate) {
     totalPlays = agg.total;
     top5 = agg.top5;
     hourly = agg.hourly;
@@ -232,19 +237,27 @@
       console.warn("Failed to load user profiles for report title", e);
     }
 
-    // 1. Seed from the TOP page timeline cache (latest ~5 records per user) for an
-    //    instant first paint, before the full PDS fetch lands.
-    try {
-      const res = await fetch("/api/timeline");
-      const { data } = await res.json();
-      if (Array.isArray(data)) {
-        const seed = data
-          .filter((i: any) => i.author?.did === did && i.type === "history")
-          .map((i: any) => i.record as HistoryRecord);
-        if (seed.length > 0) applyAggregate(seed);
+    // 1. Paint the cached all-time aggregate (poller sweep, <=30 min old). These
+    //    are already the real numbers, so no full PDS scan is needed to show them.
+    cached = await fetchUserStats(did);
+    if (cached) {
+      applyReport(toReportAggregate(cached, did));
+    } else {
+      // No cache entry (an unregistered DID, or the index hasn't been built yet).
+      // Seed from the TOP page timeline cache so something paints before the
+      // full scan in step 3 lands.
+      try {
+        const res = await fetch("/api/timeline");
+        const { data } = await res.json();
+        if (Array.isArray(data)) {
+          const seed = data
+            .filter((i: any) => i.author?.did === did && i.type === "history")
+            .map((i: any) => i.record as HistoryRecord);
+          if (seed.length > 0) applyAggregate(seed);
+        }
+      } catch (e) {
+        console.warn("Failed to seed report from timeline cache", e);
       }
-    } catch (e) {
-      console.warn("Failed to seed report from timeline cache", e);
     }
 
     // 2. Init Chart.js (browser-only, dynamic import to avoid SSR issues).
@@ -302,16 +315,28 @@
     });
     chart.update();
 
-    // 3. Full fetch from the PDS (shared with the profile page), updating
-    //    aggregates progressively so the number counts up and the bars grow as
-    //    data streams in.
-    try {
-      const all = await fetchAllHistory(did, (records) => {
-        if (!destroyed) applyAggregate(records);
-      });
-      if (!destroyed) applyAggregate(all);
-    } catch (e) {
-      console.error("Failed to load full history for report", e);
+    // 3. Catch up on whatever the sweep missed. With a cache entry that is one
+    //    page of the PDS (usually the page the profile page already fetched);
+    //    without one there is no watermark to read from, so fall back to the
+    //    full scan, updating progressively as pages stream in.
+    if (cached) {
+      try {
+        const delta = await fetchHistoryDelta(did, cached.rkey, historySeed);
+        if (!destroyed && delta.length > 0) {
+          applyReport(toReportAggregate(mergeDelta(cached, delta), did));
+        }
+      } catch (e) {
+        console.warn("Failed to merge history delta into report", e);
+      }
+    } else {
+      try {
+        const all = await fetchAllHistory(did, (records) => {
+          if (!destroyed) applyAggregate(records);
+        });
+        if (!destroyed) applyAggregate(all);
+      } catch (e) {
+        console.error("Failed to load full history for report", e);
+      }
     }
     loading = false;
   });
