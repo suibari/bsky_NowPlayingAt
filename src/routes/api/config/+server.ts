@@ -28,18 +28,26 @@ export const POST: RequestHandler = async (event) => {
       const rec = res.data.records[0].value as any;
       if (rec.hubRef !== HUB_REF) {
         const rkey = res.data.records[0].uri.split('/').pop();
+        const now = new Date().toISOString();
         await agent.com.atproto.repo.putRecord({
           repo: did,
           collection: NSID_CONFIG,
           rkey: rkey!,
-          record: { $type: NSID_CONFIG, hubRef: HUB_REF, updatedAt: new Date().toISOString() },
+          record: {
+            ...rec,
+            $type: NSID_CONFIG,
+            hubRef: HUB_REF,
+            createdAt: rec.createdAt ?? rec.updatedAt ?? now,
+            updatedAt: now,
+          },
         });
       }
     } else {
+      const now = new Date().toISOString();
       await agent.com.atproto.repo.createRecord({
         repo: did,
         collection: NSID_CONFIG,
-        record: { $type: NSID_CONFIG, hubRef: HUB_REF, updatedAt: new Date().toISOString() },
+        record: { $type: NSID_CONFIG, hubRef: HUB_REF, createdAt: now, updatedAt: now },
       });
       // Tag the auto-created favorites so timeline filters can identify it reliably.
       await agent.com.atproto.repo.createRecord({

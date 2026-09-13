@@ -153,6 +153,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.report.title.two': '{{a}} × {{b}}',
     'profile.report.title.one': '{{a}}',
     'profile.report.title.none': 'なうぷれあったー',
+    'profile.registered': 'なうぷれあっと登録日：{{date}}',
     'profile.report.toptracks': '再生回数トップ5',
     'profile.report.timeline': '時間帯別の再生',
     'profile.report.updating': '更新中…',
@@ -191,6 +192,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.edit.button': 'プロフィールを編集',
     'profile.edit.title': 'プロフィールを編集',
     'profile.edit.note': 'なうぷれあっとで表示されるプロフィールです。Blueskyのプロフィールは変更されません。',
+    'profile.edit.displayname': '表示名',
+    'profile.edit.displayname.placeholder': '表示名を入力',
+    'profile.edit.displayname.hint': '64文字まで。空欄にするとBlueskyの表示名を使用します。',
     'profile.edit.avatar': 'アバター',
     'profile.edit.pick': '画像を選択',
     'profile.edit.pick.hint': '画像を選ぶと、切り抜き位置を調整できます。',
@@ -203,7 +207,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.edit.error.toolarge': 'ファイルサイズが大きすぎます（20MBまで）。',
     'profile.edit.error.decode': 'この画像は読み込めませんでした。別の画像を選んでください。',
     'profile.edit.error.save': 'プロフィールの保存に失敗しました。',
-    'profile.edit.error.reauth': 'アバターの保存には再サインインが必要です。設定画面からサインアウトし、もう一度サインインしてください。',
+    'profile.edit.error.reauth': 'プロフィールの保存には再サインインが必要です。設定画面からサインアウトし、もう一度サインインしてください。',
 
     // --- TrackCard ---
     'track.play': '再生する',
@@ -433,6 +437,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.report.title.two': '{{a}} × {{b}}',
     'profile.report.title.one': '{{a}}',
     'profile.report.title.none': 'NowPlayingAter',
+    'profile.registered': 'Joined NowPlayingAt: {{date}}',
     'profile.report.toptracks': 'Top 5 Tracks',
     'profile.report.timeline': 'Plays by Hour',
     'profile.report.updating': 'Updating…',
@@ -471,6 +476,9 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.edit.button': 'Edit profile',
     'profile.edit.title': 'Edit profile',
     'profile.edit.note': 'This profile is shown on NowPlayingAt. Your Bluesky profile is not changed.',
+    'profile.edit.displayname': 'Display name',
+    'profile.edit.displayname.placeholder': 'Enter a display name',
+    'profile.edit.displayname.hint': 'Up to 64 characters. Leave blank to use your Bluesky display name.',
     'profile.edit.avatar': 'Avatar',
     'profile.edit.pick': 'Choose image',
     'profile.edit.pick.hint': 'Pick an image, then adjust how it is cropped.',
@@ -483,7 +491,7 @@ const translations: Record<Locale, Record<string, string>> = {
     'profile.edit.error.toolarge': 'That file is too large (20MB max).',
     'profile.edit.error.decode': 'That image could not be loaded. Please choose another one.',
     'profile.edit.error.save': 'Failed to save your profile.',
-    'profile.edit.error.reauth': 'Saving your avatar needs a fresh sign-in. Please sign out in Settings and sign in again.',
+    'profile.edit.error.reauth': 'Saving your profile needs a fresh sign-in. Please sign out in Settings and sign in again.',
 
     // --- TrackCard ---
     'track.play': 'Play',

@@ -1,6 +1,6 @@
 import { Agent, type BlobRef } from '@atproto/api';
 import { getPdsEndpoint } from '$lib/atproto';
-import { NSID_PROFILE, type ProfileRecord } from '$lib/schema';
+import { NSID_CONFIG, NSID_PROFILE, type ProfileRecord } from '$lib/schema';
 
 // The NowPlayingAt profile is a singleton record, like app.bsky.actor.profile.
 export const PROFILE_RKEY = 'self';
@@ -24,6 +24,48 @@ export async function getNowplayingProfile(did: string): Promise<ProfileRecord |
     return (res.data.value as unknown as ProfileRecord) ?? null;
   } catch {
     // RecordNotFound for anyone who has not edited their profile yet.
+    return null;
+  }
+}
+
+// AT Protocol's sortable TID stores its creation time (microseconds) in the
+// first 11 base-32 characters. Config records predate an explicit createdAt
+// field, so their rkey is the most reliable registration timestamp.
+function dateFromTid(rkey: string): string | null {
+  if (!/^[234567abcdefghij][234567abcdefghijklmnopqrstuvwxyz]{12}$/.test(rkey)) return null;
+  const alphabet = '234567abcdefghijklmnopqrstuvwxyz';
+  let micros = 0;
+  for (const char of rkey.slice(0, 11)) {
+    micros = micros * 32 + alphabet.indexOf(char);
+  }
+  const date = new Date(Math.floor(micros / 1000));
+  const time = date.getTime();
+  return Number.isNaN(time) || time > Date.now() + 86_400_000 ? null : date.toISOString();
+}
+
+/** The date this user first created NowPlayingAt's registration config. */
+export async function getNowplayingRegisteredAt(did: string): Promise<string | null> {
+  const pds = await getPdsEndpoint(did);
+  if (!pds) return null;
+
+  try {
+    const pdsAgent = new Agent({ service: pds });
+    const res = await pdsAgent.com.atproto.repo.listRecords({
+      repo: did,
+      collection: NSID_CONFIG,
+      limit: 1,
+      reverse: true,
+    });
+    const record = res.data.records[0];
+    if (!record) return null;
+    const rkey = record.uri.split('/').pop() ?? '';
+    const value = record.value as { createdAt?: unknown; updatedAt?: unknown };
+    return (
+      dateFromTid(rkey) ??
+      (typeof value.createdAt === 'string' ? value.createdAt : null) ??
+      (typeof value.updatedAt === 'string' ? value.updatedAt : null)
+    );
+  } catch {
     return null;
   }
 }
@@ -52,10 +94,14 @@ export class ProfileUpdateError extends Error {
   }
 }
 
-/** Upload a cropped square avatar and store it on the profile record. */
-export async function updateNowplayingAvatar(avatar: Blob): Promise<ProfileRecord> {
+/** Update editable fields on the user's NowPlayingAt profile record. */
+export async function updateNowplayingProfile(
+  displayName: string,
+  avatar?: Blob,
+): Promise<ProfileRecord> {
   const form = new FormData();
-  form.append('avatar', avatar, 'avatar.jpg');
+  form.append('displayName', displayName);
+  if (avatar) form.append('avatar', avatar, 'avatar.jpg');
 
   const res = await fetch('/api/profile', { method: 'PUT', body: form });
   if (!res.ok) {
