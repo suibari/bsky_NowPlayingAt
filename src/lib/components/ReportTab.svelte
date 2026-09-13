@@ -8,9 +8,9 @@
   import { fetchAllHistory, songKey } from "$lib/bsky";
   import type { HistoryRecord } from "$lib/schema";
   import type { Track } from "$lib/music";
-  import { t } from "$lib/i18n";
+  import { locale, t } from "$lib/i18n";
   import { GENRES } from "$lib/genres";
-  import { normalizeArtistStr, type UserProfile } from "$lib/recommendation";
+  import { normalizeArtistStr } from "$lib/recommendation";
   import {
     fetchUserStats,
     fetchHistoryDelta,
@@ -19,13 +19,14 @@
     historyRecordToTrack,
     type HistoryPage,
     type ReportAggregate,
-    type UserStatsEntry,
+    type UserStatsResponse,
   } from "$lib/userStats";
 
   export let did: string | undefined = undefined;
   // The profile page already fetched the first page of history for its own list.
   // Handing it over lets the cache delta cost no extra PDS request.
   export let historySeed: HistoryPage | undefined = undefined;
+  export let registeredAt: string | null = null;
 
   let loading = true;
   let totalPlays = 0;
@@ -40,12 +41,12 @@
   // history. Used for the genre chart and the listener "title".
   let genreFreqAll: Record<string, number> = {};
   let artistDisplay = new Map<string, string>();
-  // Per-user listening profiles from KV (7-day window, all app users) — the
-  // source for the cross-user artist title determination.
-  let userProfilesMap: Record<string, UserProfile> | null = null;
   // This user's cached all-time aggregate, or null when the sweep has no entry
   // for them (unregistered DID). Null is what selects the full-scan fallback.
-  let cached: UserStatsEntry | null = null;
+  let cached: UserStatsResponse | null = null;
+  // All-time cross-user winners are calculated server-side from the same
+  // full-history index used by the report.
+  let titleArtistKeys: string[] = [];
   // The computed listener title words (0–2 entries: artists and/or genres).
   let titleWords: string[] = [];
 
@@ -162,32 +163,12 @@
   }
 
   // Listener title: up to 2 artists where the user has ≥2 plays AND is the top
-  // listener across all app users (KV 7-day data); remaining slots filled by the
-  // user's top all-time genres. Returns 0–2 display words.
+  // all-time listener across all registered users; remaining slots are filled
+  // by the user's top all-time genres. Returns 0–2 display words.
   function computeTitleWords(): string[] {
     const words: string[] = [];
-    const myFreq =
-      did && userProfilesMap?.[did]?.artistFreq
-        ? userProfilesMap[did].artistFreq
-        : null;
-    if (myFreq && userProfilesMap) {
-      const candidates: { key: string; count: number }[] = [];
-      for (const [artist, count] of Object.entries(myFreq)) {
-        if (count < 2) continue;
-        let isTop = true;
-        for (const [otherDid, prof] of Object.entries(userProfilesMap)) {
-          if (otherDid === did) continue;
-          if ((prof.artistFreq?.[artist] ?? 0) > count) {
-            isTop = false;
-            break;
-          }
-        }
-        if (isTop) candidates.push({ key: artist, count });
-      }
-      candidates.sort((a, b) => b.count - a.count);
-      for (const c of candidates.slice(0, 2)) {
-        words.push(artistDisplay.get(c.key) ?? c.key);
-      }
+    for (const key of titleArtistKeys.slice(0, 2)) {
+      words.push(artistDisplay.get(key) ?? key);
     }
     // Fill remaining slots (up to 2 total) with top genres that have plays.
     if (words.length < 2) {
@@ -223,24 +204,12 @@
       return;
     }
 
-    // 0. Load per-user listening profiles (KV, 7-day, all users) for the title.
-    try {
-      const res = await fetch("/api/user-profiles");
-      if (res.ok) {
-        const { data } = await res.json();
-        if (data) {
-          userProfilesMap = data;
-          titleWords = computeTitleWords();
-        }
-      }
-    } catch (e) {
-      console.warn("Failed to load user profiles for report title", e);
-    }
-
     // 1. Paint the cached all-time aggregate (poller sweep, <=30 min old). These
     //    are already the real numbers, so no full PDS scan is needed to show them.
     cached = await fetchUserStats(did);
     if (cached) {
+      // Be tolerant of an API response cached before titleArtists was added.
+      titleArtistKeys = (cached.titleArtists ?? []).map(({ key }) => key);
       applyReport(toReportAggregate(cached, did));
     } else {
       // No cache entry (an unregistered DID, or the index hasn't been built yet).
@@ -353,6 +322,14 @@
       : titleWords.length === 1
         ? $t("profile.report.title.one", { a: titleWords[0] })
         : $t("profile.report.title.none");
+  $: registeredDate = registeredAt ? new Date(registeredAt) : null;
+  $: registeredDateText = registeredDate && !Number.isNaN(registeredDate.getTime())
+    ? new Intl.DateTimeFormat($locale === "ja" ? "ja-JP" : "en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }).format(registeredDate)
+    : "";
 </script>
 
 <div class="relative">
@@ -425,6 +402,11 @@
           >
             {titleText}
           </p>
+          {#if registeredDateText}
+            <p class="mt-2 text-xs text-gray-500">
+              {$t("profile.registered", { date: registeredDateText })}
+            </p>
+          {/if}
         </div>
       </div>
     </div>

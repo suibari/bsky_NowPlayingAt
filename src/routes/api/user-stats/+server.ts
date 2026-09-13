@@ -22,7 +22,27 @@ export const GET: RequestHandler = async (event) => {
       return json({ data: null, stale: !index }, { status: 200 });
     }
 
-    const data: UserStatsResponse = { ...entry, did, updatedAt: index.updatedAt };
+    const highestArtistCounts = new Map<string, number>();
+    for (const user of Object.values(index.users)) {
+      for (const artist of user.artists) {
+        highestArtistCounts.set(
+          artist.k,
+          Math.max(highestArtistCounts.get(artist.k) ?? 0, artist.c),
+        );
+      }
+    }
+    const titleArtists = entry.artists
+      .filter(({ k, c }) => {
+        if (c < 2) return false;
+        return (highestArtistCounts.get(k) ?? 0) <= c;
+      })
+      .map(({ k, c }) => ({ key: k, count: c }));
+    const data: UserStatsResponse = {
+      ...entry,
+      did,
+      updatedAt: index.updatedAt,
+      titleArtists,
+    };
     return json(
       { data, updatedAt: index.updatedAt, stale: false },
       { headers: { 'Cache-Control': 'public, max-age=300' } },

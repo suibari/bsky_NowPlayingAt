@@ -41,34 +41,42 @@ function isScopeError(e: any): boolean {
   return status === 401 || status === 403;
 }
 
-// PUT: update the NowPlayingAt profile. Only the avatar is editable for now;
-// other fields already on the record are preserved.
+// PUT: update the editable NowPlayingAt profile fields. Other fields already
+// on the record are preserved.
 export const PUT: RequestHandler = async (event) => {
   const did = getDid(event);
   if (!did) throw error(401, 'Unauthorized');
 
   const form = await event.request.formData();
   const file = form.get('avatar');
-  if (!(file instanceof Blob)) throw error(400, 'avatar is required');
-  if (file.type && !file.type.startsWith('image/')) throw error(400, 'avatar must be an image');
-  if (file.size > UPLOAD_SIZE_LIMIT) throw error(413, 'avatar is too large');
+  const rawDisplayName = form.get('displayName');
+  if (typeof rawDisplayName !== 'string') throw error(400, 'displayName is required');
+  const displayName = rawDisplayName.trim();
+  if (Array.from(displayName).length > 64) throw error(400, 'displayName is too long');
+  if (file !== null && !(file instanceof Blob)) throw error(400, 'avatar must be an image');
+  if (file instanceof Blob && file.type && !file.type.startsWith('image/')) {
+    throw error(400, 'avatar must be an image');
+  }
+  if (file instanceof Blob && file.size > UPLOAD_SIZE_LIMIT) throw error(413, 'avatar is too large');
 
   const agent = await getAgent(did, event);
 
-  // cropSquare guards against a non-square upload; it is a no-op for the
-  // already-cropped blob the editor sends.
-  const { blob } = await processImage(file, true);
-
   try {
-    const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
-
     const existing = await getExistingRecord(agent, did);
-    const record = {
+    const record: Record<string, unknown> = {
       ...(existing ?? {}),
       $type: NSID_PROFILE,
-      avatar: uploadRes.data.blob,
+      displayName,
       createdAt: (existing?.createdAt as string | undefined) ?? new Date().toISOString(),
     };
+
+    if (file instanceof Blob) {
+      // cropSquare guards against a non-square upload; it is a no-op for the
+      // already-cropped blob the editor sends.
+      const { blob } = await processImage(file, true);
+      const uploadRes = await agent.uploadBlob(blob, { encoding: 'image/jpeg' });
+      record.avatar = uploadRes.data.blob;
+    }
 
     await agent.com.atproto.repo.putRecord({
       repo: did,

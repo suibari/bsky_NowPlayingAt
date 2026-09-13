@@ -2,16 +2,17 @@
   import { createEventDispatcher, onDestroy } from "svelte";
   import { ImagePlus, Loader2, User, X } from "lucide-svelte";
   import { t } from "$lib/i18n";
-  import { ProfileUpdateError, updateNowplayingAvatar } from "$lib/profile";
+  import { ProfileUpdateError, updateNowplayingProfile } from "$lib/profile";
   import type { ProfileRecord } from "$lib/schema";
 
   // Avatar currently shown on the profile (NowPlayingAt's own, or the Bluesky
   // fallback) — displayed until the user picks a new image.
   export let currentAvatarUrl: string | null = null;
+  export let currentDisplayName = "";
 
   const dispatch = createEventDispatcher<{
     close: void;
-    saved: { record: ProfileRecord; previewUrl: string };
+    saved: { record: ProfileRecord; previewUrl?: string };
   }>();
 
   // Crop viewport in CSS px. The canvas is a WYSIWYG preview of the square that
@@ -36,6 +37,9 @@
 
   let saving = false;
   let errorKey = "";
+  let displayName = currentDisplayName;
+
+  $: canSave = !saving && (img !== null || displayName.trim() !== currentDisplayName.trim());
 
   const pointers = new Map<number, { x: number; y: number }>();
   let dragStart: { x: number; y: number; offsetX: number; offsetY: number } | null = null;
@@ -195,14 +199,17 @@
   }
 
   async function handleSave() {
-    if (!img || saving) return;
+    if (!canSave) return;
     saving = true;
     errorKey = "";
     try {
-      const blob = await renderOutput(img);
-      if (!blob) throw new Error("render failed");
-      const record = await updateNowplayingAvatar(blob);
-      dispatch("saved", { record, previewUrl: URL.createObjectURL(blob) });
+      const blob = img ? await renderOutput(img) : undefined;
+      if (img && !blob) throw new Error("render failed");
+      const record = await updateNowplayingProfile(displayName.trim(), blob ?? undefined);
+      dispatch("saved", {
+        record,
+        ...(blob ? { previewUrl: URL.createObjectURL(blob) } : {}),
+      });
     } catch (e) {
       console.error("Failed to update profile", e);
       errorKey =
@@ -247,6 +254,23 @@
     </div>
 
     <p class="text-xs text-gray-500 mb-4">{$t("profile.edit.note")}</p>
+
+    <label class="block mb-5">
+      <span class="block text-sm font-bold text-gray-300 mb-2">
+        {$t("profile.edit.displayname")}
+      </span>
+      <input
+        type="text"
+        maxlength="64"
+        bind:value={displayName}
+        disabled={saving}
+        placeholder={$t("profile.edit.displayname.placeholder")}
+        class="w-full rounded-lg border border-gray-700 bg-gray-950 px-3 py-2 text-white placeholder:text-gray-600 focus:border-green-500 focus:outline-none disabled:opacity-50"
+      />
+      <span class="mt-1 block text-[11px] text-gray-500">
+        {$t("profile.edit.displayname.hint")}
+      </span>
+    </label>
 
     <p class="text-sm font-bold text-gray-300 mb-2">{$t("profile.edit.avatar")}</p>
 
@@ -326,7 +350,7 @@
       </button>
       <button
         on:click={handleSave}
-        disabled={!img || saving}
+        disabled={!canSave}
         class="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
       >
         {#if saving}

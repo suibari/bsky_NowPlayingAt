@@ -23,7 +23,7 @@ export const GET: RequestHandler = async (event) => {
     const oauthClient = await createOAuthClient(event.url.origin);
     console.log('[login] origin:', event.url.origin, 'client_id:', oauthClient.clientMetadata.client_id, 'prompt:', prompt ?? '-');
     const url = await oauthClient.authorize(handle, {
-      scope: 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create',
+      scope: 'atproto blob:*/* repo:com.suibari.nowplayingat.config repo:com.suibari.nowplayingat.history repo:com.suibari.nowplayingat.playlist repo:com.suibari.nowplayingat.profile repo:com.suibari.nowplayingat.reaction repo:app.bsky.feed.post?action=create',
       ...(prompt ? { prompt } : {}),
     });
     console.log('[login] authorize URL:', url.toString());

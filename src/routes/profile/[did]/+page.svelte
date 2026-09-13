@@ -29,7 +29,11 @@
   import ProfileEditModal from "$lib/components/ProfileEditModal.svelte";
   import BlueskyIcon from "$lib/components/BlueskyIcon.svelte";
   import { resolveArtworkUrl } from "$lib/artwork";
-  import { getNowplayingProfile, resolveAvatarUrl } from "$lib/profile";
+  import {
+    getNowplayingProfile,
+    getNowplayingRegisteredAt,
+    resolveAvatarUrl,
+  } from "$lib/profile";
   import { normalizeArtistStr } from "$lib/recommendation";
   import {
     fetchUserStats,
@@ -67,6 +71,7 @@
   // NowPlayingAt's own profile record (null for anyone who never edited it —
   // the Bluesky profile is then used as the fallback).
   let npProfile: ProfileRecord | null = null;
+  let registeredAt: string | null = null;
   // Local crop shown right after a save, while the image CDN catches up.
   let avatarPreviewUrl: string | null = null;
   let showProfileEdit = false;
@@ -153,18 +158,21 @@
     if (!actorDid) return;
     loading = true;
     npProfile = null;
+    registeredAt = null;
     artistTags = [];
     historySeed = undefined;
     clearAvatarPreview();
     try {
       // 1. Get Profile: NowPlayingAt's own record, with Bluesky as the fallback
       //    for users who have never edited it.
-      const [pRes, npRes] = await Promise.all([
+      const [pRes, npRes, registrationDate] = await Promise.all([
         publicAgent.getProfile({ actor: actorDid }),
         getNowplayingProfile(actorDid),
+        getNowplayingRegisteredAt(actorDid),
       ]);
       profile = pRes.data;
       npProfile = npRes;
+      registeredAt = registrationDate;
 
       // 2. Get Playlists
       const plRes = await getPlaylists(actorDid);
@@ -241,12 +249,14 @@
   }
 
   function handleProfileSaved(
-    e: CustomEvent<{ record: ProfileRecord; previewUrl: string }>,
+    e: CustomEvent<{ record: ProfileRecord; previewUrl?: string }>,
   ) {
     npProfile = e.detail.record;
-    // Show the local crop until the image CDN has the new blob.
-    clearAvatarPreview();
-    avatarPreviewUrl = e.detail.previewUrl;
+    if (e.detail.previewUrl) {
+      // Show the local crop until the image CDN has the new blob.
+      clearAvatarPreview();
+      avatarPreviewUrl = e.detail.previewUrl;
+    }
     showProfileEdit = false;
   }
 
@@ -548,7 +558,7 @@
     <!-- Content -->
     <div>
       {#if activeTab === "report"}
-        <ReportTab {did} {historySeed} />
+        <ReportTab {did} {historySeed} {registeredAt} />
       {:else if activeTab === "playlists"}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <!-- Create New Card (Owner Only) -->
@@ -651,6 +661,7 @@
   {#if showProfileEdit}
     <ProfileEditModal
       currentAvatarUrl={avatarUrl}
+      currentDisplayName={displayName}
       on:close={() => (showProfileEdit = false)}
       on:saved={handleProfileSaved}
     />

@@ -64,7 +64,7 @@ export interface PlaylistRecord {
 
 // NowPlayingAt's own actor profile. The shape mirrors app.bsky.actor.profile so
 // a Bluesky profile can be used as a drop-in fallback when a user has never
-// edited their NowPlayingAt profile. Only `avatar` is editable for now.
+// edited their NowPlayingAt profile.
 export interface ProfileRecord {
   $type: typeof NSID_PROFILE;
   displayName?: string;
@@ -77,6 +77,7 @@ export interface ProfileRecord {
 export interface ConfigRecord {
   $type: typeof NSID_CONFIG;
   hubRef: string;
+  createdAt?: string;
   updatedAt: string;
 }
 

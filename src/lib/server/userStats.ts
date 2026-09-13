@@ -41,4 +41,7 @@ export interface UserStatsIndex {
 export interface UserStatsResponse extends UserStatsEntry {
   did: string;
   updatedAt: number;
+  // Artists for which this user has the highest all-time play count across all
+  // registered users (ties included), ordered by this user's count.
+  titleArtists: { key: string; count: number }[];
 }
