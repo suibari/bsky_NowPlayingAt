@@ -3,7 +3,7 @@ import type { RequestHandler } from './$types';
 import { Agent, RichText } from '@atproto/api';
 import { getDid } from '$lib/server/session';
 import { createSessionOAuthClient } from '$lib/server/oauth';
-import { resolveLinks, pickBestServiceLink } from '$lib/odesli';
+import { playUrl } from '$lib/playLink';
 import { processImage } from '$lib/server/image';
 
 export const POST: RequestHandler = async (event) => {
@@ -16,16 +16,14 @@ export const POST: RequestHandler = async (event) => {
   const session = await oauthClient.restore(did);
   const agent = new Agent(session);
 
-  // Resolve streaming links: skip Odesli if client already resolved them
-  let odesliLinks = null;
-  if (!track.spotifyUrl && !track.youtubeMusicUrl && track.trackUri) {
-    odesliLinks = await resolveLinks(track.trackUri).catch(() => null);
-  }
-  const { url: targetUrl, name: serviceName } = pickBestServiceLink(
-    odesliLinks,
-    track.trackUri,
-    { spotifyUrl: track.spotifyUrl, youtubeMusicUrl: track.youtubeMusicUrl },
+  const targetUrl = playUrl(
+    { spotify: track.spotifyUrl, youtube: track.youtubeMusicUrl, appleMusic: track.appleMusicUrl },
+    track.artist,
+    track.title,
   );
+  const host = new URL(targetUrl).hostname;
+  const serviceName = host.endsWith('youtube.com') ? 'YouTube Music'
+    : host.endsWith('apple.com') ? 'Apple Music' : 'Spotify';
 
   // Upload thumbnail
   let thumbBlob = undefined;
