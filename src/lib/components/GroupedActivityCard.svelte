@@ -6,6 +6,7 @@
   import { t } from "$lib/i18n";
   import { userProfile } from "$lib/stores";
   import { Play } from "lucide-svelte";
+  import { playUrl } from "$lib/playLink";
 
   // 2〜9件の同一ユーザー連続 history アイテム（新しい順）
   export let items: any[];
@@ -24,14 +25,7 @@
 
   function playItem(item: any, e: MouseEvent) {
     e.stopPropagation();
-    const links = item.record?.links;
-    const url = links?.spotify ?? links?.youtube ?? links?.appleMusic;
-    if (url) {
-      window.open(url, "_blank");
-    } else {
-      const q = encodeURIComponent(`${item.record.artist} ${item.record.track}`);
-      window.open(`https://open.spotify.com/search/${q}`, "_blank");
-    }
+    window.open(playUrl(item.record?.links, item.record.artist, item.record.track), "_blank");
   }
 
   // n 枚のジャケットを余白なしで並べるための行ごとのアイテム数

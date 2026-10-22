@@ -29,8 +29,8 @@ export function artistShard(key: string): number {
 
 /**
  * A representative play, trimmed to what a track card renders. Genres, comments,
- * timestamps and resolved streaming links are dropped by the poller: cards look
- * streaming links up through Odesli on demand, and the rest is never shown here.
+ * timestamps and saved streaming links are dropped by the poller: the play button
+ * falls back to a Spotify search, and the rest is never shown here.
  */
 export type ArtistTrackRecord = Pick<HistoryRecord, 'track' | 'artist'> &
   Partial<Pick<HistoryRecord, 'album' | 'img' | 'imgBlob' | 'trackUri' | 'postUri' | 'provider'>>;

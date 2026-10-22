@@ -1,9 +1,9 @@
 <script lang="ts">
   import { resolveArtworkUrl } from "$lib/artwork";
-  import { resolveLinks } from "$lib/odesli";
+  import { playUrl } from "$lib/playLink";
   import { t } from "$lib/i18n";
   import { timelineStore, mutedDidsStore } from "$lib/stores";
-  import { Play, Loader2 } from "lucide-svelte";
+  import { Play } from "lucide-svelte";
 
   const LIVE_WINDOW_MS = 10 * 60 * 1000;
   const MAX_SHOWN = 6;
@@ -21,8 +21,6 @@
     ytMusicUrl: string | null;
     appleMusicUrl: string | null;
   }
-
-  let resolvingDid: string | null = null;
 
   function filterLiveUsers(items: any[], mutedDids: Set<string>): LiveUser[] {
     const cutoff = Date.now() - LIVE_WINDOW_MS;
@@ -68,33 +66,12 @@
   $: liveUsers = filterLiveUsers($timelineStore.data ?? [], $mutedDidsStore.dids);
   $: isLive = liveUsers.length > 0;
 
-  async function resolveAndPlay(user: LiveUser) {
-    const cached = user.spotifyUrl ?? user.ytMusicUrl ?? user.appleMusicUrl;
-    if (cached) {
-      window.open(cached, "_blank");
-      return;
-    }
-    resolvingDid = user.did;
-    try {
-      const res = await resolveLinks(user.trackUri);
-      if (res) {
-        user.spotifyUrl = res.linksByPlatform.spotify?.url ?? null;
-        user.ytMusicUrl = res.linksByPlatform.youtubeMusic?.url ?? null;
-        user.appleMusicUrl = res.linksByPlatform.appleMusic?.url ?? null;
-        liveUsers = liveUsers;
-      }
-      const url = user.spotifyUrl ?? user.ytMusicUrl ?? user.appleMusicUrl;
-      if (url) {
-        window.open(url, "_blank");
-      } else {
-        const q = encodeURIComponent(`${user.artist} ${user.track}`);
-        window.open(`https://open.spotify.com/search/${q}`, "_blank");
-      }
-    } finally {
-      resolvingDid = null;
-    }
+  function play(user: LiveUser) {
+    window.open(playUrl(
+      { spotify: user.spotifyUrl, youtube: user.ytMusicUrl, appleMusic: user.appleMusicUrl },
+      user.artist, user.track,
+    ), "_blank");
   }
-
 </script>
 
 <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
@@ -163,18 +140,13 @@
               <div class="w-8 h-8 rounded bg-gray-800"></div>
             {/if}
             <button
-              on:click={() => resolveAndPlay(user)}
-              disabled={resolvingDid === user.did}
+              on:click={() => play(user)}
               class="absolute inset-0 flex items-center justify-center rounded
                      bg-black/0 group-hover/jacket:bg-black/60 transition-colors
                      opacity-0 group-hover/jacket:opacity-100"
               title={$t("track.play")}
             >
-              {#if resolvingDid === user.did}
-                <Loader2 size={14} class="animate-spin text-white" />
-              {:else}
-                <Play size={14} class="fill-white text-white" />
-              {/if}
+              <Play size={14} class="fill-white text-white" />
             </button>
           </div>
         </li>

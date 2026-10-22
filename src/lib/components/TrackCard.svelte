@@ -4,12 +4,11 @@
   import {
     ChevronDown,
     Disc,
-    Loader2,
     GripVertical,
     Trash2,
     Play,
   } from "lucide-svelte";
-  import { resolveLinks } from "$lib/odesli";
+  import { playUrl } from "$lib/playLink";
   import { songKey } from "$lib/bsky";
   import TrackActionPane from "$lib/components/TrackActionPane.svelte";
   import { t } from "$lib/i18n";
@@ -57,49 +56,17 @@
 
   let expanded = autoExpand;
 
-  // Link Resolution
-  let resolving = false;
-  let cachedSpotify: string | undefined = track.spotifyUrl;
-  let cachedYtMusic: string | undefined = track.youtubeMusicUrl;
-  let cachedAppleMusic: string | undefined = track.appleMusicUrl;
-
   function toggleExpand() {
     expanded = !expanded;
   }
 
-  // Single unified play button: jump to the first available service following a
-  // fixed priority (Spotify → YouTube Music → Apple Music). Resolves missing
-  // links once via Odesli, falling back to a Spotify search.
-  async function resolveAndPlay() {
-    // 1. Use any already-known link in priority order.
-    const cached = cachedSpotify ?? cachedYtMusic ?? cachedAppleMusic;
-    if (cached) {
-      window.open(cached, "_blank");
-      return;
-    }
-
-    // 2. Resolve all platform links once, then pick by priority.
-    resolving = true;
-    try {
-      const res = await resolveLinks(track.trackUri);
-      if (res) {
-        cachedSpotify = res.linksByPlatform.spotify?.url;
-        cachedYtMusic = res.linksByPlatform.youtubeMusic?.url;
-        cachedAppleMusic = res.linksByPlatform.appleMusic?.url;
-      }
-
-      const targetUrl = cachedSpotify ?? cachedYtMusic ?? cachedAppleMusic;
-      if (targetUrl) {
-        window.open(targetUrl, "_blank");
-      } else {
-        // 3. Fallback: Spotify search.
-        const query = encodeURIComponent(`${track.artist} ${track.title}`);
-        window.open(`https://open.spotify.com/search/${query}`, "_blank");
-      }
-    } catch (e) {
-      console.error("Link resolution failed", e);
-    }
-    resolving = false;
+  // Single unified play button: a saved track link if the record has one,
+  // otherwise a Spotify search.
+  function play() {
+    window.open(playUrl(
+      { spotify: track.spotifyUrl, youtube: track.youtubeMusicUrl, appleMusic: track.appleMusicUrl },
+      track.artist, track.title,
+    ), "_blank");
   }
 
   function handleDelete() {
@@ -138,16 +105,11 @@
 
       <!-- Play button (top-left) -->
       <button
-        on:click|stopPropagation={resolveAndPlay}
+        on:click|stopPropagation={play}
         class="absolute top-2 left-2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors active:scale-95"
         title={$t('track.play')}
-        disabled={resolving}
       >
-        {#if resolving}
-          <Loader2 size={18} class="animate-spin" />
-        {:else}
-          <Play size={18} class="fill-current" />
-        {/if}
+        <Play size={18} class="fill-current" />
       </button>
 
       <!-- Delete / Drag handle (top-right) -->
@@ -259,16 +221,11 @@
 
       <!-- Play button (top-right) -->
       <button
-        on:click|stopPropagation={resolveAndPlay}
+        on:click|stopPropagation={play}
         class="absolute top-2 right-2 text-gray-300 hover:text-green-500 transition-colors p-1.5 rounded-full hover:bg-gray-800 active:scale-95"
         title={$t('track.play')}
-        disabled={resolving}
       >
-        {#if resolving}
-          <Loader2 size={20} class="animate-spin" />
-        {:else}
-          <Play size={20} class="fill-current" />
-        {/if}
+        <Play size={20} class="fill-current" />
       </button>
 
       <!-- Delete Button (bottom-right, red for caution) -->
