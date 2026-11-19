@@ -162,11 +162,100 @@ export async function getGlobalTimeline() {
   return sorted();
 }
 
-// --- GLOBAL PLAY STATS ---
+// --- GLOBAL SCAN: PLAY STATS / ARTIST INDEX / PER-USER STATS ---
 
 const STATS_BATCH_SIZE = 25;
 const STATS_DAILY_RETENTION_DAYS = 30;
 const STATS_MAX_PAGES_PER_USER = 100; // safety cap: 100 pages * 100 = 10k records/user
+
+// List caps. Deliberately larger than what the UI shows: the client merges its
+// own PDS delta (records newer than `rkey`) into these lists, and a delta can
+// only reorder entries it can see. Keeping runners-up means the true top 5
+// songs / top 10 artist tags survive the merge.
+const ARTIST_TOP_TRACKS = 6;
+const ARTIST_TOP_LISTENERS = 20;
+const USER_TOP_SONGS = 12;   // report tab shows 5
+const USER_TOP_ARTISTS = 30; // profile shows 10 tags
+
+// The artist index is split across this many KV entries so a single artist page
+// only ever parses a quarter of it. Four shards at the 30-minute cadence is 192
+// writes/day, which together with snapshot/stats/user_stats stays well inside
+// the 1000 writes/day KV limit.
+const ARTIST_INDEX_SHARDS = 4;
+
+// Trim a payload if it would ever outgrow a comfortable KV value.
+const INDEX_SIZE_BUDGET = 2 * 1024 * 1024;
+
+/**
+ * Which shard an artist key lives in. FNV-1a over the key: cheap, stable, and
+ * mirrored byte for byte in the web app (src/lib/server/artists.ts) — both sides
+ * must agree or lookups miss.
+ */
+export function artistShard(key: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h % ARTIST_INDEX_SHARDS;
+}
+
+/**
+ * Keep only what a track card renders. Full history records carry genres,
+ * comments, timestamps and resolved streaming links, none of which the artist
+ * page shows — and `links` alone is two long URLs per record. Cards resolve
+ * streaming links through Odesli on demand anyway.
+ */
+function trimTrackRecord(v: any) {
+  return {
+    track: v.track,
+    artist: v.artist,
+    album: v.album || undefined,
+    img: v.img || undefined,
+    imgBlob: v.imgBlob || undefined,
+    trackUri: v.trackUri || undefined,
+    postUri: v.postUri || undefined,
+    provider: v.provider || undefined,
+  };
+}
+
+/** Cross-user artist aggregate. DIDs are interned into `dids` and referenced by index. */
+export interface ArtistIndex {
+  dids: string[];
+  artists: Record<string, {
+    n: string;                  // display name, casing of the most recent play
+    p: number;                  // total plays across every user
+    l: [number, number][];      // [didIndex, plays], desc — feed-hidden users excluded
+    t: {                        // representative tracks, plays desc
+      k: string;                // songKey
+      c: number;                // plays
+      d: number;                // didIndex of the representative record's owner
+      r: any;                   // trimmed representative (most recent) record
+    }[];
+  }>;
+  shard: number;
+  updatedAt: number;
+}
+
+/** Per-user aggregate: everything the profile page derives from a full history scan. */
+export interface UserStatsIndex {
+  users: Record<string, {
+    total: number;
+    rkey: string;               // watermark: newest history rkey counted here
+    hourlyUtc: number[];        // 24 slots, bucketed by UTC hour
+    genreFreq: Record<string, number>;
+    songs: { k: string; c: number; r: any }[];
+    artists: { k: string; n: string; c: number }[];
+  }>;
+  updatedAt: number;
+}
+
+export interface ScanResult {
+  stats: { totalPlays: number; daily: Record<string, number>; updatedAt: number };
+  /** One entry per shard, in shard order. */
+  artists: ArtistIndex[];
+  users: UserStatsIndex;
+}
 
 // JST (UTC+9) calendar day so day boundaries match the app's primary audience.
 function dayKeyJST(iso?: string): string | null {
@@ -176,19 +265,50 @@ function dayKeyJST(iso?: string): string | null {
   return new Date(t + 9 * 60 * 60 * 1000).toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
+// ISO 8601 sorts lexicographically, so a plain string compare is chronological.
+function isNewer(a?: string, b?: string): boolean {
+  return (a || '') > (b || '');
+}
+
+type ArtistAcc = {
+  n: string;
+  nameAt: string;
+  p: number;
+  listeners: Map<string, number>;
+  tracks: Map<string, { c: number; r: any; did: string; at: string }>;
+};
+
+type UserAcc = {
+  total: number;
+  rkey: string;
+  hourlyUtc: number[];
+  genreFreq: Record<string, number>;
+  songs: Map<string, { c: number; r: any; at: string }>;
+  artists: Map<string, { n: string; c: number; at: string }>;
+};
+
 /**
- * Aggregate ALL history records across every registered user into a global
- * play counter. Walks each user's full PDS history (paginated) so historical
- * records are counted, not just new ones — `totalPlays` is the all-time count
- * and `daily` buckets the last 30 days by each record's postedAt/createdAt.
+ * Walk every registered user's full PDS history once and derive three payloads:
+ * the global play counter, the cross-user artist index, and a per-user aggregate
+ * that lets the profile page skip its own full scan.
+ *
+ * All three are pure derivations of PDS records — throwing them away and
+ * rebuilding costs nothing but one scan, which is why they live in KV and not
+ * in a database of record.
  */
-export async function getPlayStats(): Promise<{ totalPlays: number; daily: Record<string, number>; updatedAt: number }> {
+export async function scanAllHistory(): Promise<ScanResult> {
   const backlinks = await getBacklinks(HUB_REF, `${NSID_CONFIG}:hubRef`);
   const userDids = Array.from(new Set(backlinks.map(b => b.did)));
+  // Feed-hidden users still count towards play totals and representative tracks;
+  // they are only left out of the artist page's listener list.
+  const hiddenDids = new Set(await getHiddenFromFeedDids().catch(() => [] as string[]));
 
   let totalPlays = 0;
   const daily: Record<string, number> = {};
   const dailyCutoff = Date.now() - STATS_DAILY_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+
+  const artistAcc = new Map<string, ArtistAcc>();
+  const userAcc = new Map<string, UserAcc>();
 
   const batches: string[][] = [];
   for (let i = 0; i < userDids.length; i += STATS_BATCH_SIZE) {
@@ -200,6 +320,15 @@ export async function getPlayStats(): Promise<{ totalPlays: number; daily: Recor
       const pds = await getPdsEndpoint(did);
       if (!pds) return;
       const pdsAgent = new Agent({ service: pds });
+
+      const u: UserAcc = {
+        total: 0,
+        rkey: '',
+        hourlyUtc: new Array(24).fill(0),
+        genreFreq: {},
+        songs: new Map(),
+        artists: new Map(),
+      };
 
       let cursor: string | undefined;
       let pages = 0;
@@ -213,25 +342,195 @@ export async function getPlayStats(): Promise<{ totalPlays: number; daily: Recor
             cursor,
           });
         } catch (e) {
-          console.warn(`[stats] listRecords failed for ${did}`, e);
+          console.warn(`[scan] listRecords failed for ${did}`, e);
           break;
         }
         for (const r of res.data.records as any[]) {
-          totalPlays++;
-          const iso = r.value.postedAt || r.value.createdAt;
+          const v = r.value ?? {};
+          const iso: string = v.postedAt || v.createdAt || '';
           const ts = iso ? new Date(iso).getTime() : NaN;
+
+          totalPlays++;
           if (!isNaN(ts) && ts >= dailyCutoff) {
             const key = dayKeyJST(iso);
             if (key) daily[key] = (daily[key] ?? 0) + 1;
+          }
+
+          // --- per-user ---
+          u.total++;
+          // TIDs sort lexicographically in creation order, so max() is the newest.
+          const rkey = String(r.uri || '').split('/').pop() || '';
+          if (rkey > u.rkey) u.rkey = rkey;
+          if (!isNaN(ts)) u.hourlyUtc[new Date(ts).getUTCHours()]++;
+
+          const genres: string[] = Array.isArray(v.genres) ? v.genres : (v.genre ? [v.genre] : []);
+          for (const g of genres) {
+            const gk = String(g).trim().toLowerCase();
+            if (gk) u.genreFreq[gk] = (u.genreFreq[gk] ?? 0) + 1;
+          }
+
+          const sk = songKey(v.artist, v.track, v.trackUri);
+          if (sk) {
+            const song = u.songs.get(sk);
+            if (song) {
+              song.c++;
+              // The representative is always the latest play, so the card's
+              // artwork and its postUri come from the same, newest record.
+              if (isNewer(iso, song.at)) { song.r = v; song.at = iso; }
+            } else {
+              u.songs.set(sk, { c: 1, r: v, at: iso });
+            }
+          }
+
+          const ak = normalizeArtist(v.artist);
+          if (!ak) continue;
+
+          const mine = u.artists.get(ak);
+          if (mine) {
+            mine.c++;
+            if (isNewer(iso, mine.at)) { mine.n = v.artist; mine.at = iso; }
+          } else {
+            u.artists.set(ak, { n: v.artist, c: 1, at: iso });
+          }
+
+          // --- cross-user artist index ---
+          let a = artistAcc.get(ak);
+          if (!a) {
+            a = { n: v.artist, nameAt: iso, p: 0, listeners: new Map(), tracks: new Map() };
+            artistAcc.set(ak, a);
+          }
+          a.p++;
+          if (isNewer(iso, a.nameAt)) { a.n = v.artist; a.nameAt = iso; }
+          if (!hiddenDids.has(did)) {
+            a.listeners.set(did, (a.listeners.get(did) ?? 0) + 1);
+          }
+          if (sk) {
+            const track = a.tracks.get(sk);
+            if (track) {
+              track.c++;
+              if (isNewer(iso, track.at)) {
+                track.r = trimTrackRecord(v);
+                track.did = did;
+                track.at = iso;
+              }
+            } else {
+              a.tracks.set(sk, { c: 1, r: trimTrackRecord(v), did, at: iso });
+            }
           }
         }
         cursor = res.data.cursor;
         pages++;
       } while (cursor && pages < STATS_MAX_PAGES_PER_USER);
+
+      if (u.total > 0) userAcc.set(did, u);
     }));
   }
 
-  return { totalPlays, daily, updatedAt: Date.now() };
+  const updatedAt = Date.now();
+  return {
+    stats: { totalPlays, daily, updatedAt },
+    artists: buildArtistIndex(artistAcc, updatedAt),
+    users: buildUserStatsIndex(userAcc, updatedAt),
+  };
+}
+
+function buildArtistIndex(acc: Map<string, ArtistAcc>, updatedAt: number): ArtistIndex[] {
+  // Each shard interns its own DIDs so it stays self-contained: one KV read is
+  // all an artist page needs. DIDs repeat across thousands of artists while only
+  // a few dozen exist, so interning is where most of the payload size goes away.
+  const shards: ArtistIndex[] = Array.from({ length: ARTIST_INDEX_SHARDS }, (_, shard) => ({
+    dids: [],
+    artists: {},
+    shard,
+    updatedAt,
+  }));
+  const didIndex = shards.map(() => new Map<string, number>());
+  const intern = (shard: number, did: string): number => {
+    let i = didIndex[shard].get(did);
+    if (i === undefined) {
+      i = shards[shard].dids.length;
+      shards[shard].dids.push(did);
+      didIndex[shard].set(did, i);
+    }
+    return i;
+  };
+
+  for (const [key, a] of acc) {
+    const shard = artistShard(key);
+    shards[shard].artists[key] = {
+      n: a.n,
+      p: a.p,
+      l: [...a.listeners.entries()]
+        .sort(([, x], [, y]) => y - x)
+        .slice(0, ARTIST_TOP_LISTENERS)
+        .map(([did, c]) => [intern(shard, did), c] as [number, number]),
+      t: [...a.tracks.entries()]
+        .sort(([, x], [, y]) => y.c - x.c)
+        .slice(0, ARTIST_TOP_TRACKS)
+        .map(([k, t]) => ({ k, c: t.c, d: intern(shard, t.did), r: t.r })),
+    };
+  }
+
+  for (const index of shards) {
+    trimToBudget(
+      index,
+      `artists_${index.shard}`,
+      () => Object.entries(index.artists).sort(([, x], [, y]) => x.p - y.p),
+      ([key]) => { index.artists[key].t = []; index.artists[key].l = []; },
+    );
+  }
+  return shards;
+}
+
+function buildUserStatsIndex(acc: Map<string, UserAcc>, updatedAt: number): UserStatsIndex {
+  const users: UserStatsIndex['users'] = {};
+  for (const [did, u] of acc) {
+    users[did] = {
+      total: u.total,
+      rkey: u.rkey,
+      hourlyUtc: u.hourlyUtc,
+      genreFreq: u.genreFreq,
+      songs: [...u.songs.entries()]
+        .sort(([, x], [, y]) => y.c - x.c)
+        .slice(0, USER_TOP_SONGS)
+        .map(([k, s]) => ({ k, c: s.c, r: s.r })),
+      artists: [...u.artists.entries()]
+        .sort(([, x], [, y]) => y.c - x.c)
+        .slice(0, USER_TOP_ARTISTS)
+        .map(([k, a]) => ({ k, n: a.n, c: a.c })),
+    };
+  }
+
+  const index: UserStatsIndex = { users, updatedAt };
+  trimToBudget(
+    index,
+    'user_stats',
+    () => Object.entries(index.users).sort(([, x], [, y]) => x.total - y.total),
+    ([did]) => { index.users[did].songs = []; },
+  );
+  return index;
+}
+
+/** Drop detail from the smallest entries until the payload fits INDEX_SIZE_BUDGET. */
+function trimToBudget<T>(
+  payload: unknown,
+  label: string,
+  candidates: () => T[],
+  strip: (entry: T) => void,
+): void {
+  if (JSON.stringify(payload).length <= INDEX_SIZE_BUDGET) return;
+  const ordered = candidates();
+  // Strip in chunks so the check costs at most ~20 serialisations, not one per entry.
+  const chunk = Math.max(1, Math.ceil(ordered.length / 20));
+  let stripped = 0;
+  for (let i = 0; i < ordered.length; i += chunk) {
+    for (let j = i; j < Math.min(i + chunk, ordered.length); j++) {
+      strip(ordered[j]);
+      stripped++;
+    }
+    if (JSON.stringify(payload).length <= INDEX_SIZE_BUDGET) break;
+  }
+  console.warn(`[scan] ${label} exceeded ${INDEX_SIZE_BUDGET} bytes; stripped detail from ${stripped} entries`);
 }
 
 // --- HOT CONTENT ---
