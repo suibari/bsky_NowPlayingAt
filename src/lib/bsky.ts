@@ -6,6 +6,7 @@ import type { Track as MusicTrack } from '$lib/music';
 import { type HistoryRecord, type PlaylistRecord, type ReactionRecord, type Track as SchemaTrack, type ConstellationRecord } from '$lib/schema';
 import type { AppBskyFeedPost, BlobRef } from '@atproto/api';
 import { Agent } from '@atproto/api';
+import { songKey } from '$shared/keys';
 
 export const NSID_HISTORY = 'com.suibari.nowplayingat.history';
 export const NSID_CONFIG = 'com.suibari.nowplayingat.config';
@@ -379,9 +380,4 @@ export async function hydrateReactions(records: ConstellationRecord[]): Promise<
 
 // Stable per-song key. Auto-posts (Last.fm) have no trackUri, so we key songs by
 // normalized artist::title and fall back to trackUri/subjectUri only if both empty.
-export function songKey(artist?: string, track?: string, fallback?: string): string {
-  const a = (artist || '').trim().toLowerCase();
-  const t = (track || '').trim().toLowerCase();
-  if (a || t) return `song:${a}::${t}`;
-  return fallback || '';
-}
+export { songKey };

@@ -4,13 +4,9 @@
 // unifies identical character-song renderings. We only strip Discogs disambiguation
 // noise (trailing `*` or `(N)`) which is a real cross-source mismatch.
 
-export function normalizeArtist(raw?: string): string {
-  if (!raw) return '';
-  let s = raw.normalize('NFKC');
-  // Discogs disambiguation: "Nirvana (2)" / "米津玄師*"
-  s = s.replace(/\s*\(\d+\)\s*$/, '').replace(/\*+\s*$/, '');
-  return s.replace(/\s+/g, ' ').trim().toLowerCase();
-}
+// normalizeArtist is shared with the web app (artist pages look keys up with it).
+import { normalizeArtist } from '../../shared/keys.js';
+export { normalizeArtist };
 
 export function normalizeTitle(raw?: string): string {
   if (!raw) return '';

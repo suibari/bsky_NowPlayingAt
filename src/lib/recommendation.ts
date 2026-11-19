@@ -5,17 +5,17 @@
 // Profiles are built server-side (poller getHotContent → KV 'user_profiles').
 // artistFreq/genreFreq keys are normalized & lowercased. songKeys is kept for
 // backward compatibility but is no longer used in scoring.
+import { normalizeArtist } from '$shared/keys';
+
 export type UserProfile = {
   songKeys: string[];
   genreFreq: Record<string, number>;
   artistFreq: Record<string, number>;
 };
 
-// Mirrors server-side normalizeArtist (normalize.ts): NFKC + Discogs strip + lowercase.
+// Same normalization the poller uses for KV artist keys (shared/keys.ts).
 export function normalizeArtistStr(raw: string): string {
-  let s = raw.normalize('NFKC');
-  s = s.replace(/\s*\(\d+\)\s*$/, '').replace(/\*+\s*$/, '');
-  return s.replace(/\s+/g, ' ').trim().toLowerCase();
+  return normalizeArtist(raw);
 }
 
 // Split compound artist strings on common delimiters (feat., ×, &, with, vs., ,).
