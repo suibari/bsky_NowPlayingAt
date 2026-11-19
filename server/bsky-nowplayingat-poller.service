@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 User=suibari
-WorkingDirectory=/home/suibari/work/bsky_nowplayingat/bsky_nowplayingat_server
-EnvironmentFile=/home/suibari/work/bsky_nowplayingat/bsky_nowplayingat_server/.env
+WorkingDirectory=/home/suibari/work/bsky_NowPlayingAt/server
+EnvironmentFile=/home/suibari/work/bsky_NowPlayingAt/server/.env
 ExecStart=/usr/bin/npx tsx src/index.ts
 Restart=always
 RestartSec=10
