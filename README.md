@@ -88,10 +88,12 @@ PDS はローカルの client metadata を取得できないため、本番の c
   ここで loopback client を使うとライブラリが `AuthMethodUnsatisfiableError` を投げ、
   セッション行が**削除される**（= 実ユーザーが強制サインアウトされる）。
 
-**ほかのユーザーの再生履歴の収集**は poller（`bsky_NowPlayingAt_server`）の
+**ほかのユーザーの再生履歴の収集**は poller（`server/`）の
 `NOWPLAYINGAT_API_URL` をローカルに向ければ動く：
 
 ```sh
+cd server
+npm install
 NOWPLAYINGAT_API_URL=http://127.0.0.1:5173 npm run dev
 ```
 
@@ -117,9 +119,9 @@ npm run seed:kv -- http://127.0.0.1:5174
 poller を掃引モードで一度走らせる（全ユーザーの PDS を読むので数分かかる）：
 
 ```sh
-cd ../bsky_NowPlayingAt_server
+cd server
 NOWPLAYINGAT_API_URL=http://127.0.0.1:5173 \
-NOWPLAYINGAT_SHARED_SECRET=<このリポジトリの .env と同じ値> \
+NOWPLAYINGAT_SHARED_SECRET=<ルートの .env と同じ値> \
   npx tsx src/index.ts --stats-only
 ```
 
