@@ -5,6 +5,8 @@ import { Agent } from '@atproto/api';
 import { NSID_HISTORY, NSID_CONFIG, NSID_REACTION, NSID_PLAYLIST } from './schema.js';
 import type { ReactionRecord, ConstellationRecord, PlaylistRecord } from './schema.js';
 import { recommendSongKey, normalizeArtist } from './normalize.js';
+import { songKey, artistShard, ARTIST_INDEX_SHARDS } from '../../shared/keys.js';
+import type { ArtistIndex as SharedArtistIndex, UserStatsIndex as SharedUserStatsIndex } from '../../shared/kvTypes.js';
 
 // --- PLAYLISTS ---
 
@@ -177,28 +179,8 @@ const ARTIST_TOP_LISTENERS = 20;
 const USER_TOP_SONGS = 12;   // report tab shows 5
 const USER_TOP_ARTISTS = 30; // profile shows 10 tags
 
-// The artist index is split across this many KV entries so a single artist page
-// only ever parses a quarter of it. Four shards at the 30-minute cadence is 192
-// writes/day, which together with snapshot/stats/user_stats stays well inside
-// the 1000 writes/day KV limit.
-const ARTIST_INDEX_SHARDS = 4;
-
 // Trim a payload if it would ever outgrow a comfortable KV value.
 const INDEX_SIZE_BUDGET = 2 * 1024 * 1024;
-
-/**
- * Which shard an artist key lives in. FNV-1a over the key: cheap, stable, and
- * mirrored byte for byte in the web app (src/lib/server/artists.ts) — both sides
- * must agree or lookups miss.
- */
-export function artistShard(key: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < key.length; i++) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h % ARTIST_INDEX_SHARDS;
-}
 
 /**
  * Keep only what a track card renders. Full history records carry genres,
@@ -219,36 +201,10 @@ function trimTrackRecord(v: any) {
   };
 }
 
-/** Cross-user artist aggregate. DIDs are interned into `dids` and referenced by index. */
-export interface ArtistIndex {
-  dids: string[];
-  artists: Record<string, {
-    n: string;                  // display name, casing of the most recent play
-    p: number;                  // total plays across every user
-    l: [number, number][];      // [didIndex, plays], desc — feed-hidden users excluded
-    t: {                        // representative tracks, plays desc
-      k: string;                // songKey
-      c: number;                // plays
-      d: number;                // didIndex of the representative record's owner
-      r: any;                   // trimmed representative (most recent) record
-    }[];
-  }>;
-  shard: number;
-  updatedAt: number;
-}
-
-/** Per-user aggregate: everything the profile page derives from a full history scan. */
-export interface UserStatsIndex {
-  users: Record<string, {
-    total: number;
-    rkey: string;               // watermark: newest history rkey counted here
-    hourlyUtc: number[];        // 24 slots, bucketed by UTC hour
-    genreFreq: Record<string, number>;
-    songs: { k: string; c: number; r: any }[];
-    artists: { k: string; n: string; c: number }[];
-  }>;
-  updatedAt: number;
-}
+// KV entry shapes live in shared/kvTypes.ts; the poller fills the record slot
+// with raw (trimmed) PDS records.
+export type ArtistIndex = SharedArtistIndex<any>;
+export type UserStatsIndex = SharedUserStatsIndex<any>;
 
 export interface ScanResult {
   stats: { totalPlays: number; daily: Record<string, number>; updatedAt: number };
@@ -535,12 +491,7 @@ function trimToBudget<T>(
 
 // --- HOT CONTENT ---
 
-export function songKey(artist?: string, track?: string, fallback?: string): string {
-  const a = (artist || '').trim().toLowerCase();
-  const t = (track || '').trim().toLowerCase();
-  if (a || t) return `song:${a}::${t}`;
-  return fallback || '';
-}
+export { songKey };
 
 const HOT_RANK_MS = 3 * 24 * 60 * 60 * 1000;    // 曲・ユーザーランキング集計期間（3日）
 const HOT_HISTORY_MS = 7 * 24 * 60 * 60 * 1000; // 推薦プロファイル・タイムラインスキャン期間（7日）

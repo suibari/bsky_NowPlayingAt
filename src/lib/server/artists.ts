@@ -1,31 +1,22 @@
 // Cross-user artist index stored in KV under the `artists` key.
 //
-// Built by the poller (bsky_nowplayingat_server, scanAllHistory) from the same
+// Built by the poller (server/src/bsky.ts, scanAllHistory) from the same
 // full PDS sweep that produces `stats`. Nothing here is a source of truth: every
 // field is a pure derivation of history records living in users' own PDSs, and
-// the whole entry is rebuilt from scratch every 30 minutes.
+// the whole entry is rebuilt from scratch every hour.
 //
 // The index is split across ARTIST_INDEX_SHARDS KV entries (`artists_0` …) so a
 // single artist page only parses a fraction of it. Each shard interns its own
 // DIDs into `dids` and references them by index; `/api/artists` unwraps that
 // before responding, so clients never see the indices.
 import type { HistoryRecord } from '$lib/schema';
+import type {
+  ArtistIndex as SharedArtistIndex,
+  ArtistIndexEntry as SharedArtistIndexEntry,
+  ArtistIndexTrack as SharedArtistIndexTrack,
+} from '$shared/kvTypes';
 
-export const ARTIST_INDEX_SHARDS = 4;
-
-/**
- * Which shard an artist key lives in. FNV-1a over the key — mirrored byte for
- * byte from the poller's `artistShard` (bsky_nowplayingat_server/src/bsky.ts).
- * Both sides must agree or every lookup misses.
- */
-export function artistShard(key: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < key.length; i++) {
-    h ^= key.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h % ARTIST_INDEX_SHARDS;
-}
+export { ARTIST_INDEX_SHARDS, artistShard } from '$shared/keys';
 
 /**
  * A representative play, trimmed to what a track card renders. Genres, comments,
@@ -35,26 +26,9 @@ export function artistShard(key: string): number {
 export type ArtistTrackRecord = Pick<HistoryRecord, 'track' | 'artist'> &
   Partial<Pick<HistoryRecord, 'album' | 'img' | 'imgBlob' | 'trackUri' | 'postUri' | 'provider'>>;
 
-export interface ArtistIndexTrack {
-  k: string;   // songKey
-  c: number;   // plays across every user
-  d: number;   // didIndex of the representative record's owner
-  r: ArtistTrackRecord;
-}
-
-export interface ArtistIndexEntry {
-  n: string;               // display name, casing of the most recent play
-  p: number;               // total plays across every user
-  l: [number, number][];   // [didIndex, plays], desc — feed-hidden users excluded
-  t: ArtistIndexTrack[];   // representative tracks, plays desc
-}
-
-export interface ArtistIndex {
-  dids: string[];
-  artists: Record<string, ArtistIndexEntry>;
-  shard: number;
-  updatedAt: number;
-}
+export type ArtistIndexTrack = SharedArtistIndexTrack<ArtistTrackRecord>;
+export type ArtistIndexEntry = SharedArtistIndexEntry<ArtistTrackRecord>;
+export type ArtistIndex = SharedArtistIndex<ArtistTrackRecord>;
 
 // --- response shape (indices resolved) ---
 
